@@ -82,7 +82,6 @@ const STORAGE_KEY = 'randomander:state:v2'
 const MAX_HISTORY = 40
 const MAX_SAVED = 40
 const MAX_ATTEMPTS = 24
-const PAGE_SIZE = 175
 
 export const modes = [
   {
@@ -540,7 +539,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     const picked: string[] = []
     for (let i = 0; i < target; i += 1) {
       const index = Math.floor(Math.random() * available.length)
-      picked.push(available.splice(index, 1)[0])
+      picked.push(available.splice(index, 1)[0]!)
     }
     return picked
   }
