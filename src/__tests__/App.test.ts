@@ -122,4 +122,36 @@ describe('Randomander', () => {
     expect(results).toHaveLength(3)
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
+
+  it('shows loading overlay while fetching cards', async () => {
+    let resolveCard: (value: Response) => void
+    const cardPromise = new Promise<Response>((resolve) => {
+      resolveCard = resolve
+    })
+    
+    const fetchMock = vi.fn(() => cardPromise)
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(App, {
+      global: {
+        plugins: [createPinia()],
+      },
+    })
+    const user = userEvent.setup()
+    const randomizeButton = screen.getByRole('button', { name: /^randomize$/i })
+    await user.click(randomizeButton)
+
+    // Verify loading overlay appears
+    expect(screen.getByRole('status', { name: /loading cards/i })).toBeInTheDocument()
+    expect(screen.getByText('Shuffling cards...')).toBeInTheDocument()
+
+    // Resolve the fetch and verify overlay disappears
+    resolveCard!(mockResponse(createCard()))
+    await screen.findAllByText('Atraxa, Praetors Voice')
+    
+    // Wait for the loading overlay to disappear (transition takes time)
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('status', { name: /loading cards/i })).not.toBeInTheDocument()
+    })
+  })
 })
