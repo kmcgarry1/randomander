@@ -44,7 +44,7 @@ const extractTags = (data: EdhrecResponse): EdhrecTag[] => {
     acc.push({
       label: item.value,
       href,
-      count: slugMatch ? countMap.get(slugMatch[1]) : undefined,
+      count: slugMatch ? countMap.get(slugMatch[1]!) : undefined,
     })
     return acc
   }, [])

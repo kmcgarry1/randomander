@@ -53,7 +53,7 @@ export const pruneCache = (maxEntries: number) => {
   const keys = Object.keys(cacheState.entries)
   if (keys.length <= maxEntries) return
   const ordered = keys
-    .map((key) => ({ key, updatedAt: cacheState.entries[key].updatedAt }))
+    .map((key) => ({ key, updatedAt: cacheState.entries[key]?.updatedAt ?? 0 }))
     .sort((a, b) => a.updatedAt - b.updatedAt)
   const removeCount = Math.max(0, ordered.length - maxEntries)
   ordered.slice(0, removeCount).forEach(({ key }) => {

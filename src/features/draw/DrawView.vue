@@ -33,11 +33,6 @@ const {
   partnerButtonLabel,
 } = storeToRefs(store);
 
-const galleryGroups = computed(() => {
-  if (isChoiceMode.value) return choices.value.map((choice) => choice.cards);
-  return cards.value.length ? [cards.value] : [];
-});
-
 const galleryLayoutClass = computed(() => {
   const count = galleryItemCount.value;
   if (count <= 1) return "flex justify-center";
@@ -270,7 +265,7 @@ const setMode = (next: Mode) => {
               <div class="mt-6 grid gap-6">
                 <div class="grid gap-6 sm:grid-cols-2">
                   <article
-                    v-for="(card, cardIndex) in choice.cards"
+                    v-for="card in choice.cards"
                     :key="card.id"
                     class="group rounded-3xl transition duration-300 hover:-translate-y-1 hover:scale-[1.01]"
                   >
@@ -359,11 +354,11 @@ const setMode = (next: Mode) => {
                       v-if="
                         getTaggableCards(choice.cards)[0] &&
                         hasTagEntry(
-                          getTaggableCards(choice.cards)[0],
+                          getTaggableCards(choice.cards)[0]!,
                           choice.cards,
                         ) &&
                         getTagLabel(
-                          getTaggableCards(choice.cards)[0],
+                          getTaggableCards(choice.cards)[0]!,
                           choice.cards,
                         ).length
                       "
@@ -371,7 +366,7 @@ const setMode = (next: Mode) => {
                     >
                       <a
                         v-for="tag in getTagLabel(
-                          getTaggableCards(choice.cards)[0],
+                          getTaggableCards(choice.cards)[0]!,
                           choice.cards,
                         )"
                         :key="tag.href"
@@ -387,7 +382,7 @@ const setMode = (next: Mode) => {
                       v-else-if="
                         getTaggableCards(choice.cards)[0] &&
                         hasTagEntry(
-                          getTaggableCards(choice.cards)[0],
+                          getTaggableCards(choice.cards)[0]!,
                           choice.cards,
                         )
                       "

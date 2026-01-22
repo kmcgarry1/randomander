@@ -73,5 +73,9 @@ export const fetchRankedRandomCard = async (
     lowerBound +
     Math.floor(Math.random() * Math.max(1, pageData.data.length - lowerBound))
 
-  return pageData.data[index]
+  const card = pageData.data[index]
+  if (!card) {
+    throw new Error('No card found at the selected index.')
+  }
+  return card
 }
