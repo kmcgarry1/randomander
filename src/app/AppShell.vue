@@ -8,12 +8,13 @@ import SavedView from '../features/saved/SavedView.vue'
 import SettingsView from '../features/settings/SettingsView.vue'
 import OptionsModal from '../components/layout/OptionsModal.vue'
 import ActionBar from '../components/layout/ActionBar.vue'
+import LoadingOverlay from '../components/layout/LoadingOverlay.vue'
 import { useTheme } from '../composables/useTheme'
 
 useTheme()
 
 const store = useRandomanderStore()
-const { view, display, isOptionsOpen, isFirstLoad } = storeToRefs(store)
+const { view, display, isOptionsOpen, isFirstLoad, isLoading } = storeToRefs(store)
 
 const navItems: Array<{ id: ViewKey; label: string; description: string }> = [
   { id: 'draw', label: 'Draw', description: 'Randomizer' },
@@ -110,5 +111,6 @@ const openOptions = () => {
 
     <ActionBar v-if="showActionBar" />
     <OptionsModal v-if="isOptionsOpen" />
+    <LoadingOverlay :is-loading="isLoading" />
   </div>
 </template>
