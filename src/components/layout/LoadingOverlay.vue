@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-
-const props = defineProps<{
+defineProps<{
   isLoading: boolean
 }>()
-
-const show = computed(() => props.isLoading)
 </script>
 
 <template>
@@ -18,7 +14,7 @@ const show = computed(() => props.isLoading)
     leave-to-class="opacity-0"
   >
     <div
-      v-if="show"
+      v-if="isLoading"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm dark:bg-slate-950/50"
       role="status"
       aria-live="polite"
