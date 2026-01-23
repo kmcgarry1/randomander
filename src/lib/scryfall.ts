@@ -129,7 +129,9 @@ const normalizePartnerVariant = (variant: string) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-const PARTNER_VARIANT_REGEX = /partner\s*[-—–]{1,2}\s*([^\n(]+)/i
+// Match "partner—<variant>" allowing one or more dash-like characters (hyphen, en, em)
+// to be robust to minor formatting differences in oracle text.
+const PARTNER_VARIANT_REGEX = /partner\s*[-—–]+\s*([^\n(]+)/i
 
 export const getPartnerVariant = (card: ScryfallCard) => {
   const oracle = getOracleText(card)
