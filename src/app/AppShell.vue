@@ -146,7 +146,7 @@ const selectView = (next: ViewKey) => {
           <button
             type="button"
             class="w-full rounded-[1.5rem] bg-purple-600 px-4 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-purple-300"
-            aria-label="Randomize"
+            :aria-label="isLoading ? 'Shuffling (mobile)' : 'Randomize (mobile)'"
             :disabled="isLoading"
             @click="handleRandomize"
           >
