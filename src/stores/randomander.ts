@@ -475,7 +475,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     if (display.usePairTags && isPairGroup(group)) {
       return getPairSlug(group)
     }
-    return slugify(card.name)
+    return getCardSlug(card)
   }
 
   const shouldRenderTagPanel = (card: ScryfallCard) =>
@@ -919,7 +919,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       if (display.usePairTags && isPairGroup(group)) {
         if (group.some((card) => usesCommanderLink(card))) {
           const pairSlug = getPairSlug(group)
-          const orderedSlug = group.map((card) => slugify(card.name)).join('-')
+          const orderedSlug = group.map((card) => getCardSlug(card)).join('-')
           const candidates = orderedSlug === pairSlug ? [pairSlug] : [pairSlug, orderedSlug]
           targets.set(pairSlug, candidates)
         }
@@ -927,7 +927,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       }
       group.forEach((card) => {
         if (!shouldShowTags(card)) return
-        const slug = slugify(card.name)
+          const slug = getCardSlug(card)
         targets.set(slug, [slug])
       })
     })
