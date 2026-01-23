@@ -93,7 +93,7 @@ const partnerSlug = computed(() => {
 });
 
 const partnerLinkUrl = computed(() =>
-  partnerSlug.value ? `https://edhrec.com/commanders/${partnerSlug.value}` : null,
+  partnerSlug.value ? `https://edhrec.com/commanders/${partnerSlug.value}` : undefined,
 );
 
 const partnerCardsAreCommanders = computed(
@@ -105,7 +105,7 @@ const showPartnerLink = computed(
   () =>
     display.value.showLinks &&
     mode.value !== 'spark' &&
-    partnerLinkUrl.value !== null &&
+    partnerLinkUrl.value != null &&
     partnerCardsAreCommanders.value,
 );
 

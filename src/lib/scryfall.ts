@@ -75,7 +75,10 @@ export const slugify = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 
-const getNameBeforeSlash = (name: string) => name.split('//')[0].trim()
+const getNameBeforeSlash = (name: string) => {
+  const [first = ''] = name.split('//')
+  return first.trim()
+}
 
 export const getCanonicalName = (card: ScryfallCard) =>
   getNameBeforeSlash(card.name)
