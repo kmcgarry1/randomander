@@ -52,6 +52,12 @@ const props = defineProps({
 });
 
 const store = useRandomanderStore();
+
+// Helper function to get deck count for a card, avoiding double lookups
+const getDeckCount = (card: ScryfallCard) => {
+  if (!store.shouldShowTags(card)) return null;
+  return store.getDeckCountForCard(card, props.heroGroup);
+};
 </script>
 
 <template>
@@ -166,14 +172,10 @@ const store = useRandomanderStore();
                   {{ formatColorIdentity(card.color_identity) }}
                 </p>
                 <p
-                  v-if="store.shouldShowTags(card) && store.getDeckCountForCard(card, heroGroup)"
+                  v-if="getDeckCount(card) != null"
                   class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400"
                 >
-                  {{
-                    store
-                      .getDeckCountForCard(card, heroGroup)
-                      ?.toLocaleString()
-                  }}
+                  {{ getDeckCount(card)?.toLocaleString() }}
                   EDHREC decks
                 </p>
               </div>

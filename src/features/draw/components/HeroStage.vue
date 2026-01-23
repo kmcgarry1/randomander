@@ -5,7 +5,7 @@ import { getCardImageUrl } from "../../../lib/scryfall";
 
 const props = defineProps({
   stageTitle: { type: String, required: true },
-  heroCardName: { type: String, default: null },
+  heroCardName: { type: String, default: "" },
   heroSubtitle: { type: String, default: "" },
   heroCards: { type: Array as PropType<ScryfallCard[]>, required: true },
   isLoading: { type: Boolean, required: true },
@@ -45,7 +45,18 @@ const handleRandomize = () => emit("randomize");
             class="aspect-[63/88] w-[220px] overflow-hidden rounded-[1.4rem] border border-white/10 bg-slate-900/80 shadow-[0_10px_40px_-18px_rgba(0,0,0,0.7)]"
             role="listitem"
           >
-            <img :src="getCardImageUrl(card)" :alt="card.name" class="h-full w-full object-cover" />
+            <img
+              v-if="getCardImageUrl(card)"
+              :src="getCardImageUrl(card)"
+              :alt="card.name"
+              class="h-full w-full object-cover"
+            />
+            <div
+              v-else
+              class="flex h-full w-full items-center justify-center bg-slate-900/60 text-[0.65rem] uppercase tracking-[0.3em] text-slate-500"
+            >
+              No image
+            </div>
           </article>
         </div>
         <button
