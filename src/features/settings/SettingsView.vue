@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRandomanderStore, type ThemeMode, type DisplaySettings } from '../../stores/randomander'
 
 const store = useRandomanderStore()
-const { display, theme, cacheSettings, history, saved } = storeToRefs(store)
+const { display, theme, cacheSettings, history, saved, view } = storeToRefs(store)
 
 type DisplayKey = keyof DisplaySettings
 
@@ -33,15 +33,26 @@ const setTheme = (value: ThemeMode) => {
 const clearCache = () => {
   store.clearNetworkCache()
 }
+
+const exitSettings = () => {
+  view.value = 'draw'
+}
 </script>
 
 <template>
   <section class="mt-6 space-y-6">
-    <header>
+    <header class="flex items-center justify-between gap-4">
       <p class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">
         Preferences
       </p>
       <h2 class="font-heading text-2xl text-slate-900 dark:text-white">Settings</h2>
+      <button
+        type="button"
+        class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-400 dark:hover:bg-slate-800"
+        @click="exitSettings"
+      >
+        Back
+      </button>
     </header>
 
     <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">

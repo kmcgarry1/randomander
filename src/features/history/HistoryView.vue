@@ -45,6 +45,10 @@ const getGroups = (record: PullRecord) =>
 const getGroupLabel = (cards: PullRecord['cards']) =>
   cards.map((card) => card.name).join(' + ')
 
+const handleBack = () => {
+  store.view = 'draw'
+}
+
 const handleLoad = (record: PullRecord) => {
   store.loadRecord(record)
 }
@@ -72,7 +76,7 @@ const handleClear = () => {
           Entries stored locally on this device.
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
           class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -80,6 +84,13 @@ const handleClear = () => {
           @click="handleClear"
         >
           Clear history
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-white/30 bg-slate-900/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-slate-900/90 dark:border-slate-100/40 dark:bg-slate-900"
+          @click="handleBack"
+        >
+          Back to draw
         </button>
         <span class="text-[0.65rem] font-semibold text-slate-500 dark:text-slate-400">
           Reset view to start over

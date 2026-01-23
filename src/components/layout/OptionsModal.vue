@@ -6,13 +6,23 @@ import {
   colorOptions,
   modes,
   useRandomanderStore,
+  viewNavItems,
   type ColorCount,
   type Mode,
+  type ViewKey,
 } from '../../stores/randomander'
 import { formatColorIdentity } from '../../lib/scryfall'
 
 const store = useRandomanderStore()
-const { mode, options } = storeToRefs(store)
+const {
+  mode,
+  options,
+  view,
+} = storeToRefs(store)
+
+const selectView = (next: ViewKey) => {
+  view.value = next
+}
 
 const selectMode = (next: Mode) => {
   mode.value = next
@@ -54,6 +64,7 @@ const close = () => {
 const resetFilters = () => {
   store.resetOptions()
 }
+
 </script>
 
 <template>
@@ -86,9 +97,34 @@ const resetFilters = () => {
         </button>
       </div>
 
+        <div class="mt-5 rounded-2xl border border-violet-200/60 bg-gradient-to-br from-violet-50/80 to-white/80 p-4 text-sm text-slate-600 shadow-sm dark:border-violet-400/70 dark:bg-violet-900/60 dark:text-slate-200">
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-violet-200">
+            Quick note
+          </p>
+          <p class="mt-1">
+            Mix modes, color chips, and deck popularity filters without leaving the draw view.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">
+            <button
+              v-for="item in viewNavItems"
+              :key="item.id"
+              type="button"
+              class="rounded-full px-3 py-1 transition"
+              :class="
+                view === item.id
+                  ? 'bg-slate-900/90 text-white dark:bg-white dark:text-slate-900'
+                  : 'text-slate-500 hover:text-slate-900/80 dark:hover:text-white/80'
+              "
+              @click="selectView(item.id)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
+        </div>
+
         <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section
-            class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+            class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
           >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Mode
@@ -125,7 +161,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Color focus
@@ -163,7 +199,7 @@ const resetFilters = () => {
 
         <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section
-          class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             {{ store.colorLabel }}
@@ -187,7 +223,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Deck popularity
@@ -228,7 +264,7 @@ const resetFilters = () => {
 
       <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section
-          class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Choice mode
@@ -248,7 +284,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Spark extras

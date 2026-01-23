@@ -39,6 +39,7 @@ export type OptionsState = {
   twoChoices: boolean
   excludeGameChangers: boolean
   useRankCutoff: boolean
+  colorCountMode: 'up-to' | 'exactly'
 }
 
 export type DisplaySettings = {
@@ -100,6 +101,13 @@ export const modes = [
     label: '3-card spark',
     description: 'Three random Commander-legal cards.',
   },
+] as const
+
+export const viewNavItems: Array<{ id: ViewKey; label: string }> = [
+  { id: 'draw', label: 'Draw' },
+  { id: 'history', label: 'History' },
+  { id: 'saved', label: 'Saved' },
+  { id: 'settings', label: 'Settings' },
 ] as const
 
 export const colorOptions = [
@@ -166,18 +174,19 @@ const defaultOptions: OptionsState = {
   twoChoices: false,
   excludeGameChangers: false,
   useRankCutoff: false,
+  colorCountMode: 'up-to',
 }
 
 const defaultDisplay: DisplaySettings = {
-  showHeader: true,
-  showStatus: true,
-  showChips: true,
+  showHeader: false,
+  showStatus: false,
+  showChips: false,
   showCardTitles: true,
   showColorIdentity: true,
   showLinks: true,
   showTags: true,
   usePairTags: true,
-  showAmbient: true,
+  showAmbient: false,
 }
 
 const defaultCache: CacheSettings = {
@@ -258,6 +267,18 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const colorCountNumber = computed(() =>
     options.colorCount === 'any' ? null : Number(options.colorCount)
   )
+
+  const formatColorCountLabel = (
+    value: ColorCount,
+    comparison: 'up-to' | 'exactly'
+  ) => {
+    if (value === 'any') return 'any colors'
+    if (value === '0') return 'Colorless only'
+    const count = Number(value)
+    const prefix = comparison === 'exactly' ? 'Exactly' : 'Up to'
+    const plural = count === 1 ? 'color' : 'colors'
+    return `${prefix} ${count} ${plural}`
+  }
   const selectedColorSet = computed(
     () => new Set(options.selectedColors.map((color) => color.toUpperCase()))
   )
@@ -277,15 +298,10 @@ export const useRandomanderStore = defineStore('randomander', () => {
     if (options.colorCount === 'any') {
       return selection ? `any colors ${selection}` : 'any colors'
     }
-    const count = Number(options.colorCount)
-    if (mode.value === 'commander') {
-      const base =
-        colorOptions.find((option) => option.value === options.colorCount)
-          ?.label ?? 'Any colors'
-      return selection ? `${base} ${selection}` : base
-    }
-    if (count === 0) return 'colorless only'
-    const base = `up to ${count} color${count === 1 ? '' : 's'}`
+    const base = formatColorCountLabel(
+      options.colorCount,
+      options.colorCountMode
+    )
     return selection ? `${base} ${selection}` : base
   })
 
@@ -412,17 +428,28 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   const colorIdentityQuery = computed(() => {
     if (options.selectedColors.length === 0) return ''
-    const colors = options.selectedColors
-      .map((color) => color.toUpperCase())
-      .filter((color) => color !== 'C')
-    const hasColorless = options.selectedColors.some(
-      (color) => color.toUpperCase() === 'C'
-    )
-    if (colors.length === 0 && hasColorless) return 'ci:c'
-    if (colors.length === 0) return ''
-    const colorString = colors.join('').toLowerCase()
-    const base = `ci<=${colorString}`
-    return hasColorless ? `(${base} or ci:c)` : base
+    const normalized = options.selectedColors.map((color) => color.toUpperCase())
+    const hasColorless = normalized.includes('C')
+    const palette = normalized.filter((color) => color !== 'C')
+    const colorString = palette.join('').toLowerCase()
+
+    // If only colorless is selected, just return colorless identity.
+    if (!colorString && hasColorless) {
+      return 'ci:c'
+    }
+
+    // Build base query depending on "exactly" vs "up to" color-count mode.
+    const baseQuery =
+      options.colorCountMode === 'exactly'
+        ? `ci=${colorString}`
+        : `ci<=${colorString}`
+
+    // If colorless is also selected alongside other colors, include it explicitly.
+    if (hasColorless) {
+      return `(${baseQuery} or ci:c)`
+    }
+
+    return baseQuery
   })
 
   const commanderQuery = computed(() =>
@@ -448,6 +475,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
   const backgroundQuery = computed(() =>
     joinQuery('type:background legal:commander', colorIdentityQuery.value)
+  )
+  const chooseBackgroundCommanderQuery = computed(() =>
+    joinQuery('is:commander legal:commander o:"choose a background"', colorIdentityQuery.value)
   )
 
   const usesCommanderLink = (card: ScryfallCard) => {
@@ -488,11 +518,19 @@ export const useRandomanderStore = defineStore('randomander', () => {
       getTagKeyForCard(card, group)
     )
 
+  const getDeckCountForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
+    const key = getTagKeyForCard(card, group)
+    return metaCache.get(key)?.deckCount ?? null
+  }
+
   const matchesColorCount = (card: ScryfallCard) => {
     const expected = colorCountNumber.value
     if (expected === null) return true
     const actual = card.color_identity?.length ?? 0
-    return actual === expected
+    if (options.colorCountMode === 'exactly' || expected === 0) {
+      return actual === expected
+    }
+    return actual <= expected
   }
 
   const matchesSelectedColors = (card: ScryfallCard) => {
@@ -913,6 +951,43 @@ export const useRandomanderStore = defineStore('randomander', () => {
     }
   }
 
+  const randomizeCommanderForBackground = async () => {
+    const background = primaryCard.value
+    if (!background || !getTypeLine(background).toLowerCase().includes('background')) {
+      return
+    }
+    errorMessage.value = ''
+    const current = new AbortController()
+    controller.value?.abort()
+    controller.value = current
+    isLoading.value = true
+    try {
+      const commander = await fetchCardMatchingFilters(
+        current.signal,
+        chooseBackgroundCommanderQuery.value,
+        {
+          applyColorFilter: true,
+          extraFilter: matchesSelectedColors,
+          asyncFilter: passesDeckLimit,
+          useRankedRandom: options.useRankCutoff,
+        }
+      )
+      cards.value = [commander, background]
+      choices.value = []
+      addHistory(buildRecord(cards.value))
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return
+      }
+      errorMessage.value =
+        error instanceof Error ? error.message : 'Unable to fetch a commander.'
+    } finally {
+      if (controller.value === current) {
+        isLoading.value = false
+      }
+    }
+  }
+
   const loadTagsForGroups = async (groups: ScryfallCard[][]) => {
     if (!display.showTags || mode.value === 'spark') return
     const targets = new Map<string, string[]>()
@@ -991,6 +1066,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     [
       () => mode.value,
       () => options.colorCount,
+      () => options.colorCountMode,
       () => options.excludeGameChangers,
       () => options.selectedColors,
       () => options.limitByDecks,
@@ -1078,11 +1154,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
 
   const getColorOptionLabel = (option: { value: ColorCount; label: string }) => {
-    if (mode.value === 'commander') return option.label
     if (option.value === 'any') return 'Any colors'
-    const count = Number(option.value)
-    if (count === 0) return 'Colorless only'
-    return `Up to ${count} color${count === 1 ? '' : 's'}`
+    return formatColorCountLabel(option.value, options.colorCountMode)
   }
 
   return {
@@ -1131,6 +1204,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     shouldRenderTagPanel,
     getTagsForCard,
     hasTagEntry,
+    getDeckCountForCard,
     getPartnerButtonLabel,
     getColorOptionLabel,
     randomize,
@@ -1151,5 +1225,6 @@ export const useRandomanderStore = defineStore('randomander', () => {
     getTypeLine,
     getTagKeyForCard,
     getPartnerSlugForGroup,
+    randomizeCommanderForBackground,
   }
 })
