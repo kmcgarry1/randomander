@@ -2,7 +2,9 @@ import { defineStore } from 'pinia'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import {
   formatColorIdentity,
+  getCardSlug,
   getPartnerKind,
+  getPartnerVariant,
   getPartnerWithName,
   getTypeLine,
   slugify,
@@ -462,9 +464,12 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const isPairGroup = (group: ScryfallCard[]) => group.length === 2
   const getPairSlug = (group: ScryfallCard[]) =>
     group
-      .map((card) => slugify(card.name))
-      .sort()
+      .map((card) => getCardSlug(card))
+      .sort((a, b) => a.localeCompare(b))
       .join('-')
+
+  const getPartnerSlugForGroup = (group: ScryfallCard[]) =>
+    getPairSlug(group)
 
   const getTagKeyForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
     if (display.usePairTags && isPairGroup(group)) {
@@ -562,7 +567,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     if (!Number.isFinite(options.maxDecks) || options.maxDecks <= 0) return true
     if (options.useRankCutoff) return true
     if (mode.value === 'spark') return true
-    const meta = await getEdhrecMeta(slugify(card.name), signal)
+    const meta = await getEdhrecMeta(getCardSlug(card), signal)
     if (meta.deckCount === null) {
       throw new Error('EDHREC deck counts are unavailable for this commander.')
     }
@@ -605,6 +610,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   ) => {
     const partnerKind = getPartnerKind(primary)
     if (!partnerKind) return null
+    const variant = getPartnerVariant(primary)
     if (partnerKind === 'partner_with') {
       const partnerName = getPartnerWithName(primary)
       if (!partnerName) {
@@ -650,6 +656,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       extraFilter: (card) =>
         card.id !== primary.id &&
         getPartnerKind(card) === 'partner' &&
+        getPartnerVariant(card) === variant &&
         isWithinMaxColors([primary, card], maxColors) &&
         isWithinSelectedColors([primary, card]),
       asyncFilter: passesDeckLimit,
@@ -1140,5 +1147,6 @@ export const useRandomanderStore = defineStore('randomander', () => {
     formatColorIdentity,
     getTypeLine,
     getTagKeyForCard,
+    getPartnerSlugForGroup,
   }
 })

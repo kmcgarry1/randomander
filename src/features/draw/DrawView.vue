@@ -86,6 +86,29 @@ const galleryItemCount = computed(
 
 const primaryTagCard = computed(() => getTaggableCards(cards.value)[0] ?? null);
 
+const partnerSlug = computed(() => {
+  if (cards.value.length !== 2) return null;
+  const slug = store.getPartnerSlugForGroup(cards.value);
+  return slug?.length ? slug : null;
+});
+
+const partnerLinkUrl = computed(() =>
+  partnerSlug.value ? `https://edhrec.com/commanders/${partnerSlug.value}` : null,
+);
+
+const partnerCardsAreCommanders = computed(
+  () =>
+    cards.value.length === 2 && cards.value.every((card) => store.usesCommanderLink(card)),
+);
+
+const showPartnerLink = computed(
+  () =>
+    display.value.showLinks &&
+    mode.value !== 'spark' &&
+    partnerLinkUrl.value !== null &&
+    partnerCardsAreCommanders.value,
+);
+
 const canRandomizeChoicePartner = (card: ScryfallCard) =>
   getPartnerKind(card) !== null;
 
@@ -608,6 +631,16 @@ const setMode = (next: Mode) => {
                   </div>
                 </div>
               </article>
+            </div>
+            <div v-if="showPartnerLink" class="mt-4 flex justify-center">
+              <a
+                class="rounded-full border border-slate-200 bg-white px-4 py-1 text-[0.65rem] font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                :href="partnerLinkUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                EDHREC partners
+              </a>
             </div>
           </div>
         </div>

@@ -75,11 +75,18 @@ export const slugify = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 
+const getNameBeforeSlash = (name: string) => name.split('//')[0].trim()
+
+export const getCanonicalName = (card: ScryfallCard) =>
+  getNameBeforeSlash(card.name)
+
+export const getCardSlug = (card: ScryfallCard) => slugify(getCanonicalName(card))
+
 export const getEdhrecCommanderUrl = (card: ScryfallCard) =>
-  `https://edhrec.com/commanders/${slugify(card.name)}`
+  `https://edhrec.com/commanders/${getCardSlug(card)}`
 
 export const getEdhrecCardUrl = (card: ScryfallCard) =>
-  `https://edhrec.com/cards/${slugify(card.name)}`
+  `https://edhrec.com/cards/${getCardSlug(card)}`
 
 export type PartnerKind =
   | 'partner_with'
@@ -110,4 +117,21 @@ export const getPartnerWithName = (card: ScryfallCard) => {
   const oracle = getOracleText(card)
   const match = oracle.match(/Partner with ([^(.\n]+)/i)
   return match?.[1]?.trim() ?? null
+}
+
+const normalizePartnerVariant = (variant: string) =>
+  variant
+    .toLowerCase()
+    .replace(/[.,:;]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const PARTNER_VARIANT_REGEX = /partner\s*[-—–]{1,2}\s*([^\n(]+)/i
+
+export const getPartnerVariant = (card: ScryfallCard) => {
+  const oracle = getOracleText(card)
+  const match = oracle.match(PARTNER_VARIANT_REGEX)
+  if (!match?.[1]) return null
+  const normalized = normalizePartnerVariant(match[1])
+  return normalized.length > 0 ? normalized : null
 }
