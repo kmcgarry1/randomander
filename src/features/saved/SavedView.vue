@@ -57,21 +57,31 @@ const handleClear = () => {
 
 <template>
   <section class="mt-6 space-y-6">
-    <header class="flex flex-wrap items-center justify-between gap-4">
+    <header
+      class="sticky top-6 z-20 -mx-4 flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white/90 px-4 py-4 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 sm:-mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6"
+    >
       <div>
         <p class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">
           Favorites
         </p>
         <h2 class="font-heading text-2xl text-slate-900 dark:text-white">Saved pulls</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          Favorites are stored locally for quick recall.
+        </p>
       </div>
-      <button
-        type="button"
-        class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-        :disabled="saved.length === 0"
-        @click="handleClear"
-      >
-        Clear saved
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          :disabled="saved.length === 0"
+          @click="handleClear"
+        >
+          Clear saved
+        </button>
+        <span class="text-[0.65rem] font-semibold text-slate-500 dark:text-slate-400">
+          Clean slate for new favorites
+        </span>
+      </div>
     </header>
 
     <div v-if="saved.length === 0" class="rounded-3xl border border-slate-200/80 bg-white/80 p-10 text-center dark:border-slate-700/60 dark:bg-slate-900/80">

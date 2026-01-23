@@ -68,12 +68,14 @@ export const formatColorIdentity = (colors?: string[]) => {
   return names.join(', ')
 }
 
-export const slugify = (name: string) =>
-  name
+export const slugify = (name: string) => {
+  const baseName = name.split(/\s*\/\/\s*/)[0]
+  return baseName
     .toLowerCase()
     .replace(/[\u2019']/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
+}
 
 export const getEdhrecCommanderUrl = (card: ScryfallCard) =>
   `https://edhrec.com/commanders/${slugify(card.name)}`
