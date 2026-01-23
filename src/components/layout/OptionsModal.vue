@@ -26,7 +26,9 @@ const sortColors = (colors: string[]) =>
   COLOR_CHOICES.map((choice) => choice.symbol).filter((symbol) => colors.includes(symbol))
 
 const toggleColor = (symbol: string) => {
-  const next = new Set(options.value.selectedColors.map((color) => color.toUpperCase()))
+  const next = new Set<string>(
+    options.value.selectedColors.map((color: string) => color.toUpperCase())
+  )
   if (next.has(symbol)) {
     next.delete(symbol)
   } else {

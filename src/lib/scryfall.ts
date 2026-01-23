@@ -15,6 +15,7 @@ export type ScryfallCard = {
     image_uris?: {
       normal?: string
     }
+    name?: string
   }>
   all_parts?: Array<{
     id: string
@@ -75,11 +76,24 @@ export const slugify = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 
+const getNameBeforeSlash = (name: string) => {
+  const [first = ''] = name.split('//')
+  return first.trim()
+}
+
+export const getCanonicalName = (card: ScryfallCard) => {
+  const frontFaceName = card.card_faces?.[0]?.name
+  if (frontFaceName) return frontFaceName
+  return getNameBeforeSlash(card.name)
+}
+
+export const getCardSlug = (card: ScryfallCard) => slugify(getCanonicalName(card))
+
 export const getEdhrecCommanderUrl = (card: ScryfallCard) =>
-  `https://edhrec.com/commanders/${slugify(card.name)}`
+  `https://edhrec.com/commanders/${getCardSlug(card)}`
 
 export const getEdhrecCardUrl = (card: ScryfallCard) =>
-  `https://edhrec.com/cards/${slugify(card.name)}`
+  `https://edhrec.com/cards/${getCardSlug(card)}`
 
 export type PartnerKind =
   | 'partner_with'
@@ -110,4 +124,24 @@ export const getPartnerWithName = (card: ScryfallCard) => {
   const oracle = getOracleText(card)
   const match = oracle.match(/Partner with ([^(.\n]+)/i)
   return match?.[1]?.trim() ?? null
+}
+
+const normalizePartnerVariant = (variant: string) =>
+  variant
+    .toLowerCase()
+    .trim()
+    .replace(/[.,:;]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+// Match "partner—<variant>" allowing one or more dash-like characters (hyphen, en, em)
+// to be robust to minor formatting differences in oracle text.
+const PARTNER_VARIANT_REGEX = /partner\s*[-—–]+\s*([^\n(]+)/i
+
+export const getPartnerVariant = (card: ScryfallCard) => {
+  const oracle = getOracleText(card)
+  const match = oracle.match(PARTNER_VARIANT_REGEX)
+  if (!match?.[1]) return null
+  const normalized = normalizePartnerVariant(match[1])
+  return normalized.length > 0 ? normalized : null
 }

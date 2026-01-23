@@ -8,7 +8,7 @@ import type { PullRecord } from '../../stores/randomander'
 const store = useRandomanderStore()
 const { history, saved } = storeToRefs(store)
 
-const savedIds = computed(() => new Set(saved.value.map((record) => record.id)))
+const savedIds = computed(() => new Set(saved.value.map((record: PullRecord) => record.id)))
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('en-US', {
