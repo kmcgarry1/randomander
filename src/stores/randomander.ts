@@ -429,11 +429,27 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const colorIdentityQuery = computed(() => {
     if (options.selectedColors.length === 0) return ''
     const normalized = options.selectedColors.map((color) => color.toUpperCase())
+    const hasColorless = normalized.includes('C')
     const palette = normalized.filter((color) => color !== 'C')
     const colorString = palette.join('').toLowerCase()
-    const baseColor = colorString || 'c'
-    const operator = options.colorCountMode === 'exactly' ? 'c' : 'ci'
-    return `${operator}:${baseColor}`
+
+    // If only colorless is selected, just return colorless identity.
+    if (!colorString && hasColorless) {
+      return 'ci:c'
+    }
+
+    // Build base query depending on "exactly" vs "up to" color-count mode.
+    const baseQuery =
+      options.colorCountMode === 'exactly'
+        ? `ci=${colorString}`
+        : `ci<=${colorString}`
+
+    // If colorless is also selected alongside other colors, include it explicitly.
+    if (hasColorless) {
+      return `(${baseQuery} or ci:c)`
+    }
+
+    return baseQuery
   })
 
   const commanderQuery = computed(() =>
@@ -951,6 +967,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
         chooseBackgroundCommanderQuery.value,
         {
           applyColorFilter: true,
+          extraFilter: matchesSelectedColors,
           asyncFilter: passesDeckLimit,
           useRankedRandom: options.useRankCutoff,
         }

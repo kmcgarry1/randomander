@@ -54,6 +54,7 @@ const toggleSettings = () => {
           type="button"
           class="flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-xs uppercase tracking-[0.3em] transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
           aria-label="Randomize"
+          :disabled="isLoading"
           @click="handleRandomize"
         >
           <svg
@@ -71,7 +72,7 @@ const toggleSettings = () => {
             <path d="M16 6h4v4"></path>
             <path d="M20 14h-4l-4 4 4 4h4"></path>
           </svg>
-          Randomize
+          {{ isLoading ? 'Shuffling...' : 'Randomize' }}
         </button>
         <button
           type="button"
