@@ -129,6 +129,7 @@ export const getPartnerWithName = (card: ScryfallCard) => {
 const normalizePartnerVariant = (variant: string) =>
   variant
     .toLowerCase()
+    .trim()
     .replace(/[.,:;]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
