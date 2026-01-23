@@ -62,25 +62,30 @@ const openOptions = () => {
           </div>
         </div>
 
-        <nav class="flex flex-1 justify-center" aria-label="Primary">
-          <div class="flex flex-wrap items-center gap-1.5 rounded-full border border-slate-200/60 bg-white/70 px-2 py-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-slate-500 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300">
-            <button
-              v-for="item in navItems"
-              :key="item.id"
-              type="button"
-              class="rounded-full px-3.5 py-1.5 transition"
-              :class="
-                view === item.id
-                  ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20'
-                  : 'text-slate-500 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800'
-              "
-              :aria-current="view === item.id ? 'page' : undefined"
-              @click="setView(item.id)"
-            >
-              {{ item.label }}
-            </button>
-          </div>
-        </nav>
+      <nav class="flex flex-1 justify-center" aria-label="Primary">
+        <div
+          role="tablist"
+          aria-label="Primary views"
+          class="grid w-full grid-cols-2 gap-1.5 rounded-full border border-slate-200/60 bg-white/70 px-3 py-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 sm:flex sm:w-auto sm:flex-wrap sm:justify-center sm:gap-1.5 sm:px-2 sm:text-[0.6rem]"
+        >
+          <button
+            v-for="item in navItems"
+            :key="item.id"
+            type="button"
+            role="tab"
+            :aria-selected="view === item.id"
+            class="w-full text-center rounded-full px-3.5 py-2 text-[0.65rem] transition sm:w-auto sm:px-3.5 sm:py-1.5 sm:text-[0.6rem]"
+            :class="
+              view === item.id
+                ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20'
+                : 'text-slate-500 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800'
+            "
+            @click="setView(item.id)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </nav>
 
         <div class="flex items-center gap-2">
           <button

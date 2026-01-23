@@ -50,6 +50,10 @@ const colorSummary = computed(() =>
 const close = () => {
   store.closeOptions()
 }
+
+const resetFilters = () => {
+  store.resetOptions()
+}
 </script>
 
 <template>
@@ -61,7 +65,7 @@ const close = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="options-title"
-      class="w-full max-w-5xl max-h-[86vh] overflow-y-auto rounded-[2.5rem] border border-slate-200/80 bg-white/95 p-6 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur sm:p-8 dark:border-slate-700/60 dark:bg-slate-900/90"
+      class="w-full max-w-5xl max-h-[86vh] overflow-y-auto rounded-[2.5rem] border border-slate-200/80 bg-white/95 p-6 pb-12 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
     >
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -75,16 +79,17 @@ const close = () => {
         <button
           type="button"
           class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 transition hover:bg-slate-50 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800"
+          aria-label="Close options"
           @click="close"
         >
-          Done
+          Close
         </button>
       </div>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <section
-          class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
-        >
+        <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <section
+            class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
+          >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Mode
           </p>
@@ -153,10 +158,10 @@ const close = () => {
               Clear
             </button>
           </div>
-        </section>
-      </div>
+          </section>
+        </div>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section
           class="rounded-2xl border border-slate-100 bg-slate-50/80 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70"
         >
@@ -261,6 +266,29 @@ const close = () => {
             Applies only to 3-card spark mode.
           </p>
         </section>
+      </div>
+
+      <div class="mt-6 border-t border-slate-200/80 pt-4 dark:border-slate-700/60">
+        <div
+          class="sticky bottom-0 z-20 -mx-6 -mb-6 bg-gradient-to-b from-white/70 to-white/95 px-6 py-4 backdrop-blur dark:from-slate-900/70 dark:to-slate-900/95"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              class="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto"
+              @click="resetFilters"
+            >
+              Reset filters
+            </button>
+            <button
+              type="button"
+              class="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
+              @click="close"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

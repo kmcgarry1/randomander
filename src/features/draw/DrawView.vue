@@ -219,32 +219,32 @@ const setMode = (next: Mode) => {
             v-else-if="isFirstLoad"
             class="flex min-h-[46vh] flex-col items-center justify-center gap-8 text-center"
           >
-            <div class="max-w-lg space-y-3 text-pretty">
+            <div class="max-w-lg space-y-3 text-center sm:text-left">
               <p
-                class="text-sm uppercase tracking-[0.32em] text-violet-600 dark:text-violet-200/80"
+                class="text-[0.65rem] uppercase tracking-[0.35em] text-violet-600 dark:text-violet-200/80"
               >
                 Ready to shuffle
               </p>
               <p
                 class="font-heading text-3xl text-slate-900 sm:text-4xl dark:text-white"
               >
-                Pull a commander or spark a deck idea.
+                {{ stageTitle }}
               </p>
-              <p class="text-sm text-slate-500 dark:text-slate-300">
-                Tap randomize, or open the options panel to fine tune your pool.
+              <p class="text-base text-slate-600 dark:text-slate-300">
+                Tap Randomize to draw instantly, or open the options panel to fine-tune your pool.
               </p>
             </div>
-            <div class="flex flex-wrap items-center justify-center gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
               <button
                 type="button"
-                class="rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:bg-violet-500"
+                class="w-full rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:bg-violet-500 sm:w-auto"
                 @click="handleRandomize"
               >
                 Randomize
               </button>
               <button
                 type="button"
-                class="rounded-full border border-slate-200 bg-white px-7 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                class="w-full rounded-full border border-slate-200 bg-white px-7 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
                 @click="handleOptions"
               >
                 Options

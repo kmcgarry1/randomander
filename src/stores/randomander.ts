@@ -734,6 +734,10 @@ export const useRandomanderStore = defineStore('randomander', () => {
     saved.value = []
   }
 
+  const resetOptions = () => {
+    Object.assign(options, defaultOptions)
+  }
+
   const randomize = async () => {
     errorMessage.value = ''
     const current = new AbortController()
@@ -1139,6 +1143,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     removeSaved,
     clearHistory,
     clearSaved,
+    resetOptions,
     openOptions,
     closeOptions,
     clearNetworkCache,
