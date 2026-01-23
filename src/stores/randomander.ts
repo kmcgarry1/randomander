@@ -7,7 +7,6 @@ import {
   getPartnerVariant,
   getPartnerWithName,
   getTypeLine,
-  slugify,
   type PartnerKind,
   type ScryfallCard,
 } from '../lib/scryfall'
@@ -467,6 +466,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
       .map((card) => getCardSlug(card))
       .sort((a, b) => a.localeCompare(b))
       .join('-')
+
+  const getPartnerSlugForGroup = (group: ScryfallCard[]) => getPairSlug(group)
 
   const getTagKeyForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
     if (display.usePairTags && isPairGroup(group)) {

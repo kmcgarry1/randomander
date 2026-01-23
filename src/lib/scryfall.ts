@@ -15,6 +15,7 @@ export type ScryfallCard = {
     image_uris?: {
       normal?: string
     }
+    name?: string
   }>
   all_parts?: Array<{
     id: string
