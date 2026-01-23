@@ -69,7 +69,7 @@ export const formatColorIdentity = (colors?: string[]) => {
 }
 
 export const slugify = (name: string) => {
-  const baseName = name.split(/\s*\/\/\s*/)[0]
+  const baseName = name.split(/\s*\/\/\s*/)[0] ?? ''
   return baseName
     .toLowerCase()
     .replace(/[\u2019']/g, '')
