@@ -468,9 +468,6 @@ export const useRandomanderStore = defineStore('randomander', () => {
       .sort((a, b) => a.localeCompare(b))
       .join('-')
 
-  const getPartnerSlugForGroup = (group: ScryfallCard[]) =>
-    getPairSlug(group)
-
   const getTagKeyForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
     if (display.usePairTags && isPairGroup(group)) {
       return getPairSlug(group)
