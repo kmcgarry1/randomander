@@ -98,7 +98,8 @@ const partnerLinkUrl = computed(() =>
 
 const partnerCardsAreCommanders = computed(
   () =>
-    cards.value.length === 2 && cards.value.every((card) => store.usesCommanderLink(card)),
+    cards.value.length === 2 &&
+    cards.value.every((card: ScryfallCard) => store.usesCommanderLink(card)),
 );
 
 const showPartnerLink = computed(

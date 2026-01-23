@@ -15,6 +15,7 @@ export type ScryfallCard = {
     image_uris?: {
       normal?: string
     }
+    name?: string
   }>
   all_parts?: Array<{
     id: string
@@ -80,8 +81,11 @@ const getNameBeforeSlash = (name: string) => {
   return first.trim()
 }
 
-export const getCanonicalName = (card: ScryfallCard) =>
-  getNameBeforeSlash(card.name)
+export const getCanonicalName = (card: ScryfallCard) => {
+  const frontFaceName = card.card_faces?.[0]?.name
+  if (frontFaceName) return frontFaceName
+  return getNameBeforeSlash(card.name)
+}
 
 export const getCardSlug = (card: ScryfallCard) => slugify(getCanonicalName(card))
 
