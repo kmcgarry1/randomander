@@ -151,11 +151,11 @@ const getDeckCount = (card: ScryfallCard) => {
               </button>
             </div>
           </div>
-          <div class="mt-4 flex gap-4 overflow-x-auto pb-2">
-            <article
-              v-for="card in heroCards"
-              :key="card.id"
-              class="flex min-w-[16rem] flex-grow-0 flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
+        <div class="mt-4 grid gap-4 md:flex md:flex-wrap md:overflow-x-auto md:pb-2">
+          <article
+            v-for="card in heroCards"
+            :key="card.id"
+            class="flex w-full flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] md:min-w-[16rem]"
             >
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>

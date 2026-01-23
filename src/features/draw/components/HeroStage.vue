@@ -26,30 +26,36 @@ const handleRandomize = () => emit("randomize");
       {{ stageTitle }}
     </h1>
     <div
-      class="relative flex h-[320px] w-full max-w-[23rem] flex-col items-center justify-center overflow-hidden rounded-[2.5rem] border border-dashed border-slate-700/70 bg-slate-950/90 shadow-[0_25px_60px_-36px_rgba(10,12,20,0.95)]"
+      class="relative flex h-[320px] w-full max-w-[23rem] flex-col items-center justify-center overflow-hidden rounded-[2.5rem] border border-dashed border-slate-700/70 bg-slate-950/90 shadow-[0_25px_60px_-36px_rgba(10,12,20,0.95)] sm:max-w-[28rem]"
     >
       <div
         class="absolute inset-0 rounded-[2.5rem] border border-slate-800/40 bg-gradient-to-b from-transparent via-slate-950/30 to-slate-950/80"
       ></div>
-      <div class="relative z-10 flex w-full flex-col items-center justify-center gap-6 px-4 text-center">
+      <div
+        class="relative z-10 flex flex-col items-center justify-center w-full gap-6 px-4 text-center"
+      >
         <p class="text-sm uppercase tracking-[0.5em] text-slate-400">
           {{ heroCardName || "Commander" }}
         </p>
         <p class="text-xs uppercase tracking-[0.3em] text-slate-400">
           {{ heroSubtitle }}
         </p>
-        <div v-if="heroCards.length" role="list" class="flex items-center justify-center gap-6 py-2">
+        <div
+          v-if="heroCards.length"
+          role="list"
+          class="flex flex-wrap items-center justify-center w-full gap-6 py-2"
+        >
           <article
             v-for="card in heroCards"
             :key="card.id"
-            class="aspect-[63/88] w-[220px] overflow-hidden rounded-[1.4rem] border border-white/10 bg-slate-900/80 shadow-[0_10px_40px_-18px_rgba(0,0,0,0.7)]"
+            class="aspect-[63/88] w-full max-w-[220px] overflow-hidden rounded-[1.4rem] border border-white/10 bg-slate-900/80 shadow-[0_10px_40px_-18px_rgba(0,0,0,0.7)] sm:w-[220px]"
             role="listitem"
           >
             <img
               v-if="getCardImageUrl(card)"
               :src="getCardImageUrl(card)"
               :alt="card.name"
-              class="h-full w-full object-cover"
+              class="object-cover w-full h-full"
             />
             <div
               v-else

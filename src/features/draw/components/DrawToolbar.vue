@@ -34,9 +34,9 @@ const onColorCountChange = (event: Event) => {
 
 <template>
   <div
-    class="mx-auto flex w-full max-w-5xl flex-wrap items-end justify-center gap-6 rounded-[2.5rem] border border-white/10 bg-white/5 px-6 py-8 text-[0.65rem] uppercase tracking-[0.3em] text-slate-200 shadow-[0_20px_60px_-40px_rgba(2,6,23,0.6)] backdrop-blur"
+    class="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[2.5rem] border border-white/10 bg-white/5 px-6 py-8 text-[0.65rem] uppercase tracking-[0.3em] text-slate-200 shadow-[0_20px_60px_-40px_rgba(2,6,23,0.6)] backdrop-blur sm:flex-row sm:flex-wrap sm:items-end sm:justify-center"
   >
-    <div class="flex min-w-[10rem] flex-1 flex-col gap-2">
+    <div class="flex w-full flex-col gap-2 sm:min-w-[10rem] sm:flex-1">
       <label class="text-[0.55rem] tracking-[0.4em] text-slate-400">Mode</label>
       <select
         :value="props.mode"
@@ -54,7 +54,7 @@ const onColorCountChange = (event: Event) => {
       </select>
     </div>
 
-    <div class="flex min-w-[10rem] flex-1 flex-col gap-2">
+    <div class="flex w-full flex-col gap-2 sm:min-w-[10rem] sm:flex-1">
       <label class="text-[0.55rem] tracking-[0.4em] text-slate-400">Comparison</label>
       <select
         :value="props.optionsState.colorCountMode"
@@ -72,7 +72,7 @@ const onColorCountChange = (event: Event) => {
       </select>
     </div>
 
-    <div class="flex min-w-[10rem] flex-1 flex-col gap-2">
+    <div class="flex w-full flex-col gap-2 sm:min-w-[10rem] sm:flex-1">
       <label class="text-[0.55rem] tracking-[0.4em] text-slate-400">Count</label>
       <select
         :value="props.optionsState.colorCount"
@@ -90,9 +90,9 @@ const onColorCountChange = (event: Event) => {
       </select>
     </div>
 
-    <div class="flex min-w-[14rem] flex-1 flex-col gap-2">
+    <div class="flex w-full flex-col gap-2 sm:min-w-[14rem] sm:flex-1">
       <p class="text-[0.55rem] tracking-[0.3em] text-slate-400">Mana filters</p>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
         <button
           v-for="choice in props.colorChoices"
           :key="choice.symbol"

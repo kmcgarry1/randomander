@@ -491,10 +491,25 @@ export const useRandomanderStore = defineStore('randomander', () => {
     display.showTags && usesCommanderLink(card)
 
   const isPairGroup = (group: ScryfallCard[]) => group.length === 2
+  const isDoctorCard = (card: ScryfallCard) => {
+    const typeLine = getTypeLine(card).toLowerCase()
+    return typeLine.includes('doctor') && getPartnerKind(card) !== 'doctors_companion'
+  }
+  const sortPairForSlug = (group: ScryfallCard[]) => {
+    if (group.length !== 2) return group
+    const [first, second] = group as [ScryfallCard, ScryfallCard]
+    const firstIsDoctor = isDoctorCard(first)
+    const secondIsDoctor = isDoctorCard(second)
+
+    if (firstIsDoctor !== secondIsDoctor) {
+      return firstIsDoctor ? [first, second] : [second, first]
+    }
+
+    return group.slice().sort((a, b) => getCardSlug(a).localeCompare(getCardSlug(b)))
+  }
   const getPairSlug = (group: ScryfallCard[]) =>
-    group
+    sortPairForSlug(group)
       .map((card) => getCardSlug(card))
-      .sort((a, b) => a.localeCompare(b))
       .join('-')
 
   const getPartnerSlugForGroup = (group: ScryfallCard[]) => getPairSlug(group)
@@ -996,8 +1011,13 @@ export const useRandomanderStore = defineStore('randomander', () => {
       if (display.usePairTags && isPairGroup(group)) {
         if (group.some((card) => usesCommanderLink(card))) {
           const pairSlug = getPairSlug(group)
-          const orderedSlug = group.map((card) => getCardSlug(card)).join('-')
-          const candidates = orderedSlug === pairSlug ? [pairSlug] : [pairSlug, orderedSlug]
+          const alphabeticalSlug = group
+            .map((card) => getCardSlug(card))
+            .slice()
+            .sort((a, b) => a.localeCompare(b))
+            .join('-')
+          const candidates =
+            alphabeticalSlug === pairSlug ? [pairSlug] : [pairSlug, alphabeticalSlug]
           targets.set(pairSlug, candidates)
         }
         return
