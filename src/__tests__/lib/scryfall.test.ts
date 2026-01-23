@@ -10,24 +10,98 @@ const createCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
 })
 
 describe('scryfall helper utilities', () => {
-  it('creates a slug from the canonical portion of the name', () => {
-    const card = createCard({
-      name: 'Kaya, Ghost of Heroes // Kaya, Eternity Weaver',
+  describe('getCardSlug', () => {
+    it('creates a slug from the canonical portion of a double-faced card name', () => {
+      const card = createCard({
+        name: 'Kaya, Ghost of Heroes // Kaya, Eternity Weaver',
+      })
+      expect(getCardSlug(card)).toBe('kaya-ghost-of-heroes')
     })
-    expect(getCardSlug(card)).toBe('kaya-ghost-of-heroes')
+
+    it('creates a slug from a regular single-faced card name', () => {
+      const card = createCard({
+        name: 'Tymna the Weaver',
+      })
+      expect(getCardSlug(card)).toBe('tymna-the-weaver')
+    })
+
+    it('handles single-faced cards with special characters', () => {
+      const card = createCard({
+        name: "Jeska, Thrice Reborn",
+      })
+      expect(getCardSlug(card)).toBe('jeska-thrice-reborn')
+    })
   })
 
-  it('normalizes partner variants from oracle text', () => {
-    const fatherAndSon = createCard({
-      oracle_text:
-        'Partner—Father & son (You can have two commanders if both have this ability.)',
-    })
-    const survivors = createCard({
-      oracle_text:
-        'Partner—Survivors (You can have two commanders if both have this ability.)',
+  describe('getPartnerVariant', () => {
+    it('normalizes partner variants from oracle text with em-dash', () => {
+      const fatherAndSon = createCard({
+        oracle_text:
+          'Partner—Father & son (You can have two commanders if both have this ability.)',
+      })
+      const survivors = createCard({
+        oracle_text:
+          'Partner—Survivors (You can have two commanders if both have this ability.)',
+      })
+
+      expect(getPartnerVariant(fatherAndSon)).toBe('father & son')
+      expect(getPartnerVariant(survivors)).toBe('survivors')
     })
 
-    expect(getPartnerVariant(fatherAndSon)).toBe('father & son')
-    expect(getPartnerVariant(survivors)).toBe('survivors')
+    it('returns null for cards without any partner variant', () => {
+      const noPartner = createCard({
+        oracle_text: 'When this creature enters the battlefield, draw a card.',
+      })
+      const regularPartner = createCard({
+        oracle_text: 'Partner (You can have two commanders if both have partner.)',
+      })
+
+      expect(getPartnerVariant(noPartner)).toBe(null)
+      expect(getPartnerVariant(regularPartner)).toBe(null)
+    })
+
+    it('handles different dash types (hyphen, en-dash, em-dash)', () => {
+      const hyphen = createCard({
+        oracle_text: 'Partner-Survivors (You can have two commanders if both have this ability.)',
+      })
+      const enDash = createCard({
+        oracle_text: 'Partner–Survivors (You can have two commanders if both have this ability.)',
+      })
+      const emDash = createCard({
+        oracle_text: 'Partner—Survivors (You can have two commanders if both have this ability.)',
+      })
+
+      expect(getPartnerVariant(hyphen)).toBe('survivors')
+      expect(getPartnerVariant(enDash)).toBe('survivors')
+      expect(getPartnerVariant(emDash)).toBe('survivors')
+    })
+
+    it('handles trailing punctuation in different positions', () => {
+      const trailingPeriod = createCard({
+        oracle_text: 'Partner—Survivors. (You can have two commanders if both have this ability.)',
+      })
+      const trailingComma = createCard({
+        oracle_text: 'Partner—Survivors, (You can have two commanders if both have this ability.)',
+      })
+      const trailingColon = createCard({
+        oracle_text: 'Partner—Survivors: (You can have two commanders if both have this ability.)',
+      })
+
+      expect(getPartnerVariant(trailingPeriod)).toBe('survivors')
+      expect(getPartnerVariant(trailingComma)).toBe('survivors')
+      expect(getPartnerVariant(trailingColon)).toBe('survivors')
+    })
+
+    it('returns null when variant text is empty or only whitespace after dash', () => {
+      const emptyVariant = createCard({
+        oracle_text: 'Partner— (You can have two commanders if both have this ability.)',
+      })
+      const whitespaceVariant = createCard({
+        oracle_text: 'Partner—   \n(You can have two commanders if both have this ability.)',
+      })
+
+      expect(getPartnerVariant(emptyVariant)).toBe(null)
+      expect(getPartnerVariant(whitespaceVariant)).toBe(null)
+    })
   })
 })
