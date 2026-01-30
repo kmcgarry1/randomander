@@ -6,23 +6,13 @@ import {
   colorOptions,
   modes,
   useRandomanderStore,
-  viewNavItems,
   type ColorCount,
   type Mode,
-  type ViewKey,
 } from '../../stores/randomander'
 import { formatColorIdentity } from '../../lib/scryfall'
 
 const store = useRandomanderStore()
-const {
-  mode,
-  options,
-  view,
-} = storeToRefs(store)
-
-const selectView = (next: ViewKey) => {
-  view.value = next
-}
+const { mode, options } = storeToRefs(store)
 
 const selectMode = (next: Mode) => {
   mode.value = next
@@ -64,12 +54,11 @@ const close = () => {
 const resetFilters = () => {
   store.resetOptions()
 }
-
 </script>
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 px-4 py-6 backdrop-blur"
+    class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 px-4 py-6 backdrop-blur"
     @click.self="close"
   >
     <div
@@ -78,14 +67,19 @@ const resetFilters = () => {
       aria-labelledby="options-title"
       class="w-full max-w-5xl max-h-[86vh] overflow-y-auto rounded-[2.5rem] border border-slate-200/80 bg-white/95 p-6 pb-12 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
     >
-      <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">
+          <p
+            class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400"
+          >
             Customization
           </p>
           <h2 id="options-title" class="font-heading text-2xl text-slate-900 dark:text-white">
             Randomizer options
           </h2>
+          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Filters update here; navigation tabs above keep history, saved, and settings one tap away.
+          </p>
         </div>
         <button
           type="button"
@@ -97,35 +91,10 @@ const resetFilters = () => {
         </button>
       </div>
 
-        <div class="mt-5 rounded-2xl border border-violet-200/60 bg-gradient-to-br from-violet-50/80 to-white/80 p-4 text-sm text-slate-600 shadow-sm dark:border-violet-400/70 dark:bg-violet-900/60 dark:text-slate-200">
-          <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-violet-200">
-            Quick note
-          </p>
-          <p class="mt-1">
-            Mix modes, color chips, and deck popularity filters without leaving the draw view.
-          </p>
-          <div class="mt-3 flex flex-wrap gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">
-            <button
-              v-for="item in viewNavItems"
-              :key="item.id"
-              type="button"
-              class="rounded-full px-3 py-1 transition"
-              :class="
-                view === item.id
-                  ? 'bg-slate-900/90 text-white dark:bg-white dark:text-slate-900'
-                  : 'text-slate-500 hover:text-slate-900/80 dark:hover:text-white/80'
-              "
-              @click="selectView(item.id)"
-            >
-              {{ item.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section
-            class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
-          >
+      <div class="mt-6 grid gap-6 lg:grid-cols-3">
+        <section
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+        >
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             Mode
           </p>
@@ -194,10 +163,8 @@ const resetFilters = () => {
               Clear
             </button>
           </div>
-          </section>
-        </div>
+        </section>
 
-        <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section
           class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
@@ -221,7 +188,9 @@ const resetFilters = () => {
             </button>
           </div>
         </section>
+      </div>
 
+      <div class="mt-6 grid gap-6 lg:grid-cols-3">
         <section
           class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
@@ -260,9 +229,7 @@ const resetFilters = () => {
             </label>
           </div>
         </section>
-      </div>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section
           class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
@@ -279,7 +246,7 @@ const resetFilters = () => {
             />
           </label>
           <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Spark mode always returns a trio of cards.
+            Spark draws always return a trio of cards.
           </p>
         </section>
 
@@ -305,25 +272,21 @@ const resetFilters = () => {
       </div>
 
       <div class="mt-6 border-t border-slate-200/80 pt-4 dark:border-slate-700/60">
-        <div
-          class="sticky bottom-0 z-20 -mx-6 -mb-6 bg-gradient-to-b from-white/70 to-white/95 px-6 py-4 backdrop-blur dark:from-slate-900/70 dark:to-slate-900/95"
-        >
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <button
-              type="button"
-              class="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto"
-              @click="resetFilters"
-            >
-              Reset filters
-            </button>
-            <button
-              type="button"
-              class="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
-              @click="close"
-            >
-              Done
-            </button>
-          </div>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            class="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto"
+            @click="resetFilters"
+          >
+            Reset filters
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
+            @click="close"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>

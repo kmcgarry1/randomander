@@ -10,6 +10,7 @@ import {
 import type { CommanderChoice } from "../../../stores/randomander";
 import { useRandomanderStore } from "../../../stores/randomander";
 import ChoiceOptionsSection from "./ChoiceOptionsSection.vue";
+import { computed } from "vue";
 
 const props = defineProps({
   heroCards: { type: Array as PropType<ScryfallCard[]>, required: true },
@@ -58,6 +59,32 @@ const getDeckCount = (card: ScryfallCard) => {
   if (!store.shouldShowTags(card)) return null;
   return store.getDeckCountForCard(card, props.heroGroup);
 };
+
+const formatCommanderLine = (card: ScryfallCard, prefix: string) => {
+  const setCode = card.set ? card.set.toUpperCase() : "";
+  const number = card.collector_number ?? "";
+  const parts = [prefix, card.name];
+  if (setCode) parts.push(`(${setCode})`);
+  if (number) parts.push(number);
+  return parts.join(" ").trim();
+};
+
+const buildMultisearchUrl = (format: "archidekt" | "moxfield", line: string) =>
+  `https://www.tcg.land/multisearch#/magic-the-gathering?format=${format}&separator=%7C&lines=${encodeURIComponent(
+    line,
+  )}`;
+
+const archidektCommanderLink = computed(() => {
+  if (!props.heroCard) return null;
+  const line = formatCommanderLine(props.heroCard, "1x");
+  return buildMultisearchUrl("archidekt", line);
+});
+
+const moxfieldCommanderLink = computed(() => {
+  if (!props.heroCard) return null;
+  const line = formatCommanderLine(props.heroCard, "1");
+  return buildMultisearchUrl("moxfield", line);
+});
 </script>
 
 <template>
@@ -73,11 +100,15 @@ const getDeckCount = (card: ScryfallCard) => {
         <p class="text-[0.65rem] uppercase tracking-[0.4em] text-slate-400">
           Commander studio
         </p>
-        <h2 class="text-3xl font-semibold uppercase tracking-[0.4em] text-white">
+        <h2 class="text-3xl font-semibold tracking-tight text-white">
           {{ heroHeadline }}
         </h2>
-        <p class="text-xs uppercase tracking-[0.35em] text-slate-400">
+        <p class="text-sm tracking-tight text-slate-300">
           {{ statusText }}
+        </p>
+        <p class="max-w-md text-sm leading-relaxed text-slate-300">
+          Keep this commander as the anchor or tap the companion/partner buttons below to refresh
+          the missing half of the pair.
         </p>
         <div role="list" class="flex flex-wrap items-center justify-center gap-6 py-2">
           <article
@@ -96,7 +127,7 @@ const getDeckCount = (card: ScryfallCard) => {
               <p class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">
                 Companion needed
               </p>
-              <p class="text-sm font-semibold uppercase tracking-[0.25em] text-white">
+              <p class="text-sm font-semibold text-white">
                 {{
                   heroPartnerKind === "choose_background"
                     ? "Choose a background"
@@ -106,10 +137,13 @@ const getDeckCount = (card: ScryfallCard) => {
               <p class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
                 Tap below to reveal the missing card.
               </p>
+              <p class="text-[0.6rem] leading-relaxed text-slate-300">
+                Companion suggestions always respect the commander’s color identity and archetype focus.
+              </p>
             </div>
             <button
               type="button"
-              class="w-full rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+              class="w-full rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
               @click="onHeroCompanion"
               :disabled="isLoading"
             >
@@ -128,13 +162,13 @@ const getDeckCount = (card: ScryfallCard) => {
               Details
             </p>
             <div class="flex items-center gap-3">
-              <p class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
+              <p class="text-[0.6rem] tracking-tight text-slate-300">
                 {{ heroGroup.length }} card{{ heroGroup.length === 1 ? '' : 's' }}
               </p>
               <button
                 v-if="canRandomizePartner && heroCard"
                 type="button"
-                class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+                class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-1 text-[0.6rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
                 @click="onPartner"
                 :disabled="isLoading"
               >
@@ -143,7 +177,7 @@ const getDeckCount = (card: ScryfallCard) => {
               <button
                 v-if="heroIsBackground"
                 type="button"
-                class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-cyan-500 disabled:opacity-60"
+                class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-1 text-[0.6rem] font-semibold tracking-tight text-white transition hover:bg-cyan-500 disabled:opacity-60"
                 @click="onCommanderForBackground"
                 :disabled="isLoading"
               >
@@ -151,7 +185,10 @@ const getDeckCount = (card: ScryfallCard) => {
               </button>
             </div>
           </div>
-        <div class="mt-4 grid gap-4 md:flex md:flex-wrap md:overflow-x-auto md:pb-2">
+          <p class="mt-2 text-sm text-slate-300">
+            Randomize partners and companions as needed to keep the current draw balanced and ready for deckbuilding.
+          </p>
+          <div class="mt-4 grid gap-4 md:flex md:flex-wrap md:overflow-x-auto md:pb-2">
           <article
             v-for="card in heroCards"
             :key="card.id"
@@ -159,21 +196,21 @@ const getDeckCount = (card: ScryfallCard) => {
             >
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-100">
+                  <p class="text-sm font-semibold tracking-tight text-slate-100">
                     {{ card.name }}
                   </p>
-                  <p class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-400">
+                  <p class="text-[0.65rem] text-slate-400">
                     {{ getTypeLine(card) }}
                   </p>
                 </div>
               </div>
               <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">
+                <p class="text-[0.65rem] text-slate-400">
                   {{ formatColorIdentity(card.color_identity) }}
                 </p>
                 <p
                   v-if="getDeckCount(card) != null"
-                  class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400"
+                  class="text-[0.65rem] text-slate-400"
                 >
                   {{ getDeckCount(card)?.toLocaleString() }}
                   EDHREC decks
@@ -188,7 +225,7 @@ const getDeckCount = (card: ScryfallCard) => {
                     store.shouldRenderTagPanel(card) &&
                     !store.hasTagEntry(card, heroGroup)
                   "
-                  class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400"
+                  class="text-[0.65rem] tracking-tight text-slate-400"
                 >
                   Loading tags...
                 </p>
@@ -197,7 +234,7 @@ const getDeckCount = (card: ScryfallCard) => {
                     store.hasTagEntry(card, heroGroup) &&
                     store.getTagsForCard(card, heroGroup).length === 0
                   "
-                  class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400"
+                  class="text-[0.65rem] tracking-tight text-slate-400"
                 >
                   No tags yet
                 </p>
@@ -244,6 +281,29 @@ const getDeckCount = (card: ScryfallCard) => {
               class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-white/20"
             >
               EDHREC partners
+            </a>
+          </div>
+          <p class="mt-2 text-[0.6rem] text-slate-300">
+            Launch Archidekt or Moxfield via TCG Land Multisearch with this commander as the deck’s lead.
+          </p>
+          <div class="mt-2 flex flex-wrap items-center gap-3">
+            <a
+              v-if="archidektCommanderLink"
+              :href="archidektCommanderLink"
+              target="_blank"
+              rel="noreferrer"
+              class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500"
+            >
+              Build on Archidekt
+            </a>
+            <a
+              v-if="moxfieldCommanderLink"
+              :href="moxfieldCommanderLink"
+              target="_blank"
+              rel="noreferrer"
+              class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-cyan-500"
+            >
+              Build on Moxfield
             </a>
           </div>
         </section>

@@ -1,51 +1,51 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { storeToRefs } from "pinia";
-import { getPartnerKind, type ScryfallCard } from "../../lib/scryfall";
+import {
+  ClockIcon,
+  Cog6ToothIcon,
+  FunnelIcon,
+} from "@heroicons/vue/24/outline";
 import { modes, type Mode, useRandomanderStore } from "../../stores/randomander";
 import HeroStage from "./components/HeroStage.vue";
-import HeroDetailsSection from "./components/HeroDetailsSection.vue";
-import DrawToolbar from "./components/DrawToolbar.vue";
 import { useHeroSummary } from "./composables/useHeroSummary";
-import { useManaFilters } from "./composables/useManaFilters";
 
 const store = useRandomanderStore();
-const {
-  mode,
-  isLoading,
-  stageTitle,
-  choices,
-  isChoiceMode,
-  statusText,
-  isFirstLoad,
-  canRandomizePartner,
-  partnerButtonLabel,
-} = storeToRefs(store);
-const optionsState = store.options;
-const colorOptionLabel = store.getColorOptionLabel;
+const { mode, isLoading, stageTitle, canRandomizePartner, partnerButtonLabel } =
+  storeToRefs(store);
 
 const heroSummary = useHeroSummary();
 const {
-  heroGroup,
   heroCard,
   heroCards,
+  heroSubtitle,
   heroPartnerKind,
   heroHasCompanionSlot,
-  heroPartnerLinkUrl,
   heroCompanionButtonLabel,
-  heroSubtitle,
-  heroBackgroundStyle,
-  heroHeadline,
-  heroIsBackground,
+  heroGroup,
 } = heroSummary;
 
-const {
-  colorChoices,
-  colorCountOptions,
-  colorCountModeOptions,
-  isColorlessActive,
-  isColorSelected,
-  toggleColorFilter,
-} = useManaFilters(optionsState);
+const heroTitle = computed(() =>
+  heroGroup.value.length > 1
+    ? heroGroup.value.map((card) => card.name).join(" + ")
+    : heroCard.value?.name ?? stageTitle.value
+);
+
+const partnerNames = computed(() =>
+  heroGroup.value.length > 1
+    ? heroGroup.value.slice(1).map((card) => card.name).join(" / ")
+    : ""
+);
+
+const updateMode = (value: Mode) => {
+  mode.value = value;
+};
+
+const handleModeChange = (event: Event) => {
+  const target = event.target as HTMLSelectElement | null;
+  if (!target) return;
+  updateMode(target.value as Mode);
+};
 
 const handleRandomize = () => {
   store.randomize();
@@ -55,85 +55,134 @@ const handlePartner = () => {
   store.randomizePartnerForPrimary();
 };
 
-const handleCommanderForBackground = () => {
-  store.randomizeCommanderForBackground();
-};
-
 const handleHeroCompanion = () => {
   if (heroPartnerKind.value === "choose_background") {
-    handleCommanderForBackground();
-    return;
+    store.randomizeCommanderForBackground();
+  } else {
+    store.randomizePartnerForPrimary();
   }
-  handlePartner();
 };
 
-const canRandomizeChoicePartner = (card: ScryfallCard) =>
-  getPartnerKind(card) !== null;
-
-const handleChoicePartner = (index: number) => {
-  store.randomizePartnerForChoice(index);
+const openFilters = () => {
+  store.openOptions();
 };
 
-const updateMode = (value: Mode) => {
-  mode.value = value;
+const openSettings = () => {
+  store.view = "settings";
+};
+
+const openHistory = () => {
+  store.view = "history";
 };
 </script>
 
 <template>
-  <section
-    aria-live="polite"
-    aria-atomic="true"
-    :aria-busy="isLoading ? 'true' : 'false'"
-    class="mt-10 flex flex-col gap-10 px-4"
-  >
+    <section class="mt-10 flex flex-col gap-6 px-4 md:px-8">
     <HeroStage
-      v-if="isFirstLoad"
       :stage-title="stageTitle"
-      :hero-card-name="heroCard?.name"
+      :hero-card-name="heroTitle"
       :hero-subtitle="heroSubtitle"
       :hero-cards="heroCards"
-      :is-loading="isLoading"
-      @randomize="handleRandomize"
     />
 
-    <HeroDetailsSection
-      v-else
-      :hero-cards="heroCards"
-      :hero-group="heroGroup"
-      :hero-has-companion-slot="heroHasCompanionSlot"
-      :hero-partner-kind="heroPartnerKind"
-      :hero-companion-button-label="heroCompanionButtonLabel"
-      :hero-background-style="heroBackgroundStyle"
-      :hero-headline="heroHeadline"
-      :status-text="statusText"
-      :hero-partner-link-url="heroPartnerLinkUrl"
-      :hero-is-background="heroIsBackground"
-      :can-randomize-partner="canRandomizePartner"
-      :partner-button-label="partnerButtonLabel"
-      :is-loading="isLoading"
-      :hero-card="heroCard"
-      :choices="choices"
-      :is-choice-mode="isChoiceMode"
-      :can-randomize-choice-partner="canRandomizeChoicePartner"
-      :on-choice-partner="handleChoicePartner"
-      :get-partner-button-label="store.getPartnerButtonLabel"
-      :on-partner="handlePartner"
-      :on-hero-companion="handleHeroCompanion"
-      :on-commander-for-background="handleCommanderForBackground"
-    />
+      <div class="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-[1.5rem] border border-slate-900/40 bg-slate-950/50 px-4 py-4 text-sm text-slate-200 dark:border-slate-700/50">
+        <div class="flex justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-[0.35em] text-slate-500">
+              {{ heroGroup.length }} card{{ heroGroup.length === 1 ? "" : "s" }} in view
+            </p>
+            <p class="text-base font-semibold text-white">
+              {{ heroTitle }}
+            </p>
+            <p
+              v-if="partnerNames && heroGroup.length > 1"
+              class="text-xs uppercase tracking-[0.2em] text-slate-400"
+            >
+              Partner: {{ partnerNames }}
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <button
+              v-if="canRandomizePartner"
+              type="button"
+              class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+              @click="handlePartner"
+              :disabled="isLoading"
+            >
+              {{ partnerButtonLabel }}
+            </button>
+            <button
+              v-if="heroHasCompanionSlot"
+              type="button"
+              class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-cyan-500 disabled:opacity-60"
+              @click="handleHeroCompanion"
+              :disabled="isLoading"
+            >
+              {{ heroCompanionButtonLabel }}
+            </button>
+          </div>
+        </div>
+      </div>
 
-    <DrawToolbar
-      :mode="mode"
-      :modes="modes"
-      :options-state="optionsState"
-      :color-count-mode-options="colorCountModeOptions"
-      :color-count-options="colorCountOptions"
-      :color-choices="colorChoices"
-      :is-colorless-active="isColorlessActive"
-      :is-color-selected="isColorSelected"
-      :toggle-color-filter="toggleColorFilter"
-      :color-option-label="colorOptionLabel"
-      @update:mode="updateMode"
-    />
+    <div class="mx-auto flex w-full max-w-4xl flex-col gap-4 border-t border-slate-900/40 pt-5 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex w-full flex-col gap-2 sm:w-1/2">
+        <label class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
+          Mode
+        </label>
+        <select
+          :value="mode"
+          class="w-full rounded-2xl border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-white transition focus:border-fuchsia-400 focus:outline-none"
+          @change="handleModeChange"
+        >
+          <option
+            v-for="option in modes"
+            :key="option.id"
+            :value="option.id"
+            class="bg-slate-950 text-white"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          class="flex items-center justify-center rounded-2xl bg-fuchsia-600 px-8 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+          :disabled="isLoading"
+          @click="handleRandomize"
+        >
+          {{ isLoading ? "Shuffling…" : "Randomize" }}
+        </button>
+
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
+            aria-label="Open history"
+            @click="openHistory"
+          >
+            <ClockIcon class="h-5 w-5" stroke-width="1.7" />
+          </button>
+
+          <button
+            type="button"
+            class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
+            aria-label="Open filters"
+            @click="openFilters"
+          >
+            <FunnelIcon class="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
+            aria-label="Open settings"
+            @click="openSettings"
+          >
+            <Cog6ToothIcon class="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

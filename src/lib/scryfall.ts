@@ -2,6 +2,8 @@ export type ScryfallCard = {
   id: string
   name: string
   scryfall_uri: string
+  set?: string
+  collector_number?: string
   type_line?: string
   oracle_text?: string
   keywords?: string[]
