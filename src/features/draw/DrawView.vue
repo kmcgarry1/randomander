@@ -9,6 +9,7 @@ import {
 import { modes, type Mode, useRandomanderStore } from "../../stores/randomander";
 import HeroStage from "./components/HeroStage.vue";
 import { useHeroSummary } from "./composables/useHeroSummary";
+import { getEdhrecCommanderUrl } from "../../lib/scryfall";
 
 const store = useRandomanderStore();
 const { mode, isLoading, stageTitle, canRandomizePartner, partnerButtonLabel } =
@@ -24,6 +25,11 @@ const {
   heroCompanionButtonLabel,
   heroGroup,
 } = heroSummary;
+
+const heroScryfallUrl = computed(() => heroCard.value?.scryfall_uri ?? "");
+const heroEdhrecUrl = computed(() =>
+  heroCard.value ? getEdhrecCommanderUrl(heroCard.value) : ""
+);
 
 const heroTitle = computed(() =>
   heroGroup.value.length > 1
@@ -100,6 +106,26 @@ const openHistory = () => {
             >
               Partner: {{ partnerNames }}
             </p>
+            <div v-if="heroScryfallUrl || heroEdhrecUrl" class="mt-1 flex flex-wrap gap-2 text-[0.65rem]">
+              <a
+                v-if="heroScryfallUrl"
+                :href="heroScryfallUrl"
+                target="_blank"
+                rel="noreferrer"
+                class="rounded-full border border-white/20 px-3 py-1 uppercase tracking-[0.2em] text-white transition hover:border-white/60"
+              >
+                Scryfall
+              </a>
+              <a
+                v-if="heroEdhrecUrl"
+                :href="heroEdhrecUrl"
+                target="_blank"
+                rel="noreferrer"
+                class="rounded-full border border-white/20 px-3 py-1 uppercase tracking-[0.2em] text-white transition hover:border-white/60"
+              >
+                EDHREC commander
+              </a>
+            </div>
           </div>
           <div class="flex gap-2">
             <button
@@ -168,10 +194,11 @@ const openHistory = () => {
           <button
             type="button"
             class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
-            aria-label="Open filters"
+            aria-label="Options"
             @click="openFilters"
           >
             <FunnelIcon class="h-5 w-5" />
+            <span class="sr-only">Options</span>
           </button>
           <button
             type="button"

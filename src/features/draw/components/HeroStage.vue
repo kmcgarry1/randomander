@@ -20,11 +20,14 @@ const props = defineProps({
         <div
           class="grid gap-4 md:grid-cols-3"
           :class="heroCards.length > 1 ? 'sm:grid-cols-2 grid-cols-1' : 'grid-cols-1'"
+          role="list"
+          aria-label="Commander cards"
         >
           <article
             v-for="card in heroCards"
             :key="card.id"
             class="flex flex-col gap-2 rounded-[1.6rem] border border-white/10 bg-slate-900 shadow-[0_15px_35px_-20px_rgba(0,0,0,0.8)]"
+            role="listitem"
           >
             <div class="aspect-[63/88] w-full">
               <img
@@ -37,6 +40,7 @@ const props = defineProps({
           <article
             v-if="!heroCards.length"
             class="flex h-[360px] w-full items-center justify-center rounded-[1.6rem] border border-dashed border-white/30 bg-slate-900/60 text-[0.75rem] uppercase tracking-[0.3em] text-slate-400"
+            role="listitem"
           >
             Pull a commander
           </article>
