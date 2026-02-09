@@ -16,7 +16,10 @@ const props = defineProps({
   heroCards: { type: Array as PropType<ScryfallCard[]>, required: true },
   heroGroup: { type: Array as PropType<ScryfallCard[]>, required: true },
   heroHasCompanionSlot: { type: Boolean, required: true },
-  heroPartnerKind: { type: String as PropType<PartnerKind | null>, default: null },
+  heroPartnerKind: {
+    type: String as PropType<PartnerKind | null>,
+    default: null,
+  },
   heroCompanionButtonLabel: { type: String, required: true },
   heroBackgroundStyle: {
     type: Object as PropType<Record<string, string>>,
@@ -24,7 +27,10 @@ const props = defineProps({
   },
   heroHeadline: { type: String, required: true },
   statusText: { type: String, required: true },
-  heroPartnerLinkUrl: { type: String as PropType<string | null>, default: null },
+  heroPartnerLinkUrl: {
+    type: String as PropType<string | null>,
+    default: null,
+  },
   heroIsBackground: { type: Boolean, required: true },
   canRandomizePartner: { type: Boolean, required: true },
   partnerButtonLabel: { type: String, required: true },
@@ -94,9 +100,17 @@ const moxfieldCommanderLink = computed(() => {
     <div
       class="relative flex min-h-[420px] w-full flex-col items-center justify-between overflow-hidden rounded-[2.5rem] border border-dashed border-slate-700/70"
     >
-      <div v-if="heroBackgroundStyle.backgroundImage" class="absolute inset-0 opacity-30" :style="heroBackgroundStyle"></div>
-      <div class="absolute inset-0 bg-gradient-to-b from-transparent via-slate-950/10 to-slate-950/90"></div>
-      <div class="relative z-10 flex w-full flex-col items-center justify-center gap-4 px-6 text-center">
+      <div
+        v-if="heroBackgroundStyle.backgroundImage"
+        class="absolute inset-0 opacity-30"
+        :style="heroBackgroundStyle"
+      ></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-b from-transparent via-slate-950/10 to-slate-950/90"
+      ></div>
+      <div
+        class="relative z-10 flex w-full flex-col items-center justify-center gap-4 px-6 text-center"
+      >
         <p class="text-[0.65rem] uppercase tracking-[0.4em] text-slate-400">
           Commander studio
         </p>
@@ -107,24 +121,33 @@ const moxfieldCommanderLink = computed(() => {
           {{ statusText }}
         </p>
         <p class="max-w-md text-sm leading-relaxed text-slate-300">
-          Keep this commander as the anchor or tap the companion/partner buttons below to refresh
-          the missing half of the pair.
+          Keep this commander as the anchor or tap the companion/partner buttons
+          below to refresh the missing half of the pair.
         </p>
-        <div role="list" class="flex flex-wrap items-center justify-center gap-6 py-2">
+        <div
+          role="list"
+          class="flex flex-wrap items-center justify-center gap-6 py-2"
+        >
           <article
             v-for="card in heroCards"
             :key="card.id"
             class="aspect-[63/88] w-[260px] overflow-hidden rounded-[1.4rem] border border-white/20 bg-slate-900/80 shadow-[0_15px_45px_-20px_rgba(0,0,0,0.8)]"
             role="listitem"
           >
-            <img :src="getCardImageUrl(card)" :alt="card.name" class="h-full w-full object-cover" />
+            <img
+              :src="getCardImageUrl(card)"
+              :alt="card.name"
+              class="h-full w-full object-cover"
+            />
           </article>
           <article
             v-if="heroHasCompanionSlot"
             class="flex min-w-[16rem] flex-col justify-between gap-4 rounded-2xl border border-dashed border-white/30 bg-slate-900/40 p-4 text-left text-slate-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
           >
             <div class="space-y-2">
-              <p class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">
+              <p
+                class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400"
+              >
                 Companion needed
               </p>
               <p class="text-sm font-semibold text-white">
@@ -134,16 +157,19 @@ const moxfieldCommanderLink = computed(() => {
                     : "Partner pairing"
                 }}
               </p>
-              <p class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
+              <p
+                class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400"
+              >
                 Tap below to reveal the missing card.
               </p>
               <p class="text-[0.6rem] leading-relaxed text-slate-300">
-                Companion suggestions always respect the commander’s color identity and archetype focus.
+                Companion suggestions always respect the commander’s color
+                identity and archetype focus.
               </p>
             </div>
             <button
               type="button"
-              class="w-full rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+              class="w-full rounded-full border border-amber-300 bg-amber-400 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-slate-900 transition hover:bg-amber-300 disabled:opacity-60"
               @click="onHeroCompanion"
               :disabled="isLoading"
             >
@@ -163,12 +189,14 @@ const moxfieldCommanderLink = computed(() => {
             </p>
             <div class="flex items-center gap-3">
               <p class="text-[0.6rem] tracking-tight text-slate-300">
-                {{ heroGroup.length }} card{{ heroGroup.length === 1 ? '' : 's' }}
+                {{ heroGroup.length }} card{{
+                  heroGroup.length === 1 ? "" : "s"
+                }}
               </p>
               <button
                 v-if="canRandomizePartner && heroCard"
                 type="button"
-                class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-1 text-[0.6rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+                class="rounded-full border border-amber-300 bg-amber-400 px-4 py-1 text-[0.6rem] font-semibold tracking-tight text-slate-900 transition hover:bg-amber-300 disabled:opacity-60"
                 @click="onPartner"
                 :disabled="isLoading"
               >
@@ -177,7 +205,7 @@ const moxfieldCommanderLink = computed(() => {
               <button
                 v-if="heroIsBackground"
                 type="button"
-                class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-1 text-[0.6rem] font-semibold tracking-tight text-white transition hover:bg-cyan-500 disabled:opacity-60"
+                class="rounded-full border border-white/20 bg-white/10 px-4 py-1 text-[0.6rem] font-semibold tracking-tight text-white transition hover:bg-white/20 disabled:opacity-60"
                 @click="onCommanderForBackground"
                 :disabled="isLoading"
               >
@@ -186,17 +214,22 @@ const moxfieldCommanderLink = computed(() => {
             </div>
           </div>
           <p class="mt-2 text-sm text-slate-300">
-            Randomize partners and companions as needed to keep the current draw balanced and ready for deckbuilding.
+            Randomize partners and companions as needed to keep the current draw
+            balanced and ready for deckbuilding.
           </p>
-          <div class="mt-4 grid gap-4 md:flex md:flex-wrap md:overflow-x-auto md:pb-2">
-          <article
-            v-for="card in heroCards"
-            :key="card.id"
-            class="flex w-full flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] md:min-w-[16rem]"
+          <div
+            class="mt-4 grid gap-4 md:flex md:flex-wrap md:overflow-x-auto md:pb-2"
+          >
+            <article
+              v-for="card in heroCards"
+              :key="card.id"
+              class="flex w-full flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] md:min-w-[16rem]"
             >
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p class="text-sm font-semibold tracking-tight text-slate-100">
+                  <p
+                    class="text-sm font-semibold tracking-tight text-slate-100"
+                  >
                     {{ card.name }}
                   </p>
                   <p class="text-[0.65rem] text-slate-400">
@@ -247,14 +280,19 @@ const moxfieldCommanderLink = computed(() => {
                   class="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-100 transition hover:border-white/60"
                 >
                   {{ tag.label }}
-                  <span v-if="tag.count" class="ml-1 text-[0.55rem] text-slate-400">
+                  <span
+                    v-if="tag.count"
+                    class="ml-1 text-[0.55rem] text-slate-400"
+                  >
                     ({{ tag.count.toLocaleString() }})
                   </span>
                 </a>
               </div>
             </article>
           </div>
-          <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3">
+          <div
+            class="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3"
+          >
             <a
               v-if="heroCard"
               :href="heroCard.scryfall_uri"
@@ -284,7 +322,8 @@ const moxfieldCommanderLink = computed(() => {
             </a>
           </div>
           <p class="mt-2 text-[0.6rem] text-slate-300">
-            Launch Archidekt or Moxfield via TCG Land Multisearch with this commander as the deck’s lead.
+            Launch Archidekt or Moxfield via TCG Land Multisearch with this
+            commander as the deck’s lead.
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-3">
             <a
@@ -292,7 +331,7 @@ const moxfieldCommanderLink = computed(() => {
               :href="archidektCommanderLink"
               target="_blank"
               rel="noreferrer"
-              class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500"
+              class="rounded-full border border-amber-300 bg-amber-400 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-slate-900 transition hover:bg-amber-300"
             >
               Build on Archidekt
             </a>
@@ -301,7 +340,7 @@ const moxfieldCommanderLink = computed(() => {
               :href="moxfieldCommanderLink"
               target="_blank"
               rel="noreferrer"
-              class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-cyan-500"
+              class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-white/20"
             >
               Build on Moxfield
             </a>

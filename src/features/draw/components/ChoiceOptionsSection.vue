@@ -47,7 +47,8 @@ const handlePartnerClick = (index: number) => {
       </p>
     </div>
     <p class="mt-1 text-[0.55rem] text-slate-300">
-      These cards highlight the possible leads; use the buttons below to fill in any missing partners.
+      These cards highlight the possible leads; use the buttons below to fill in
+      any missing partners.
     </p>
     <div class="mt-4 grid gap-4 md:grid-cols-2">
       <article
@@ -75,7 +76,7 @@ const handlePartnerClick = (index: number) => {
               props.canRandomizeChoicePartner(choice.cards[0])
             "
             type="button"
-            class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-1 text-[0.65rem] font-semibold tracking-tight text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+            class="rounded-full border border-amber-300 bg-amber-400 px-4 py-1 text-[0.65rem] font-semibold tracking-tight text-slate-900 transition hover:bg-amber-300 disabled:opacity-60"
             :disabled="isLoading"
             @click="handlePartnerClick(index)"
           >
@@ -86,7 +87,8 @@ const handlePartnerClick = (index: number) => {
           v-if="choice.cards.length === 1"
           class="mt-1 text-[0.55rem] text-slate-400"
         >
-          Tap the button to reveal a partner when one is missing; paired accelerators already contain both cards.
+          Tap the button to reveal a partner when one is missing; paired
+          accelerators already contain both cards.
         </p>
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
           <article
@@ -94,7 +96,9 @@ const handlePartnerClick = (index: number) => {
             :key="card.id"
             class="group flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3 text-center"
           >
-            <div class="aspect-[63/88] w-full overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+            <div
+              class="aspect-[63/88] w-full overflow-hidden rounded-xl bg-slate-800 shadow-inner"
+            >
               <img
                 v-if="getCardImageUrl(card)"
                 :src="getCardImageUrl(card)"
@@ -102,13 +106,17 @@ const handlePartnerClick = (index: number) => {
                 class="h-full w-full object-cover"
               />
             </div>
-            <p class="text-[0.75rem] font-semibold tracking-tight text-slate-100">
+            <p
+              class="text-[0.75rem] font-semibold tracking-tight text-slate-100"
+            >
               {{ card.name }}
             </p>
             <p class="text-[0.65rem] text-slate-400">
               {{ getTypeLine(card) }}
             </p>
-            <div class="flex flex-wrap justify-center gap-2 text-[0.6rem] font-semibold text-slate-400">
+            <div
+              class="flex flex-wrap justify-center gap-2 text-[0.6rem] font-semibold text-slate-400"
+            >
               <a
                 class="rounded-full border border-white/20 px-2 py-1 transition hover:border-white/60"
                 :href="card.scryfall_uri"

@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import type { OptionsState, Mode, COLOR_CHOICES, colorOptions, modes } from "../../../stores/randomander";
+import type {
+  OptionsState,
+  Mode,
+  COLOR_CHOICES,
+  colorOptions,
+  modes,
+} from "../../../stores/randomander";
 
 const props = defineProps<{
   mode: Mode;
   modes: typeof modes;
   optionsState: OptionsState;
-  colorCountModeOptions: { label: string; value: OptionsState["colorCountMode"] }[];
+  colorCountModeOptions: {
+    label: string;
+    value: OptionsState["colorCountMode"];
+  }[];
   colorCountOptions: typeof colorOptions;
   colorChoices: typeof COLOR_CHOICES;
   isColorlessActive: boolean;
@@ -44,7 +53,7 @@ const onColorCountChange = (event: Event) => {
         </p>
         <select
           :value="props.mode"
-          class="w-full rounded-2xl border border-white/20 bg-slate-950/50 px-3 py-2 text-sm text-white transition focus:border-fuchsia-400 focus:outline-none"
+          class="w-full rounded-2xl border border-white/20 bg-slate-950/50 px-3 py-2 text-sm text-white transition focus:border-amber-300 focus:outline-none"
           @change="onModeChange"
         >
           <option
@@ -59,13 +68,15 @@ const onColorCountChange = (event: Event) => {
       </div>
 
       <div class="flex flex-col gap-1 text-left">
-        <span class="text-[0.6rem] tracking-[0.3em] text-slate-400">Comparison</span>
+        <span class="text-[0.6rem] tracking-[0.3em] text-slate-400"
+          >Comparison</span
+        >
         <p class="text-[0.65rem] text-slate-300">
           Keep draws loose or lock the exact color count.
         </p>
         <select
           :value="props.optionsState.colorCountMode"
-          class="w-full rounded-2xl border border-white/20 bg-slate-950/50 px-3 py-2 text-sm text-white transition focus:border-fuchsia-400 focus:outline-none"
+          class="w-full rounded-2xl border border-white/20 bg-slate-950/50 px-3 py-2 text-sm text-white transition focus:border-amber-300 focus:outline-none"
           @change="onColorCountModeChange"
         >
           <option
@@ -86,7 +97,7 @@ const onColorCountChange = (event: Event) => {
         </p>
         <select
           :value="props.optionsState.colorCount"
-          class="w-full rounded-2xl border border-white/20 bg-slate-950/50 px-3 py-2 text-sm text-white transition focus:border-fuchsia-400 focus:outline-none"
+          class="w-full rounded-2xl border border-white/20 bg-slate-950/50 px-3 py-2 text-sm text-white transition focus:border-amber-300 focus:outline-none"
           @change="onColorCountChange"
         >
           <option
@@ -111,7 +122,7 @@ const onColorCountChange = (event: Event) => {
           v-for="choice in props.colorChoices"
           :key="choice.symbol"
           type="button"
-          class="flex min-w-[3.5rem] items-center justify-center gap-1 rounded-full border px-3 py-2 text-[0.6rem] font-semibold tracking-[0.16em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400"
+          class="flex min-w-[3.5rem] items-center justify-center gap-1 rounded-full border px-3 py-2 text-[0.6rem] font-semibold tracking-[0.16em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
           :class="[
             choice.chip,
             props.isColorSelected(choice.symbol)
@@ -126,7 +137,11 @@ const onColorCountChange = (event: Event) => {
           @click="props.toggleColorFilter(choice.symbol)"
           :aria-label="choice.name"
         >
-          <span class="text-2xl ms" aria-hidden="true" :class="choice.icon"></span>
+          <span
+            class="text-2xl ms"
+            aria-hidden="true"
+            :class="choice.icon"
+          ></span>
           <span class="sr-only">{{ choice.name }}</span>
         </button>
       </div>

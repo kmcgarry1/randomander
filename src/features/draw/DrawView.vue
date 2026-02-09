@@ -6,14 +6,24 @@ import {
   Cog6ToothIcon,
   FunnelIcon,
 } from "@heroicons/vue/24/outline";
-import { modes, type Mode, useRandomanderStore } from "../../stores/randomander";
+import {
+  modes,
+  type Mode,
+  useRandomanderStore,
+} from "../../stores/randomander";
 import HeroStage from "./components/HeroStage.vue";
 import { useHeroSummary } from "./composables/useHeroSummary";
-import { getEdhrecCommanderUrl } from "../../lib/scryfall";
+import { formatColorIdentity, getEdhrecCommanderUrl } from "../../lib/scryfall";
 
 const store = useRandomanderStore();
-const { mode, isLoading, stageTitle, canRandomizePartner, partnerButtonLabel } =
-  storeToRefs(store);
+const {
+  mode,
+  isLoading,
+  options,
+  stageTitle,
+  canRandomizePartner,
+  partnerButtonLabel,
+} = storeToRefs(store);
 
 const heroSummary = useHeroSummary();
 const {
@@ -28,20 +38,48 @@ const {
 
 const heroScryfallUrl = computed(() => heroCard.value?.scryfall_uri ?? "");
 const heroEdhrecUrl = computed(() =>
-  heroCard.value ? getEdhrecCommanderUrl(heroCard.value) : ""
+  heroCard.value ? getEdhrecCommanderUrl(heroCard.value) : "",
 );
 
 const heroTitle = computed(() =>
   heroGroup.value.length > 1
     ? heroGroup.value.map((card) => card.name).join(" + ")
-    : heroCard.value?.name ?? stageTitle.value
+    : (heroCard.value?.name ?? stageTitle.value),
 );
 
 const partnerNames = computed(() =>
   heroGroup.value.length > 1
-    ? heroGroup.value.slice(1).map((card) => card.name).join(" / ")
-    : ""
+    ? heroGroup.value
+        .slice(1)
+        .map((card) => card.name)
+        .join(" / ")
+    : "",
 );
+
+const filterChips = computed(() => {
+  const chips: string[] = [];
+  if (options.value.selectedColors.length) {
+    chips.push(formatColorIdentity(options.value.selectedColors));
+  } else if (options.value.colorCount !== "any") {
+    chips.push(`Colors ${options.value.colorCount}`);
+  }
+  if (options.value.colorCountMode === "exactly") {
+    chips.push("Exact colors");
+  }
+  if (options.value.twoChoices && mode.value !== "spark") {
+    chips.push("Two choices");
+  }
+  if (options.value.useRankCutoff) {
+    chips.push("Skip top 10% EDHREC");
+  }
+  if (options.value.limitByDecks && !options.value.useRankCutoff) {
+    chips.push(`Decks < ${options.value.maxDecks}`);
+  }
+  if (mode.value === "spark" && options.value.excludeGameChangers) {
+    chips.push("No Game Changers");
+  }
+  return chips;
+});
 
 const updateMode = (value: Mode) => {
   mode.value = value;
@@ -83,134 +121,167 @@ const openHistory = () => {
 </script>
 
 <template>
-    <section class="mt-10 flex flex-col gap-6 px-4 md:px-8">
-    <HeroStage
-      :stage-title="stageTitle"
-      :hero-card-name="heroTitle"
-      :hero-subtitle="heroSubtitle"
-      :hero-cards="heroCards"
-    />
+  <section class="motion-fade-up mt-6 flex flex-col gap-6">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div class="flex flex-col gap-5">
+        <HeroStage
+          :stage-title="stageTitle"
+          :hero-card-name="heroTitle"
+          :hero-subtitle="heroSubtitle"
+          :hero-cards="heroCards"
+          :hero-scryfall-url="heroScryfallUrl"
+          :hero-edhrec-url="heroEdhrecUrl"
+          :mode="mode"
+        />
 
-      <div class="mx-auto flex w-full max-w-[min(92vw,1100px)] flex-col gap-3 rounded-[1.5rem] border border-slate-900/40 bg-slate-950/50 px-4 py-4 text-sm text-slate-200 dark:border-slate-700/50">
-        <div class="flex justify-between gap-3">
-          <div>
-            <p class="text-xs uppercase tracking-[0.35em] text-slate-500">
-              {{ heroGroup.length }} card{{ heroGroup.length === 1 ? "" : "s" }} in view
-            </p>
-            <p class="text-base font-semibold text-white">
-              {{ heroTitle }}
-            </p>
-            <p
-              v-if="partnerNames && heroGroup.length > 1"
-              class="text-xs uppercase tracking-[0.2em] text-slate-400"
-            >
-              Partner: {{ partnerNames }}
-            </p>
-            <div v-if="heroScryfallUrl || heroEdhrecUrl" class="mt-1 flex flex-wrap gap-2 text-[0.65rem]">
-              <a
-                v-if="heroScryfallUrl"
-                :href="heroScryfallUrl"
-                target="_blank"
-                rel="noreferrer"
-                class="rounded-full border border-white/20 px-3 py-1 uppercase tracking-[0.2em] text-white transition hover:border-white/60"
+        <div
+          v-if="partnerNames || canRandomizePartner || heroHasCompanionSlot"
+          class="rounded-2xl border border-slate-200/80 bg-white/80 px-5 py-4 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+        >
+          <div
+            class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+          >
+            <div v-if="partnerNames">
+              <p
+                class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400"
               >
-                Scryfall
-              </a>
-              <a
-                v-if="heroEdhrecUrl"
-                :href="heroEdhrecUrl"
-                target="_blank"
-                rel="noreferrer"
-                class="rounded-full border border-white/20 px-3 py-1 uppercase tracking-[0.2em] text-white transition hover:border-white/60"
+                Partner
+              </p>
+              <p class="text-lg font-semibold text-slate-900 dark:text-white">
+                {{ partnerNames }}
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-if="canRandomizePartner"
+                type="button"
+                class="motion-press rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-slate-800 disabled:opacity-60 dark:border-slate-700/60"
+                @click="handlePartner"
+                :disabled="isLoading"
               >
-                EDHREC commander
-              </a>
+                {{ partnerButtonLabel }}
+              </button>
+              <button
+                v-if="heroHasCompanionSlot"
+                type="button"
+                class="motion-press rounded-full border border-slate-200 bg-white px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                @click="handleHeroCompanion"
+                :disabled="isLoading"
+              >
+                {{ heroCompanionButtonLabel }}
+              </button>
             </div>
           </div>
-          <div class="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+        </div>
+
+        <div
+          class="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/80 px-5 py-4 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <button
+            type="button"
+            class="motion-press motion-pulse flex items-center justify-center rounded-full border border-amber-300 bg-amber-400 px-8 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-slate-900 transition hover:bg-amber-300 disabled:opacity-60"
+            :disabled="isLoading"
+            @click="handleRandomize"
+          >
+            {{ isLoading ? "Shuffling…" : "Randomize" }}
+          </button>
+          <div class="flex flex-wrap items-center gap-2">
             <button
-              v-if="canRandomizePartner"
               type="button"
-              class="rounded-full border border-fuchsia-400 bg-fuchsia-600/90 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
-              @click="handlePartner"
-              :disabled="isLoading"
+              class="motion-press flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
+              aria-label="Open history"
+              @click="openHistory"
             >
-              {{ partnerButtonLabel }}
+              <ClockIcon class="h-5 w-5" stroke-width="1.7" />
+            </button>
+
+            <button
+              type="button"
+              class="motion-press flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
+              aria-label="Options"
+              @click="openFilters"
+            >
+              <FunnelIcon class="h-5 w-5" />
+              <span class="sr-only">Options</span>
             </button>
             <button
-              v-if="heroHasCompanionSlot"
               type="button"
-              class="rounded-full border border-cyan-400 bg-cyan-600/90 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-cyan-500 disabled:opacity-60"
-              @click="handleHeroCompanion"
-              :disabled="isLoading"
+              class="motion-press flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
+              aria-label="Open settings"
+              @click="openSettings"
             >
-              {{ heroCompanionButtonLabel }}
+              <Cog6ToothIcon class="h-5 w-5" />
             </button>
           </div>
         </div>
       </div>
 
-    <div class="mx-auto flex w-full max-w-4xl flex-col gap-4 border-t border-slate-900/40 pt-5 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex w-full flex-col gap-2 sm:w-1/2">
-        <label for="mode-select" class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
-          Mode
-        </label>
-        <select
-          :value="mode"
-          id="mode-select"
-          class="w-full rounded-2xl border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-white transition focus:border-fuchsia-400 focus:outline-none"
-          @change="handleModeChange"
+      <aside class="flex flex-col gap-4">
+        <section
+          class="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
-          <option
-            v-for="option in modes"
-            :key="option.id"
-            :value="option.id"
-            class="bg-slate-950 text-white"
+          <p
+            class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400"
           >
-            {{ option.label }}
-          </option>
-        </select>
-      </div>
+            Mode
+          </p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Single commander, partner pair, or spark draw.
+          </p>
+          <select
+            :value="mode"
+            id="mode-select"
+            class="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition focus:border-amber-400 focus:outline-none dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200"
+            @change="handleModeChange"
+          >
+            <option
+              v-for="option in modes"
+              :key="option.id"
+              :value="option.id"
+              class="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              {{ option.label }}
+            </option>
+          </select>
+        </section>
 
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button
-          type="button"
-          class="flex items-center justify-center rounded-2xl bg-fuchsia-600 px-8 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
-          :disabled="isLoading"
-          @click="handleRandomize"
+        <section
+          class="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
-          {{ isLoading ? "Shuffling…" : "Randomize" }}
-        </button>
-
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
-            aria-label="Open history"
-            @click="openHistory"
-          >
-            <ClockIcon class="h-5 w-5" stroke-width="1.7" />
-          </button>
-
-          <button
-            type="button"
-            class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
-            aria-label="Options"
-            @click="openFilters"
-          >
-            <FunnelIcon class="h-5 w-5" />
-            <span class="sr-only">Options</span>
-          </button>
-          <button
-            type="button"
-            class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900/70 text-white transition hover:border-white/70"
-            aria-label="Open settings"
-            @click="openSettings"
-          >
-            <Cog6ToothIcon class="h-5 w-5" />
-          </button>
-        </div>
-      </div>
+          <div class="flex items-center justify-between">
+            <p
+              class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400"
+            >
+              Filters
+            </p>
+            <button
+              type="button"
+              class="motion-press rounded-full border border-amber-200/80 bg-amber-100/70 px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-amber-900 transition hover:bg-amber-200/80 dark:border-amber-300/40 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/20"
+              @click="openFilters"
+            >
+              Refine
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Adjust color constraints, deck limits, and choice mode.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span
+              v-for="chip in filterChips"
+              :key="chip"
+              class="motion-chip rounded-full border border-slate-200 bg-white px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300"
+            >
+              {{ chip }}
+            </span>
+            <span
+              v-if="filterChips.length === 0"
+              class="motion-chip rounded-full border border-slate-200 bg-white px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-400"
+            >
+              No filters
+            </span>
+          </div>
+        </section>
+      </aside>
     </div>
   </section>
 </template>
