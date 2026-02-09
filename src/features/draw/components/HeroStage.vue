@@ -31,6 +31,7 @@ const layoutVariant = computed(() => {
 const displayCards = computed(() =>
   props.heroCards.slice(0, desiredCount.value),
 );
+const firstCard = computed(() => displayCards.value[0] ?? null);
 const emptySlots = computed(() =>
   Math.max(desiredCount.value - displayCards.value.length, 0),
 );
@@ -57,7 +58,7 @@ const placeholderLabel = computed(() => {
           aria-label="Commander card"
         >
           <article
-            v-if="displayCards.length"
+            v-if="firstCard"
             class="motion-card motion-card-hover w-full max-w-sm sm:max-w-md lg:max-w-lg"
             role="listitem"
           >
@@ -65,8 +66,8 @@ const placeholderLabel = computed(() => {
               class="aspect-[63/88] w-full overflow-hidden rounded-[1.8rem] border border-slate-200/70 bg-white shadow-[0_25px_50px_-30px_rgba(15,23,42,0.35)] dark:border-slate-700/60 dark:bg-slate-900"
             >
               <img
-                :src="getCardImageUrl(displayCards[0])"
-                :alt="displayCards[0]?.name ?? 'Commander card'"
+                :src="getCardImageUrl(firstCard)"
+                :alt="firstCard?.name ?? 'Commander card'"
                 class="h-full w-full object-cover"
               />
             </div>
