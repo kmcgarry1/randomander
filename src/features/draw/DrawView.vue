@@ -91,7 +91,7 @@ const openHistory = () => {
       :hero-cards="heroCards"
     />
 
-      <div class="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-[1.5rem] border border-slate-900/40 bg-slate-950/50 px-4 py-4 text-sm text-slate-200 dark:border-slate-700/50">
+      <div class="mx-auto flex w-full max-w-[min(92vw,1100px)] flex-col gap-3 rounded-[1.5rem] border border-slate-900/40 bg-slate-950/50 px-4 py-4 text-sm text-slate-200 dark:border-slate-700/50">
         <div class="flex justify-between gap-3">
           <div>
             <p class="text-xs uppercase tracking-[0.35em] text-slate-500">
@@ -127,7 +127,7 @@ const openHistory = () => {
               </a>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
             <button
               v-if="canRandomizePartner"
               type="button"
@@ -152,11 +152,12 @@ const openHistory = () => {
 
     <div class="mx-auto flex w-full max-w-4xl flex-col gap-4 border-t border-slate-900/40 pt-5 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex w-full flex-col gap-2 sm:w-1/2">
-        <label class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
+        <label for="mode-select" class="text-[0.6rem] uppercase tracking-[0.3em] text-slate-400">
           Mode
         </label>
         <select
           :value="mode"
+          id="mode-select"
           class="w-full rounded-2xl border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-white transition focus:border-fuchsia-400 focus:outline-none"
           @change="handleModeChange"
         >
