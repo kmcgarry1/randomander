@@ -13,6 +13,22 @@ import { formatColorIdentity } from "../../lib/scryfall";
 
 const store = useRandomanderStore();
 const { mode, options } = storeToRefs(store);
+const colorComparisonOptions: Array<{
+  label: string;
+  value: "up-to" | "exactly";
+  description: string;
+}> = [
+  {
+    label: "Up to",
+    value: "up-to",
+    description: "Allow anything within the selected color ceiling.",
+  },
+  {
+    label: "Exactly",
+    value: "exactly",
+    description: "Only return cards that hit the exact color count.",
+  },
+];
 
 const selectMode = (next: Mode) => {
   mode.value = next;
@@ -28,9 +44,17 @@ const sortColors = (colors: string[]) =>
   );
 
 const toggleColor = (symbol: string) => {
+  if (symbol === "C") {
+    options.value.selectedColors = options.value.selectedColors.includes("C")
+      ? []
+      : ["C"];
+    return;
+  }
+
   const next = new Set<string>(
     options.value.selectedColors.map((color: string) => color.toUpperCase()),
   );
+  next.delete("C");
   if (next.has(symbol)) {
     next.delete(symbol);
   } else {
@@ -83,8 +107,8 @@ const resetFilters = () => {
             Randomizer options
           </h2>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Filters update here; navigation tabs above keep history, saved, and
-            settings one tap away.
+            Filters update here; the draw workspace keeps history, saved pulls,
+            and settings one tap away.
           </p>
         </div>
         <button
@@ -97,7 +121,7 @@ const resetFilters = () => {
         </button>
       </div>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-3">
+      <div class="mt-6 grid gap-6 lg:grid-cols-4">
         <section
           class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
         >
@@ -176,6 +200,35 @@ const resetFilters = () => {
               @click="clearColors"
             >
               Clear
+            </button>
+          </div>
+        </section>
+
+        <section
+          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+        >
+          <p
+            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+          >
+            Comparison
+          </p>
+          <div class="mt-4 grid gap-3">
+            <button
+              v-for="comparison in colorComparisonOptions"
+              :key="comparison.value"
+              type="button"
+              class="motion-press rounded-2xl border px-4 py-3 text-left transition"
+              :class="
+                options.colorCountMode === comparison.value
+                  ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+              "
+              @click="options.colorCountMode = comparison.value"
+            >
+              <p class="text-sm font-semibold">{{ comparison.label }}</p>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ comparison.description }}
+              </p>
             </button>
           </div>
         </section>

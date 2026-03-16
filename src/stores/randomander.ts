@@ -21,7 +21,9 @@ import { clearCache } from '../lib/cache'
 import type { CacheOptions } from '../services/http'
 
 export type Mode = 'commander' | 'spark' | 'partner'
-export type ViewKey = 'draw' | 'history' | 'saved' | 'settings'
+export type ViewKey = 'draw' | 'settings'
+export type LegacyViewKey = ViewKey | 'history' | 'saved'
+export type ActivePanelKey = 'filters' | 'history' | 'saved'
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 export type CommanderChoice = {
@@ -60,6 +62,12 @@ export type CacheSettings = {
   maxEntries: number
 }
 
+export type PerformanceSettings = {
+  reduceMotion: boolean
+  simplifyBackdrop: boolean
+  reduceTransparency: boolean
+}
+
 export type PullRecord = {
   id: string
   createdAt: string
@@ -70,11 +78,12 @@ export type PullRecord = {
 }
 
 type PersistedState = {
-  view: ViewKey
+  view: LegacyViewKey
   mode: Mode
   options: OptionsState
   display: DisplaySettings
   cache: CacheSettings
+  performance: PerformanceSettings
   theme: ThemeMode
   history: PullRecord[]
   saved: PullRecord[]
@@ -105,8 +114,6 @@ export const modes = [
 
 export const viewNavItems: Array<{ id: ViewKey; label: string }> = [
   { id: 'draw', label: 'Draw' },
-  { id: 'history', label: 'History' },
-  { id: 'saved', label: 'Saved' },
   { id: 'settings', label: 'Settings' },
 ] as const
 
@@ -195,6 +202,12 @@ const defaultCache: CacheSettings = {
   maxEntries: 120,
 }
 
+const defaultPerformance: PerformanceSettings = {
+  reduceMotion: false,
+  simplifyBackdrop: false,
+  reduceTransparency: false,
+}
+
 const createId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -202,8 +215,12 @@ const createId = () =>
 
 export const useRandomanderStore = defineStore('randomander', () => {
   const persisted = readStorage<Partial<PersistedState>>(STORAGE_KEY, {})
+  const persistedView = persisted.view ?? 'draw'
+  const initialPanel =
+    persistedView === 'history' || persistedView === 'saved' ? persistedView : null
 
-  const view = ref<ViewKey>(persisted.view ?? 'draw')
+  const view = ref<ViewKey>(persistedView === 'settings' ? 'settings' : 'draw')
+  const activePanel = ref<ActivePanelKey | null>(initialPanel)
   const mode = ref<Mode>(persisted.mode ?? 'commander')
   const options = reactive<OptionsState>({
     ...defaultOptions,
@@ -217,6 +234,10 @@ export const useRandomanderStore = defineStore('randomander', () => {
     ...defaultCache,
     ...(persisted.cache ?? {}),
   })
+  const performance = reactive<PerformanceSettings>({
+    ...defaultPerformance,
+    ...(persisted.performance ?? {}),
+  })
   const theme = ref<ThemeMode>(persisted.theme ?? 'system')
   const history = ref<PullRecord[]>(persisted.history ?? [])
   const saved = ref<PullRecord[]>(persisted.saved ?? [])
@@ -226,13 +247,14 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const sparkPalette = ref<string[] | null>(null)
   const isLoading = ref(false)
   const errorMessage = ref('')
-  const isOptionsOpen = ref(false)
+  const metadataSurfaceVisible = ref(false)
 
   const controller = ref<AbortController | null>(null)
   const tagController = ref<AbortController | null>(null)
   const tagLookup = ref<Record<string, EdhrecTag[]>>({})
   const tagRequestId = ref(0)
   const metaCache = new Map<string, EdhrecMeta>()
+  const isOptionsOpen = computed(() => activePanel.value === 'filters')
 
   const cacheOptions = computed<CacheOptions | undefined>(() => {
     if (!cacheSettings.enabled) return undefined
@@ -490,25 +512,62 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const shouldShowTags = (card: ScryfallCard) =>
     display.showTags && usesCommanderLink(card)
 
+  const getGroupsForState = (
+    cardsToCheck: ScryfallCard[],
+    choiceRecords?: CommanderChoice[]
+  ) =>
+    choiceRecords?.length
+      ? choiceRecords.map((choice) => choice.cards)
+      : cardsToCheck.length > 0
+        ? [cardsToCheck]
+        : []
+
+  const getFingerprintForGroups = (
+    modeToFingerprint: Mode,
+    cardsToFingerprint: ScryfallCard[],
+    choiceRecords?: CommanderChoice[]
+  ) => {
+    const groups = getGroupsForState(cardsToFingerprint, choiceRecords)
+    if (groups.length === 0) return null
+
+    const normalizedGroups = groups
+      .map((group) => group.map((card) => card.id).slice().sort().join(','))
+      .sort()
+
+    return `${modeToFingerprint}:${normalizedGroups.join('|')}`
+  }
+
+  const getRecordFingerprint = (record: PullRecord) =>
+    getFingerprintForGroups(record.mode, record.cards ?? [], record.choices)
+
+  const savedFingerprints = computed(
+    () =>
+      new Set(
+        saved.value
+          .map((record) => getRecordFingerprint(record))
+          .filter((fingerprint): fingerprint is string => fingerprint !== null)
+      )
+  )
+
+  const currentResultFingerprint = computed(() =>
+    getFingerprintForGroups(mode.value, cards.value, choices.value)
+  )
+
+  const isCurrentSaved = computed(() => {
+    const fingerprint = currentResultFingerprint.value
+    return fingerprint ? savedFingerprints.value.has(fingerprint) : false
+  })
+
+  const isRecordSaved = (record: PullRecord) => {
+    const fingerprint = getRecordFingerprint(record)
+    return fingerprint ? savedFingerprints.value.has(fingerprint) : false
+  }
+
   const isPairGroup = (group: ScryfallCard[]) => group.length === 2
-  const isDoctorCard = (card: ScryfallCard) => {
-    const typeLine = getTypeLine(card).toLowerCase()
-    return typeLine.includes('doctor') && getPartnerKind(card) !== 'doctors_companion'
-  }
-  const sortPairForSlug = (group: ScryfallCard[]) => {
-    if (group.length !== 2) return group
-    const [first, second] = group as [ScryfallCard, ScryfallCard]
-    const firstIsDoctor = isDoctorCard(first)
-    const secondIsDoctor = isDoctorCard(second)
-
-    if (firstIsDoctor !== secondIsDoctor) {
-      return firstIsDoctor ? [first, second] : [second, first]
-    }
-
-    return group.slice().sort((a, b) => getCardSlug(a).localeCompare(getCardSlug(b)))
-  }
   const getPairSlug = (group: ScryfallCard[]) =>
-    sortPairForSlug(group)
+    group
+      .slice()
+      .sort((a, b) => getCardSlug(a).localeCompare(getCardSlug(b)))
       .map((card) => getCardSlug(card))
       .join('-')
 
@@ -536,6 +595,15 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const getDeckCountForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
     const key = getTagKeyForCard(card, group)
     return metaCache.get(key)?.deckCount ?? null
+  }
+
+  const getTagUrlForCard = (
+    card: ScryfallCard,
+    group: ScryfallCard[],
+    tag: EdhrecTag
+  ) => {
+    if (!tag.slug || !usesCommanderLink(card)) return tag.href
+    return `https://edhrec.com/commanders/${getTagKeyForCard(card, group)}/${tag.slug}`
   }
 
   const matchesColorCount = (card: ScryfallCard) => {
@@ -756,13 +824,17 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const saveRecord = (record: PullRecord) => {
-    const exists = saved.value.some((item) => item.id === record.id)
+    const fingerprint = getRecordFingerprint(record)
+    if (!fingerprint) return
+    const exists = saved.value.some(
+      (item) => getRecordFingerprint(item) === fingerprint
+    )
     if (exists) return
     saved.value = [record, ...saved.value].slice(0, MAX_SAVED)
   }
 
   const saveCurrent = () => {
-    if (!hasResults.value) return
+    if (!hasResults.value || isCurrentSaved.value) return
     const record = buildRecord(cards.value, choices.value)
     saveRecord(record)
   }
@@ -773,6 +845,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     cards.value = record.cards ?? []
     choices.value = record.choices ?? []
     view.value = 'draw'
+    activePanel.value = null
   }
 
   const removeSaved = (id: string) => {
@@ -1004,7 +1077,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const loadTagsForGroups = async (groups: ScryfallCard[][]) => {
-    if (!display.showTags || mode.value === 'spark') return
+    if (!display.showTags || mode.value === 'spark' || !metadataSurfaceVisible.value) {
+      return
+    }
     const targets = new Map<string, string[]>()
     groups.forEach((group) => {
       if (!group.length) return
@@ -1070,16 +1145,50 @@ export const useRandomanderStore = defineStore('randomander', () => {
     )
   }
 
+  const openPanel = (panel: ActivePanelKey) => {
+    view.value = 'draw'
+    activePanel.value = panel
+  }
+
+  const closePanel = () => {
+    activePanel.value = null
+  }
+
+  const openHistoryPanel = () => {
+    openPanel('history')
+  }
+
+  const openSavedPanel = () => {
+    openPanel('saved')
+  }
+
   const openOptions = () => {
-    isOptionsOpen.value = true
+    openPanel('filters')
   }
 
   const closeOptions = () => {
-    isOptionsOpen.value = false
+    if (activePanel.value === 'filters') {
+      activePanel.value = null
+    }
   }
 
   const clearNetworkCache = () => {
     clearCache()
+  }
+
+  const applyPerformancePreset = (preset: 'standard' | 'low-power') => {
+    const useLowPower = preset === 'low-power'
+    performance.reduceMotion = useLowPower
+    performance.simplifyBackdrop = useLowPower
+    performance.reduceTransparency = useLowPower
+
+    if (useLowPower) {
+      display.showAmbient = false
+    }
+  }
+
+  const setMetadataSurfaceVisible = (visible: boolean) => {
+    metadataSurfaceVisible.value = visible
   }
 
   watch(
@@ -1141,14 +1250,19 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
 
   watch(
-    [cards, choices, mode, () => display.showTags, () => display.usePairTags],
+    [
+      cards,
+      choices,
+      mode,
+      metadataSurfaceVisible,
+      () => display.showTags,
+      () => display.usePairTags,
+    ],
     () => {
-      if (!display.showTags || mode.value === 'spark') return
-      const groups = isChoiceMode.value
-        ? choices.value.map((choice) => choice.cards)
-        : cards.value.length > 0
-          ? [cards.value]
-          : []
+      if (!display.showTags || mode.value === 'spark' || !metadataSurfaceVisible.value) {
+        return
+      }
+      const groups = getGroupsForState(cards.value, isChoiceMode.value ? choices.value : undefined)
       if (groups.length === 0) return
       loadTagsForGroups(groups)
     },
@@ -1156,14 +1270,28 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
 
   watch(
-    [view, mode, options, display, cacheSettings, theme, history, saved],
+    () => view.value,
+    (nextView) => {
+      if (nextView === 'settings') {
+        activePanel.value = null
+      }
+    }
+  )
+
+  watch(
+    [view, activePanel, mode, options, display, cacheSettings, performance, theme, history, saved],
     () => {
+      const persistedPanel =
+        activePanel.value === 'history' || activePanel.value === 'saved'
+          ? activePanel.value
+          : null
       const payload: PersistedState = {
-        view: view.value,
+        view: persistedPanel ?? view.value,
         mode: mode.value,
         options: { ...options },
         display: { ...display },
         cache: { ...cacheSettings },
+        performance: { ...performance },
         theme: theme.value,
         history: history.value,
         saved: saved.value,
@@ -1180,10 +1308,12 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   return {
     view,
+    activePanel,
     mode,
     options,
     display,
     cacheSettings,
+    performance,
     theme,
     history,
     saved,
@@ -1193,6 +1323,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     isLoading,
     errorMessage,
     isOptionsOpen,
+    isCurrentSaved,
     drawCount,
     primaryCard,
     primaryPartnerKind,
@@ -1225,8 +1356,11 @@ export const useRandomanderStore = defineStore('randomander', () => {
     getTagsForCard,
     hasTagEntry,
     getDeckCountForCard,
+    getTagUrlForCard,
     getPartnerButtonLabel,
     getColorOptionLabel,
+    getRecordFingerprint,
+    isRecordSaved,
     randomize,
     randomizePartnerForPrimary,
     randomizePartnerForChoice,
@@ -1238,9 +1372,14 @@ export const useRandomanderStore = defineStore('randomander', () => {
     clearHistory,
     clearSaved,
     resetOptions,
+    openHistoryPanel,
+    openSavedPanel,
     openOptions,
     closeOptions,
+    closePanel,
     clearNetworkCache,
+    applyPerformancePreset,
+    setMetadataSurfaceVisible,
     formatColorIdentity,
     getTypeLine,
     getTagKeyForCard,

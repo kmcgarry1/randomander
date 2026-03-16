@@ -10,10 +10,10 @@ describe('LoadingOverlay', () => {
       },
     })
 
-    const loadingOverlay = screen.getByRole('status')
+    const loadingOverlay = screen.getByRole('status', { name: /loading cards/i })
     expect(loadingOverlay).toBeInTheDocument()
     expect(loadingOverlay).toHaveAttribute('aria-label', 'Loading cards')
-    expect(screen.getByText('Shuffling cards...')).toBeInTheDocument()
+    expect(loadingOverlay).toHaveTextContent(/shuffling cards/i)
   })
 
   it('hides loading overlay when isLoading is false', () => {

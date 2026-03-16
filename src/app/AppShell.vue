@@ -1,35 +1,70 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { storeToRefs } from "pinia";
-import { useRandomanderStore, viewNavItems } from "../stores/randomander";
-import type { ViewKey } from "../stores/randomander";
+import { useRandomanderStore } from "../stores/randomander";
 import DrawView from "../features/draw/DrawView.vue";
 import HistoryView from "../features/history/HistoryView.vue";
 import SavedView from "../features/saved/SavedView.vue";
 import SettingsView from "../features/settings/SettingsView.vue";
 import OptionsModal from "../components/layout/OptionsModal.vue";
 import LoadingOverlay from "../components/layout/LoadingOverlay.vue";
+import SupportPanel from "../components/layout/SupportPanel.vue";
 import { useTheme } from "../composables/useTheme";
 
 useTheme();
 
 const store = useRandomanderStore();
-const { view, isOptionsOpen, isLoading, display } = storeToRefs(store);
+const { view, activePanel, isOptionsOpen, isLoading, display, performance } =
+  storeToRefs(store);
 
-const selectView = (next: ViewKey) => {
-  store.view = next;
-};
+const performanceMode = computed(() => {
+  if (
+    performance.value.reduceMotion &&
+    performance.value.simplifyBackdrop &&
+    performance.value.reduceTransparency
+  ) {
+    return "low-power";
+  }
+  if (
+    performance.value.reduceMotion ||
+    performance.value.simplifyBackdrop ||
+    performance.value.reduceTransparency
+  ) {
+    return "custom";
+  }
+  return "standard";
+});
 
 const openOptions = () => {
   store.openOptions();
+};
+
+const closePanel = () => {
+  store.closePanel();
+};
+
+const openSettings = () => {
+  store.view = "settings";
+};
+
+const returnToDraw = () => {
+  store.view = "draw";
 };
 </script>
 
 <template>
   <div
+    data-testid="app-shell"
+    :data-performance-mode="performanceMode"
     class="relative min-h-screen overflow-hidden antialiased text-slate-900 dark:text-slate-100"
+    :class="{
+      'app-reduced-motion': performance.reduceMotion,
+      'app-simplified-backdrop': performance.simplifyBackdrop,
+      'app-reduced-transparency': performance.reduceTransparency,
+    }"
   >
     <div
-      v-if="display.showAmbient"
+      v-if="display.showAmbient && !performance.simplifyBackdrop"
       class="pointer-events-none absolute inset-0 opacity-60 dark:opacity-70"
       aria-hidden="true"
     >
@@ -45,103 +80,83 @@ const openOptions = () => {
     </div>
 
     <header
-      class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/60"
+      class="sticky top-0 z-30 px-4 pt-4"
     >
       <div
-        class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4"
+        class="mx-auto flex w-full max-w-[88rem] items-center justify-between gap-4 rounded-full border border-white/70 bg-white/58 px-4 py-3 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/58 sm:px-5"
       >
         <div class="flex items-center gap-3">
           <div
-            class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold uppercase tracking-[0.35em] text-white shadow-sm dark:bg-white dark:text-slate-900"
+            class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold uppercase tracking-[0.35em] text-white shadow-sm dark:bg-white dark:text-slate-900"
           >
             R
           </div>
           <div>
             <p
-              class="text-[0.6rem] uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400"
+              class="text-[0.58rem] uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400"
             >
               Commander studio
             </p>
-            <h1 class="font-heading text-lg text-slate-900 dark:text-white">
+            <h1 class="font-heading text-base text-slate-900 dark:text-white sm:text-lg">
               Randomander
             </h1>
           </div>
         </div>
 
-        <nav
-          class="hidden items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 p-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 shadow-sm backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-300 md:flex"
-        >
-          <button
-            v-for="item in viewNavItems"
-            :key="item.id"
-            type="button"
-            class="motion-nav motion-press rounded-full px-4 py-2 transition"
-            :class="
-              view === item.id
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'hover:text-slate-900 dark:hover:text-white'
-            "
-            @click="selectView(item.id)"
-          >
-            {{ item.label }}
-          </button>
-        </nav>
-
         <div class="flex items-center gap-2">
           <button
             v-if="view === 'draw'"
             type="button"
-            class="motion-press hidden rounded-full border border-amber-200/80 bg-amber-100/80 px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-900 shadow-sm transition hover:bg-amber-200/80 dark:border-amber-300/40 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/20 sm:inline-flex"
+            class="motion-press rounded-full border border-amber-200/80 bg-amber-100/82 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-amber-950 shadow-sm transition hover:bg-amber-200/82 dark:border-amber-300/40 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/20"
             @click="openOptions"
           >
             Filters
           </button>
-          <span
-            class="hidden text-[0.65rem] font-semibold uppercase tracking-[0.25em] text-slate-400 sm:inline"
+          <button
+            v-if="view === 'draw'"
+            type="button"
+            class="motion-press rounded-full border border-white/75 bg-white/70 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-200 dark:hover:bg-slate-900"
+            @click="openSettings"
           >
-            {{ view }}
-          </span>
+            Settings
+          </button>
+          <button
+            v-else
+            type="button"
+            class="motion-press rounded-full border border-white/75 bg-white/70 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-200 dark:hover:bg-slate-900"
+            @click="returnToDraw"
+          >
+            Back to draw
+          </button>
         </div>
       </div>
     </header>
 
     <div class="relative z-10">
       <main
-        class="motion-fade-up mx-auto w-full max-w-6xl px-4 pb-32 pt-6 sm:pb-24"
+        class="motion-fade-up mx-auto w-full max-w-[88rem] px-4 pb-20 pt-4 sm:pb-20"
       >
         <div class="flex min-h-full flex-col gap-6">
           <DrawView v-if="view === 'draw'" />
-          <HistoryView v-else-if="view === 'history'" />
-          <SavedView v-else-if="view === 'saved'" />
           <SettingsView v-else />
         </div>
       </main>
     </div>
 
-    <div
-      class="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none sm:hidden"
+    <SupportPanel
+      v-if="activePanel === 'history'"
+      label="History"
+      @close="closePanel"
     >
-      <div
-        class="pointer-events-auto w-full max-w-3xl rounded-[2rem] border border-slate-200/70 bg-white/85 px-3 py-3 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.45)] backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/75"
-      >
-        <nav class="flex gap-2" aria-label="Primary">
-          <button
-            v-for="item in viewNavItems"
-            :key="item.id"
-            type="button"
-            class="motion-press flex-1 rounded-[1.25rem] px-3 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.25em] transition"
-            :class="
-              view === item.id
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'bg-white/60 text-slate-600 hover:text-slate-900 dark:bg-slate-900/60 dark:text-slate-300'
-            "
-            @click="selectView(item.id)"
-          >
-            {{ item.label }}
-          </button>
-        </nav>
-      </div>
-    </div>
+      <HistoryView panel />
+    </SupportPanel>
+    <SupportPanel
+      v-else-if="activePanel === 'saved'"
+      label="Saved pulls"
+      @close="closePanel"
+    >
+      <SavedView panel />
+    </SupportPanel>
 
     <OptionsModal v-if="isOptionsOpen" />
     <LoadingOverlay :is-loading="isLoading" />

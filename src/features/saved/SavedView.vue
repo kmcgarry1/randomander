@@ -4,6 +4,15 @@ import { useRandomanderStore, modes } from "../../stores/randomander";
 import { formatColorIdentity, getCardImageUrl } from "../../lib/scryfall";
 import type { PullRecord } from "../../stores/randomander";
 
+const props = withDefaults(
+  defineProps<{
+    panel?: boolean;
+  }>(),
+  {
+    panel: false,
+  },
+);
+
 const store = useRandomanderStore();
 const { saved } = storeToRefs(store);
 
@@ -55,12 +64,22 @@ const handleRemove = (record: PullRecord) => {
 const handleClear = () => {
   store.clearSaved();
 };
+
+const handleClose = () => {
+  if (props.panel) {
+    store.closePanel();
+    return;
+  }
+  store.view = "draw";
+};
 </script>
 
 <template>
-  <section class="motion-fade-up mt-6 space-y-6">
+  <section
+    :class="['motion-fade-up mx-auto max-w-5xl space-y-5', props.panel ? '' : 'mt-6']"
+  >
     <header
-      class="flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white/80 px-6 py-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+      class="flex flex-col gap-3 px-1 py-1 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
     >
       <div>
         <p
@@ -84,7 +103,15 @@ const handleClear = () => {
         >
           Clear saved
         </button>
+        <button
+          type="button"
+          class="motion-press rounded-full border border-white/30 bg-slate-900/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-slate-900/90 dark:border-slate-100/40 dark:bg-slate-900"
+          @click="handleClose"
+        >
+          {{ props.panel ? "Close" : "Back to draw" }}
+        </button>
         <span
+          v-if="!props.panel"
           class="text-[0.65rem] font-semibold text-slate-500 dark:text-slate-400"
         >
           Clean slate for new favorites
@@ -94,7 +121,7 @@ const handleClear = () => {
 
     <div
       v-if="saved.length === 0"
-      class="rounded-3xl border border-slate-200/80 bg-white/80 p-10 text-center dark:border-slate-700/60 dark:bg-slate-900/80"
+      class="rounded-[2rem] border border-white/80 bg-white/76 p-10 text-center shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
     >
       <p class="font-heading text-xl text-slate-900 dark:text-white">
         No saved pulls yet.
@@ -104,11 +131,11 @@ const handleClear = () => {
       </p>
     </div>
 
-    <div v-else class="motion-stagger grid gap-4">
+    <div v-else class="motion-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <article
         v-for="record in saved"
         :key="record.id"
-        class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+        class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
       >
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -149,25 +176,25 @@ const handleClear = () => {
           </span>
         </div>
 
-        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <div class="mt-5 grid gap-4">
           <div
             v-for="(group, index) in getGroups(record)"
             :key="`${record.id}-${index}`"
-            class="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-700/60 dark:bg-slate-900/60"
+            class="rounded-[1.7rem] border border-white/75 bg-white/72 p-4 dark:border-slate-700/60 dark:bg-slate-900/72"
           >
             <p
               class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
             >
               {{ record.choices?.length ? `Option ${index + 1}` : "Pull" }}
             </p>
-            <div class="mt-3 flex items-center gap-3">
-              <div class="flex -space-x-3">
+            <div class="mt-4 flex flex-col items-center gap-4 text-center">
+              <div class="flex justify-center -space-x-5">
                 <img
                   v-for="card in group"
                   :key="card.id"
                   :src="getCardImageUrl(card)"
                   :alt="card.name"
-                  class="h-12 w-9 rounded-lg border border-white object-cover shadow-sm dark:border-slate-800"
+                  class="h-24 w-[4.25rem] rounded-2xl border border-white object-cover shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)] dark:border-slate-800"
                   loading="lazy"
                 />
               </div>

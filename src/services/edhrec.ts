@@ -3,6 +3,7 @@ import { fetchJson, type CacheOptions } from './http'
 export type EdhrecTag = {
   label: string
   href: string
+  slug?: string
   count?: number
 }
 
@@ -41,10 +42,12 @@ const extractTags = (data: EdhrecResponse): EdhrecTag[] => {
       ? item.href
       : `https://edhrec.com${item.href}`
     const slugMatch = item.href.match(/\/tags\/([^/]+)/)
+    const slug = slugMatch?.[1]
     acc.push({
       label: item.value,
       href,
-      count: slugMatch ? countMap.get(slugMatch[1]!) : undefined,
+      slug,
+      count: slug ? countMap.get(slug) : undefined,
     })
     return acc
   }, [])

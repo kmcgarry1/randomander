@@ -10,12 +10,14 @@ export type ScryfallCard = {
   color_identity?: string[]
   image_uris?: {
     normal?: string
+    art_crop?: string
   }
   card_faces?: Array<{
     type_line?: string
     oracle_text?: string
     image_uris?: {
       normal?: string
+      art_crop?: string
     }
     name?: string
   }>
@@ -41,6 +43,11 @@ const COLOR_NAMES: Record<string, string> = {
 
 export const getCardImageUrl = (card: ScryfallCard) =>
   card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? ''
+
+export const getCardArtUrl = (card: ScryfallCard) =>
+  card.image_uris?.art_crop ??
+  card.card_faces?.[0]?.image_uris?.art_crop ??
+  getCardImageUrl(card)
 
 export const getOracleText = (card: ScryfallCard) => {
   if (card.oracle_text) return card.oracle_text

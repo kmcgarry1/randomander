@@ -4,14 +4,11 @@ import { storeToRefs } from "pinia";
 import {
   useRandomanderStore,
   type ThemeMode,
-  type DisplaySettings,
 } from "../../stores/randomander";
 
 const store = useRandomanderStore();
-const { display, theme, cacheSettings, history, saved, view } =
+const { display, theme, cacheSettings, history, saved, performance, view } =
   storeToRefs(store);
-
-type DisplayKey = keyof DisplaySettings;
 
 const themeOptions: Array<{
   value: ThemeMode;
@@ -25,54 +22,77 @@ const themeOptions: Array<{
 
 const displayToggles = computed(() => [
   {
-    key: "showHeader" as DisplayKey,
-    label: "Show header",
-    description: "Display the title and subtitle.",
+    key: "showLinks" as const,
+    label: "External links",
+    description: "Show Scryfall, EDHREC, and deckbuilder launch links.",
   },
   {
-    key: "showStatus" as DisplayKey,
-    label: "Show status line",
-    description: "Display the current status.",
+    key: "showTags" as const,
+    label: "EDHREC metadata",
+    description: "Show deck counts and tag chips on active results.",
   },
   {
-    key: "showChips" as DisplayKey,
-    label: "Show summary chips",
-    description: "Display mode and color chips.",
+    key: "showAmbient" as const,
+    label: "Ambient glow",
+    description: "Enable the background glow treatment behind the app shell.",
+  },
+]);
+
+const performancePreset = computed(() => {
+  if (
+    performance.value.reduceMotion &&
+    performance.value.simplifyBackdrop &&
+    performance.value.reduceTransparency
+  ) {
+    return "low-power";
+  }
+  if (
+    !performance.value.reduceMotion &&
+    !performance.value.simplifyBackdrop &&
+    !performance.value.reduceTransparency
+  ) {
+    return "standard";
+  }
+  return "custom";
+});
+
+const performanceProfiles = [
+  {
+    value: "standard" as const,
+    label: "Standard",
+    description: "Keep the full reveal effects and glass treatment.",
   },
   {
-    key: "showCardTitles" as DisplayKey,
-    label: "Show card titles",
-    description: "Display card names below images.",
+    value: "low-power" as const,
+    label: "Low power",
+    description: "Cut motion, simplify the backdrop, and reduce blur.",
+  },
+];
+
+const performanceToggles = computed(() => [
+  {
+    key: "reduceMotion" as const,
+    label: "Reduce motion",
+    description: "Turn off most animations and reveal effects.",
   },
   {
-    key: "showColorIdentity" as DisplayKey,
-    label: "Show color identity",
-    description: "Display color identity labels.",
+    key: "simplifyBackdrop" as const,
+    label: "Simplify backdrop",
+    description: "Use a single static card-art wash instead of layered animated art.",
   },
   {
-    key: "showLinks" as DisplayKey,
-    label: "Show links",
-    description: "Display Scryfall and EDHREC links.",
-  },
-  {
-    key: "showTags" as DisplayKey,
-    label: "Show EDHREC tags",
-    description: "Display commander tags (not for spark).",
-  },
-  {
-    key: "usePairTags" as DisplayKey,
-    label: "Use pair tags",
-    description: "Show tags for partner pairs as a whole.",
-  },
-  {
-    key: "showAmbient" as DisplayKey,
-    label: "Show ambient glow",
-    description: "Enable background glow.",
+    key: "reduceTransparency" as const,
+    label: "Reduce blur and glass",
+    description: "Disable expensive backdrop blur on panels and overlays.",
   },
 ]);
 
 const setTheme = (value: ThemeMode) => {
   theme.value = value;
+};
+
+const setPerformancePreset = (value: "standard" | "low-power") => {
+  store.applyPerformancePreset(value);
 };
 
 const clearCache = () => {
@@ -85,9 +105,9 @@ const exitSettings = () => {
 </script>
 
 <template>
-  <section class="motion-fade-up mt-6 space-y-6">
+  <section class="motion-fade-up mx-auto mt-6 max-w-3xl space-y-5">
     <header
-      class="flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white/80 px-6 py-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80 sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-3 px-2 py-1 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
         <p
@@ -108,9 +128,9 @@ const exitSettings = () => {
       </button>
     </header>
 
-    <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+    <div class="grid gap-4 sm:grid-cols-[1.2fr_0.8fr]">
       <section
-        class="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+        class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
       >
         <p
           class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -151,7 +171,7 @@ const exitSettings = () => {
       </section>
 
       <section
-        class="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+        class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
       >
         <p
           class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -179,13 +199,21 @@ const exitSettings = () => {
     </div>
 
     <section
-      class="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+      class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
     >
-      <p
-        class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-      >
-        Display controls
-      </p>
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p
+            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+          >
+            Display controls
+          </p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Only active controls are shown here until the richer result metadata
+            surfaces return.
+          </p>
+        </div>
+      </div>
       <div class="mt-4 grid gap-4 sm:grid-cols-2">
         <label
           v-for="item in displayToggles"
@@ -210,12 +238,82 @@ const exitSettings = () => {
     </section>
 
     <section
-      class="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+      class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+    >
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p
+            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+          >
+            Performance
+          </p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Trim the heavier visual effects for older laptops and lower-power devices.
+          </p>
+        </div>
+        <span
+          class="rounded-full border border-slate-200/70 bg-slate-50/80 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300"
+        >
+          {{
+            performancePreset === "custom"
+              ? "Custom"
+              : performancePreset === "low-power"
+                ? "Low power"
+                : "Standard"
+          }}
+        </span>
+      </div>
+
+      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <button
+          v-for="option in performanceProfiles"
+          :key="option.value"
+          type="button"
+          class="motion-press rounded-2xl border px-4 py-4 text-left transition"
+          :class="
+            performancePreset === option.value
+              ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+          "
+          @click="setPerformancePreset(option.value)"
+        >
+          <p class="text-sm font-semibold">{{ option.label }}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {{ option.description }}
+          </p>
+        </button>
+      </div>
+
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <label
+          v-for="item in performanceToggles"
+          :key="item.key"
+          class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
+        >
+          <div>
+            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {{ item.label }}
+            </p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              {{ item.description }}
+            </p>
+          </div>
+          <input
+            v-model="performance[item.key]"
+            type="checkbox"
+            class="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+          />
+        </label>
+      </div>
+    </section>
+
+    <section
+      class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
     >
       <p
         class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
       >
-        Cache & performance
+        Cache
       </p>
       <div class="mt-4 grid gap-4 sm:grid-cols-2">
         <label

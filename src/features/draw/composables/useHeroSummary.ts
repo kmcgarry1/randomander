@@ -20,13 +20,12 @@ export function useHeroSummary() {
     mode,
     isChoiceMode,
     cards,
-    choices,
     stageTitle,
     partnerButtonLabel,
   } = storeToRefs(store);
 
   const heroGroup = computed(() =>
-    isChoiceMode.value ? choices.value[0]?.cards ?? [] : cards.value,
+    isChoiceMode.value ? [] : cards.value,
   );
 
   const heroCard = computed(() => heroGroup.value[0] ?? null);
@@ -63,13 +62,6 @@ export function useHeroSummary() {
   });
 
 const heroSubtitle = computed(() => {
-  if (isChoiceMode.value && choices.value.length) {
-    const option = choices.value[0];
-    if (!option) return "Tap randomise to draw";
-    return option.cards.length > 1
-      ? `${option.cards.length} cards selected`
-      : "Partner-ready commander";
-  }
     if (cards.value.length > 1) return `${cards.value.length} cards ready`;
     if (heroCard.value) return "Commander ready to reveal";
     return "Tap randomise to draw";
