@@ -226,11 +226,11 @@ watch(activeResultKey, () => {
 </script>
 
 <template>
-  <section class="motion-fade-up relative isolate mt-6">
+  <section class="motion-fade-up relative isolate mt-2 sm:mt-6">
     <DrawBackdrop :cards="backdropCards" :simplified="performance.simplifyBackdrop" />
 
-    <div class="relative z-10 mx-auto flex max-w-[76rem] flex-col items-center gap-5 pt-3 sm:gap-6">
-      <div class="flex max-w-3xl flex-col items-center gap-3 text-center">
+    <div class="relative z-10 mx-auto flex max-w-[76rem] flex-col items-center gap-5 pt-1 sm:gap-6 sm:pt-3">
+      <div class="order-6 flex max-w-3xl flex-col items-center gap-3 text-center sm:order-1">
         <div class="flex flex-wrap justify-center gap-2">
           <span
             v-for="chip in stageChips"
@@ -242,7 +242,7 @@ watch(activeResultKey, () => {
         </div>
       </div>
 
-      <div class="flex w-full justify-center">
+      <div class="order-5 flex w-full justify-center sm:order-2">
         <div
           class="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/80 bg-white/74 p-1.5 shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-950/74"
         >
@@ -264,7 +264,7 @@ watch(activeResultKey, () => {
         </div>
       </div>
 
-      <div class="w-full max-w-[44rem]">
+      <div class="order-1 w-full max-w-[44rem] sm:order-3">
         <ChoiceOptionsSection
           v-if="isChoiceMode && choices.length"
           :choices="choices"
@@ -293,7 +293,7 @@ watch(activeResultKey, () => {
           mode !== 'spark' &&
           (partnerNames || canRandomizePartner || heroHasCompanionSlot)
         "
-        class="flex flex-wrap items-center justify-center gap-2"
+        class="order-2 flex flex-wrap items-center justify-center gap-2 sm:order-4"
       >
         <span
           v-if="partnerNames"
@@ -323,7 +323,7 @@ watch(activeResultKey, () => {
 
       <div
         v-if="resultMessage"
-        class="w-full max-w-xl rounded-full border px-5 py-3 text-center shadow-[0_16px_40px_-30px_rgba(15,23,42,0.28)] backdrop-blur-lg"
+        class="order-4 w-full max-w-xl rounded-full border px-5 py-3 text-center shadow-[0_16px_40px_-30px_rgba(15,23,42,0.28)] backdrop-blur-lg sm:order-5"
         :class="
           errorMessage
             ? 'border-rose-200 bg-rose-50/92 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100'
@@ -338,7 +338,7 @@ watch(activeResultKey, () => {
         </p>
       </div>
 
-      <div class="flex w-full max-w-[44rem] flex-col items-center gap-3">
+      <div class="order-3 flex w-full max-w-[44rem] flex-col items-center gap-3 sm:order-6">
         <button
           type="button"
           class="motion-press motion-pulse flex min-w-[15rem] items-center justify-center rounded-full border border-amber-300 bg-amber-400 px-8 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.35em] text-slate-900 shadow-[0_22px_45px_-28px_rgba(251,191,36,0.62)] transition hover:bg-amber-300 disabled:opacity-60"
@@ -402,7 +402,7 @@ watch(activeResultKey, () => {
       <Transition name="details-sheet">
         <div
           v-if="detailsOpen && !isChoiceMode && hasResults"
-          class="w-full max-w-[58rem]"
+          class="order-7 w-full max-w-[58rem] sm:order-7"
         >
           <section
             class="overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/52 px-4 py-4 shadow-[0_28px_70px_-42px_rgba(15,23,42,0.3)] backdrop-blur-2xl dark:border-slate-700/60 dark:bg-slate-950/54 sm:px-5"
