@@ -14,7 +14,7 @@ import { useTheme } from "../composables/useTheme";
 useTheme();
 
 const store = useRandomanderStore();
-const { view, activePanel, isOptionsOpen, isLoading, display, performance } =
+const { activePanel, isOptionsOpen, isLoading, display, performance } =
   storeToRefs(store);
 
 const performanceMode = computed(() => {
@@ -35,20 +35,12 @@ const performanceMode = computed(() => {
   return "standard";
 });
 
-const openOptions = () => {
-  store.openOptions();
+const openSettings = () => {
+  store.openSettingsPanel();
 };
 
 const closePanel = () => {
   store.closePanel();
-};
-
-const openSettings = () => {
-  store.view = "settings";
-};
-
-const returnToDraw = () => {
-  store.view = "draw";
 };
 </script>
 
@@ -79,72 +71,68 @@ const returnToDraw = () => {
       ></div>
     </div>
 
-    <header
-      class="sticky top-0 z-30 px-4 pt-4"
-    >
-      <div
-        class="mx-auto flex w-full max-w-[88rem] items-center justify-between gap-4 rounded-full border border-white/70 bg-white/58 px-4 py-3 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/58 sm:px-5"
-      >
-        <div class="flex items-center gap-3">
-          <div
-            class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold uppercase tracking-[0.35em] text-white shadow-sm dark:bg-white dark:text-slate-900"
-          >
-            R
-          </div>
-          <div>
-            <p
-              class="text-[0.58rem] uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400"
+    <header class="sticky top-0 z-30 hidden px-4 pb-3 pt-4 sm:block">
+      <div class="mx-auto w-full max-w-[88rem]">
+        <div
+          class="flex items-center justify-between gap-4 rounded-full border border-white/70 bg-white/58 px-4 py-3 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/58 sm:px-5"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold uppercase tracking-[0.35em] text-white shadow-sm dark:bg-white dark:text-slate-900"
             >
-              Commander studio
-            </p>
-            <h1 class="font-heading text-base text-slate-900 dark:text-white sm:text-lg">
-              Randomander
-            </h1>
+              R
+            </div>
+            <div>
+              <p
+                class="text-[0.58rem] uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400"
+              >
+                Commander studio
+              </p>
+              <h1 class="font-heading text-base text-slate-900 dark:text-white sm:text-lg">
+                Randomander
+              </h1>
+            </div>
           </div>
-        </div>
 
-        <div class="flex items-center gap-2">
-          <button
-            v-if="view === 'draw'"
-            type="button"
-            class="motion-press rounded-full border border-amber-200/80 bg-amber-100/82 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-amber-950 shadow-sm transition hover:bg-amber-200/82 dark:border-amber-300/40 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/20"
-            @click="openOptions"
-          >
-            Filters
-          </button>
-          <button
-            v-if="view === 'draw'"
-            type="button"
-            class="motion-press rounded-full border border-white/75 bg-white/70 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-200 dark:hover:bg-slate-900"
-            @click="openSettings"
-          >
-            Settings
-          </button>
-          <button
-            v-else
-            type="button"
-            class="motion-press rounded-full border border-white/75 bg-white/70 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-200 dark:hover:bg-slate-900"
-            @click="returnToDraw"
-          >
-            Back to draw
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="motion-press rounded-full border border-amber-200/80 bg-amber-100/82 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-amber-950 shadow-sm transition hover:bg-amber-200/82 dark:border-amber-300/40 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/20"
+              @click="store.openOptions()"
+            >
+              Filters
+            </button>
+            <button
+              type="button"
+              class="motion-press rounded-full border border-white/75 bg-white/70 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-200 dark:hover:bg-slate-900"
+              @click="openSettings"
+            >
+              Settings
+            </button>
+          </div>
         </div>
       </div>
     </header>
 
     <div class="relative z-10">
       <main
-        class="motion-fade-up mx-auto w-full max-w-[88rem] px-4 pb-20 pt-4 sm:pb-20"
+        class="motion-fade-up mx-auto w-full max-w-[88rem] px-4 pb-40 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pb-20 sm:pt-4"
       >
         <div class="flex min-h-full flex-col gap-6">
-          <DrawView v-if="view === 'draw'" />
-          <SettingsView v-else />
+          <DrawView />
         </div>
       </main>
     </div>
 
     <SupportPanel
-      v-if="activePanel === 'history'"
+      v-if="activePanel === 'settings'"
+      label="Settings"
+      @close="closePanel"
+    >
+      <SettingsView panel />
+    </SupportPanel>
+    <SupportPanel
+      v-else-if="activePanel === 'history'"
       label="History"
       @close="closePanel"
     >

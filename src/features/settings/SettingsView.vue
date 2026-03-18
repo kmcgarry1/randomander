@@ -6,8 +6,17 @@ import {
   type ThemeMode,
 } from "../../stores/randomander";
 
+const props = withDefaults(
+  defineProps<{
+    panel?: boolean;
+  }>(),
+  {
+    panel: false,
+  },
+);
+
 const store = useRandomanderStore();
-const { display, theme, cacheSettings, history, saved, performance, view } =
+const { display, theme, cacheSettings, history, performance } =
   storeToRefs(store);
 
 const themeOptions: Array<{
@@ -24,7 +33,7 @@ const displayToggles = computed(() => [
   {
     key: "showLinks" as const,
     label: "External links",
-    description: "Show Scryfall, EDHREC, and deckbuilder launch links.",
+    description: "Show Scryfall and EDHREC links around active results.",
   },
   {
     key: "showTags" as const,
@@ -99,13 +108,22 @@ const clearCache = () => {
   store.clearNetworkCache();
 };
 
-const exitSettings = () => {
-  view.value = "draw";
+const openHistory = () => {
+  store.openHistoryPanel();
+};
+
+const closeSettings = () => {
+  store.closePanel();
 };
 </script>
 
 <template>
-  <section class="motion-fade-up mx-auto mt-6 max-w-3xl space-y-5">
+  <section
+    :class="[
+      'motion-fade-up mx-auto max-w-3xl space-y-5',
+      props.panel ? '' : 'mt-6',
+    ]"
+  >
     <header
       class="flex flex-col gap-3 px-2 py-1 sm:flex-row sm:items-center sm:justify-between"
     >
@@ -122,9 +140,9 @@ const exitSettings = () => {
       <button
         type="button"
         class="motion-press rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-        @click="exitSettings"
+        @click="closeSettings"
       >
-        Back to draw
+        {{ props.panel ? "Close" : "Done" }}
       </button>
     </header>
 
@@ -176,7 +194,7 @@ const exitSettings = () => {
         <p
           class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
         >
-          Stats
+          History
         </p>
         <div class="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <p>
@@ -185,15 +203,16 @@ const exitSettings = () => {
               history.length
             }}</span>
           </p>
-          <p>
-            Saved pulls:
-            <span class="font-semibold text-slate-900 dark:text-white">{{
-              saved.length
-            }}</span>
-          </p>
           <p class="text-xs text-slate-500 dark:text-slate-400">
             Stored locally on this device.
           </p>
+          <button
+            type="button"
+            class="motion-press inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            @click="openHistory"
+          >
+            Open history
+          </button>
         </div>
       </section>
     </div>

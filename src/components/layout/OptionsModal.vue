@@ -84,15 +84,19 @@ const resetFilters = () => {
 
 <template>
   <div
-    class="motion-overlay fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 px-4 py-6 backdrop-blur"
+    class="motion-overlay fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 px-0 pt-6 backdrop-blur sm:items-start sm:px-4 sm:py-6"
     @click.self="close"
   >
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="options-title"
-      class="motion-modal w-full max-w-5xl max-h-[86vh] overflow-y-auto rounded-[2.5rem] border border-slate-200/80 bg-white/95 p-6 pb-12 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
+      class="motion-modal max-h-[90vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200/80 bg-white/95 p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-[0_30px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur sm:max-h-[86vh] sm:max-w-5xl sm:rounded-[2.5rem] sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
     >
+      <div
+        class="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700 sm:hidden"
+        aria-hidden="true"
+      ></div>
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p
@@ -107,8 +111,7 @@ const resetFilters = () => {
             Randomizer options
           </h2>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Filters update here; the draw workspace keeps history, saved pulls,
-            and settings one tap away.
+            Adjust filters here, then return to the draw and randomize again.
           </p>
         </div>
         <button
