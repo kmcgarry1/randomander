@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import {
   AdjustmentsHorizontalIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   Cog6ToothIcon,
 } from "@heroicons/vue/24/outline";
 import {
@@ -86,11 +88,22 @@ const filterChips = computed(() => {
 const stageChips = computed(() => filterChips.value);
 
 const detailsOpen = ref(false);
-const detailsLabel = computed(() =>
+const detailsToggleLabel = computed(() =>
   detailsOpen.value ? "Hide details" : "Show details",
 );
+const detailsSectionLabel = "Details";
 const activeFilterCount = computed(() => filterChips.value.length);
 const isMobileViewport = ref(false);
+const showHeroCompanion = computed(
+  () =>
+    !isChoiceMode.value &&
+    mode.value !== "spark" &&
+    heroGroup.value.length === 1 &&
+    heroHasCompanionSlot.value,
+);
+const showActionCard = computed(
+  () => !isMobileViewport.value || hasResults.value || showHeroCompanion.value,
+);
 
 const activeResultKey = computed(() => {
   if (isChoiceMode.value) {
@@ -109,6 +122,9 @@ const pairLinkUrl = computed(() =>
   heroGroup.value.length === 2
     ? `https://edhrec.com/commanders/${store.getPartnerSlugForGroup(heroGroup.value)}`
     : "",
+);
+const heroLinksVisible = computed(
+  () => display.value.showLinks && (!isMobileViewport.value || !detailsOpen.value),
 );
 
 const updateMode = (value: Mode) => {
@@ -189,11 +205,11 @@ watch(activeResultKey, () => {
 </script>
 
 <template>
-  <section class="motion-fade-up relative isolate mt-2 sm:mt-6">
+  <section class="motion-fade-up relative isolate mt-1 sm:mt-6">
     <DrawBackdrop :cards="backdropCards" :simplified="performance.simplifyBackdrop" />
 
-    <div class="relative z-10 mx-auto flex max-w-[76rem] flex-col items-center gap-5 pt-1 sm:gap-6 sm:pt-3">
-      <div class="order-2 flex max-w-3xl flex-col items-center gap-3 text-center sm:order-1">
+    <div class="relative z-10 mx-auto flex max-w-[76rem] flex-col items-center gap-4 pt-1 sm:gap-6 sm:pt-3">
+      <div class="order-2 hidden max-w-3xl flex-col items-center gap-3 text-center sm:order-1 sm:flex">
         <div
           v-if="stageChips.length"
           class="flex flex-wrap justify-center gap-2"
@@ -208,28 +224,68 @@ watch(activeResultKey, () => {
         </div>
       </div>
 
-      <div class="order-1 w-full max-w-[28rem] sm:order-2 sm:max-w-full">
-        <div class="grid grid-cols-3 gap-2 sm:hidden">
-          <button
-            v-for="option in modes"
-            :key="`mobile-${option.id}`"
-            type="button"
-            class="motion-nav motion-press min-h-[3.5rem] rounded-[1.25rem] border px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.14em] transition"
-            :class="
-              mode === option.id
-                ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
-                : 'border-white/80 bg-white/74 text-slate-600 backdrop-blur-md hover:border-slate-300 hover:text-slate-900 dark:border-slate-700/60 dark:bg-slate-950/74 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white'
-            "
-            :aria-pressed="mode === option.id"
-            @click="updateMode(option.id)"
-          >
-            <span class="block leading-tight">
-              {{ option.label }}
+      <div class="order-1 w-full max-w-[30rem] sm:order-2 sm:max-w-full">
+        <div
+          v-if="isMobileViewport"
+          class="rounded-[1.7rem] border border-white/80 bg-white/80 p-3 shadow-[0_22px_50px_-36px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/78 sm:hidden"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[0.82rem] font-semibold text-slate-900 dark:text-white">
+                Draw mode
+              </p>
+              <p class="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                Choose how the next pull should be generated.
+              </p>
+            </div>
+            <span
+              v-if="stageChips.length"
+              class="rounded-full bg-slate-100 px-3 py-1 text-[0.7rem] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-300"
+            >
+              {{ stageChips.length }} filter{{ stageChips.length === 1 ? "" : "s" }}
             </span>
-          </button>
+          </div>
+
+          <div
+            v-if="stageChips.length"
+            class="mt-3 flex flex-wrap gap-2"
+          >
+            <span
+              v-for="chip in stageChips"
+              :key="`mobile-${chip}`"
+              class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[0.7rem] font-medium text-slate-600 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300"
+            >
+              {{ chip }}
+            </span>
+          </div>
+
+          <div class="mt-3 rounded-[1.35rem] bg-slate-100/90 p-1.5 dark:bg-slate-900/80">
+            <div class="grid grid-cols-3 gap-1.5">
+              <button
+                v-for="option in modes"
+                :key="`mobile-${option.id}`"
+                type="button"
+                class="motion-nav motion-press min-h-11 rounded-[1rem] px-2 py-2 text-center text-[0.78rem] font-semibold transition"
+                :class="
+                  mode === option.id
+                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-50 dark:text-slate-950'
+                    : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+                "
+                :aria-pressed="mode === option.id"
+                @click="updateMode(option.id)"
+              >
+                <span class="block leading-tight">
+                  {{ option.label }}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="hidden w-full justify-center sm:flex">
+        <div
+          v-else
+          class="hidden w-full justify-center sm:flex"
+        >
           <div
             class="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/80 bg-white/74 p-1.5 shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-950/74"
           >
@@ -270,34 +326,14 @@ watch(activeResultKey, () => {
           :hero-cards="heroCards"
           :hero-scryfall-url="heroScryfallUrl"
           :hero-edhrec-url="heroEdhrecUrl"
-          :show-links="display.showLinks"
+          :show-links="heroLinksVisible"
           :mode="mode"
         />
       </div>
 
       <div
-        v-if="
-          !isChoiceMode &&
-          mode !== 'spark' &&
-          heroGroup.length === 1 &&
-          heroHasCompanionSlot
-        "
-        class="order-4 flex flex-wrap items-center justify-center gap-2 sm:order-4"
-      >
-        <button
-          v-if="heroHasCompanionSlot"
-          type="button"
-          class="motion-press rounded-full border border-slate-200 bg-white px-4 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-          @click="handleHeroCompanion"
-          :disabled="isLoading"
-        >
-          {{ heroCompanionButtonLabel }}
-        </button>
-      </div>
-
-      <div
         v-if="errorMessage"
-        class="order-5 w-full max-w-xl rounded-[1.5rem] border border-rose-200 bg-rose-50/92 px-5 py-3 text-center text-rose-900 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.28)] backdrop-blur-lg dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 sm:order-5"
+        class="order-5 w-full max-w-[30rem] rounded-[1.35rem] border border-rose-200 bg-rose-50/92 px-4 py-3 text-center text-rose-900 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.28)] backdrop-blur-lg dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 sm:max-w-xl sm:rounded-[1.5rem] sm:px-5 sm:order-5"
       >
         <p class="text-sm leading-relaxed">
           {{ errorMessage }}
@@ -305,12 +341,43 @@ watch(activeResultKey, () => {
       </div>
 
       <section
+        v-if="showActionCard"
         class="order-6 w-full max-w-[30rem] sm:order-6 sm:max-w-[58rem]"
       >
         <div
-          class="overflow-hidden rounded-[2rem] border border-white/80 bg-white/52 shadow-[0_28px_70px_-42px_rgba(15,23,42,0.3)] backdrop-blur-2xl dark:border-slate-700/60 dark:bg-slate-950/54"
+          class="overflow-hidden rounded-[1.75rem] border border-white/85 bg-white/80 shadow-[0_22px_50px_-38px_rgba(15,23,42,0.3)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/76 sm:rounded-[2rem] sm:bg-white/52 sm:shadow-[0_28px_70px_-42px_rgba(15,23,42,0.3)] sm:backdrop-blur-2xl sm:dark:bg-slate-950/54"
         >
-          <div class="flex flex-col gap-3 px-4 py-4 sm:px-5">
+          <div class="flex flex-col gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-4">
+            <div
+              v-if="isMobileViewport"
+              class="grid gap-2"
+            >
+              <button
+                v-if="showHeroCompanion"
+                type="button"
+                class="motion-press flex min-h-12 w-full items-center justify-between rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                @click="handleHeroCompanion"
+                :disabled="isLoading"
+              >
+                <span>{{ heroCompanionButtonLabel }}</span>
+              </button>
+              <button
+                v-if="!isChoiceMode && hasResults"
+                type="button"
+                class="motion-press flex min-h-12 w-full items-center justify-between rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                @click="toggleDetails"
+                :aria-expanded="detailsOpen"
+                aria-controls="result-details-panel"
+              >
+                <span>{{ detailsSectionLabel }}</span>
+                <component
+                  :is="detailsOpen ? ChevronUpIcon : ChevronDownIcon"
+                  class="h-5 w-5 text-slate-400 dark:text-slate-500"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
             <button
               v-if="!isMobileViewport"
               type="button"
@@ -321,7 +388,10 @@ watch(activeResultKey, () => {
               {{ isLoading ? "Shuffling..." : "Randomize" }}
             </button>
 
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+            <div
+              v-if="!isMobileViewport"
+              class="hidden sm:flex sm:flex-row sm:flex-wrap sm:justify-center sm:gap-2"
+            >
               <button
                 v-if="!isChoiceMode && hasResults"
                 type="button"
@@ -330,7 +400,16 @@ watch(activeResultKey, () => {
                 :aria-expanded="detailsOpen"
                 aria-controls="result-details-panel"
               >
-                {{ detailsLabel }}
+                {{ detailsToggleLabel }}
+              </button>
+              <button
+                v-if="showHeroCompanion"
+                type="button"
+                class="motion-press inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/82 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-950/82 dark:text-slate-200 dark:hover:bg-slate-900 sm:min-h-0 sm:text-[0.6rem] sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
+                @click="handleHeroCompanion"
+                :disabled="isLoading"
+              >
+                {{ heroCompanionButtonLabel }}
               </button>
               <button
                 type="button"
@@ -346,7 +425,7 @@ watch(activeResultKey, () => {
             <div
               v-if="detailsOpen && !isChoiceMode && hasResults"
               id="result-details-panel"
-              class="border-t border-white/70 px-4 py-4 dark:border-slate-700/60 sm:px-5"
+              class="border-t border-white/70 bg-slate-50/55 px-3 py-3 dark:border-slate-700/60 dark:bg-slate-900/35 sm:bg-transparent sm:px-5 sm:py-4 sm:dark:bg-transparent"
             >
               <ResultDetailsSection
                 :cards="heroCards"
@@ -361,16 +440,19 @@ watch(activeResultKey, () => {
       </section>
     </div>
 
+  </section>
+
+  <Teleport to="body">
     <div
       v-if="isMobileViewport"
       class="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:hidden"
     >
       <div
-        class="mx-auto flex max-w-[30rem] items-center gap-3 rounded-[1.75rem] border border-white/80 bg-slate-950/88 px-3 py-3 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] backdrop-blur-2xl dark:border-slate-700/60"
+        class="mx-auto flex max-w-[30rem] items-center gap-3 rounded-[1.55rem] border border-white/85 bg-white/84 px-3 py-3 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.32)] backdrop-blur-2xl dark:border-slate-700/60 dark:bg-slate-950/88"
       >
         <button
           type="button"
-          class="motion-press relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/6 text-slate-100 transition hover:bg-white/10"
+          class="motion-press relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/12 dark:bg-white/6 dark:text-slate-100 dark:hover:bg-white/10"
           @click="openFilters"
           aria-label="Filters"
         >
@@ -394,7 +476,7 @@ watch(activeResultKey, () => {
 
         <button
           type="button"
-          class="motion-press inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/6 text-slate-100 transition hover:bg-white/10"
+          class="motion-press inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/12 dark:bg-white/6 dark:text-slate-100 dark:hover:bg-white/10"
           @click="openSettings"
           aria-label="Settings"
         >
@@ -402,5 +484,5 @@ watch(activeResultKey, () => {
         </button>
       </div>
     </div>
-  </section>
+  </Teleport>
 </template>
