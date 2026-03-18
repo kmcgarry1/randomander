@@ -153,7 +153,7 @@ describe('Randomander', () => {
 
     renderApp()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /partner pair/i }))
+    await user.click(screen.getAllByRole('button', { name: /partner pair/i })[0]!)
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
 
     const pairUrl =
@@ -175,6 +175,52 @@ describe('Randomander', () => {
         .getAllByRole('link')
         .some((link) => link.getAttribute('href') === pairUrl)
     ).toBe(true)
+  })
+
+  it('randomizes a background for commanders with choose a background', async () => {
+    const fetchMock = createFetchMock(
+      createCard({
+        id: 'card-1',
+        name: 'Burakos, Party Leader',
+        scryfall_uri: 'https://scryfall.com/card/abc/burakos-party-leader',
+        color_identity: ['B'],
+        type_line: 'Legendary Creature - Orc',
+        oracle_text:
+          'Choose a Background (You can have a Background as a second commander.)',
+      }),
+      createCard({
+        id: 'card-2',
+        name: 'Agent of the Iron Throne',
+        scryfall_uri: 'https://scryfall.com/card/abc/agent-of-the-iron-throne',
+        color_identity: ['B'],
+        type_line: 'Legendary Enchantment - Background',
+        oracle_text:
+          'Commander creatures you own have "Whenever this creature attacks, defending player loses 1 life and you gain 1 life."',
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+    await screen.findAllByText('Burakos, Party Leader')
+
+    const backgroundButton = screen.getByRole('button', {
+      name: /randomize background/i,
+    })
+    expect(screen.queryByRole('button', { name: /find commander/i })).not.toBeInTheDocument()
+
+    await user.click(backgroundButton)
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /burakos, party leader \+ agent of the iron throne/i,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: 'Agent of the Iron Throne' })
+    ).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('draws three cards in 3-card spark mode', async () => {
@@ -260,10 +306,10 @@ describe('Randomander', () => {
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
 
     expect(await screen.findByText('Request failed (500).')).toBeInTheDocument()
-    expect(screen.getByText(/draw issue/i)).toBeInTheDocument()
+    expect(screen.queryByText(/draw issue/i)).not.toBeInTheDocument()
   })
 
-  it('saves the current result once and opens it from the saved panel', async () => {
+  it('keeps the draw controls focused on details and filters instead of save actions', async () => {
     const fetchMock = createFetchMock(createCard({ name: 'Atraxa, Praetors Voice' }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -272,16 +318,10 @@ describe('Randomander', () => {
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
     await screen.findAllByText('Atraxa, Praetors Voice')
 
-    await user.click(screen.getByRole('button', { name: /save current/i }))
-
-    const savedButton = screen.getByRole('button', { name: /^saved$/i })
-    expect(savedButton).toBeDisabled()
-
-    await user.click(screen.getByRole('button', { name: /saved pulls/i }))
-
-    const panel = await screen.findByRole('dialog', { name: /saved pulls/i })
-    expect(within(panel).getByText(/saved pulls/i)).toBeInTheDocument()
-    expect(within(panel).getByText('Atraxa, Praetors Voice')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save current/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /saved pulls/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /filters/i }).length).toBeGreaterThan(0)
   })
 
   it('restores the up to and exactly color comparison controls', async () => {
@@ -315,6 +355,7 @@ describe('Randomander', () => {
     renderApp()
     const user = userEvent.setup()
     await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    expect(await screen.findByRole('dialog', { name: /settings/i })).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /low power/i }))
 
     const shell = screen.getByTestId('app-shell')
@@ -323,7 +364,7 @@ describe('Randomander', () => {
     expect(shell).toHaveClass('app-simplified-backdrop')
     expect(shell).toHaveClass('app-reduced-transparency')
 
-    await user.click(screen.getAllByRole('button', { name: /back to draw/i })[0]!)
+    await user.click(screen.getByRole('button', { name: /^close$/i }))
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
     await screen.findAllByText('Atraxa, Praetors Voice')
 

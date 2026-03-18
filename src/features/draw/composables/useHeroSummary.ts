@@ -35,6 +35,8 @@ export function useHeroSummary() {
     heroCard.value ? getPartnerKind(heroCard.value) : null,
   );
 
+  const heroIsBackground = computed(() => isBackgroundCard(heroCard.value));
+
   const heroHasCompanionSlot = computed(
     () =>
       mode.value === "commander" &&
@@ -55,34 +57,32 @@ export function useHeroSummary() {
   );
 
   const heroCompanionButtonLabel = computed(() => {
-    if (heroPartnerKind.value === "choose_background") {
+    if (heroIsBackground.value) {
       return "Find commander";
     }
     return partnerButtonLabel.value;
   });
 
-const heroSubtitle = computed(() => {
+  const heroSubtitle = computed(() => {
     if (cards.value.length > 1) return `${cards.value.length} cards ready`;
     if (heroCard.value) return "Commander ready to reveal";
     return "Tap randomise to draw";
   });
 
-const heroBackgroundStyle = computed<Record<string, string>>(() => {
-  if (!heroCard.value) return {} as Record<string, string>;
-  const url = getCardImageUrl(heroCard.value);
-  if (!url) return {} as Record<string, string>;
-  return {
-    backgroundImage: `url(${url})`,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-  };
-});
+  const heroBackgroundStyle = computed<Record<string, string>>(() => {
+    if (!heroCard.value) return {} as Record<string, string>;
+    const url = getCardImageUrl(heroCard.value);
+    if (!url) return {} as Record<string, string>;
+    return {
+      backgroundImage: `url(${url})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    };
+  });
 
   const heroHeadline = computed(() =>
     heroCard.value ? heroCard.value.name : stageTitle.value,
   );
-
-  const heroIsBackground = computed(() => isBackgroundCard(heroCard.value));
 
   return {
     heroGroup,

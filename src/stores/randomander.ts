@@ -21,9 +21,9 @@ import { clearCache } from '../lib/cache'
 import type { CacheOptions } from '../services/http'
 
 export type Mode = 'commander' | 'spark' | 'partner'
-export type ViewKey = 'draw' | 'settings'
-export type LegacyViewKey = ViewKey | 'history' | 'saved'
-export type ActivePanelKey = 'filters' | 'history' | 'saved'
+export type ViewKey = 'draw'
+export type LegacyViewKey = ViewKey | 'settings' | 'history' | 'saved'
+export type ActivePanelKey = 'filters' | 'history' | 'saved' | 'settings'
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 export type CommanderChoice = {
@@ -114,7 +114,6 @@ export const modes = [
 
 export const viewNavItems: Array<{ id: ViewKey; label: string }> = [
   { id: 'draw', label: 'Draw' },
-  { id: 'settings', label: 'Settings' },
 ] as const
 
 export const colorOptions = [
@@ -219,7 +218,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const initialPanel =
     persistedView === 'history' || persistedView === 'saved' ? persistedView : null
 
-  const view = ref<ViewKey>(persistedView === 'settings' ? 'settings' : 'draw')
+  const view = ref<ViewKey>('draw')
   const activePanel = ref<ActivePanelKey | null>(initialPanel)
   const mode = ref<Mode>(persisted.mode ?? 'commander')
   const options = reactive<OptionsState>({
@@ -1166,6 +1165,10 @@ export const useRandomanderStore = defineStore('randomander', () => {
     openPanel('filters')
   }
 
+  const openSettingsPanel = () => {
+    openPanel('settings')
+  }
+
   const closeOptions = () => {
     if (activePanel.value === 'filters') {
       activePanel.value = null
@@ -1270,15 +1273,6 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
 
   watch(
-    () => view.value,
-    (nextView) => {
-      if (nextView === 'settings') {
-        activePanel.value = null
-      }
-    }
-  )
-
-  watch(
     [view, activePanel, mode, options, display, cacheSettings, performance, theme, history, saved],
     () => {
       const persistedPanel =
@@ -1375,6 +1369,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     openHistoryPanel,
     openSavedPanel,
     openOptions,
+    openSettingsPanel,
     closeOptions,
     closePanel,
     clearNetworkCache,
