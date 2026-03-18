@@ -361,6 +361,9 @@ watch(activeResultKey, () => {
       </section>
     </div>
 
+  </section>
+
+  <Teleport to="body">
     <div
       v-if="isMobileViewport"
       class="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:hidden"
@@ -402,5 +405,5 @@ watch(activeResultKey, () => {
         </button>
       </div>
     </div>
-  </section>
+  </Teleport>
 </template>
