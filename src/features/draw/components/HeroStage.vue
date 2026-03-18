@@ -93,7 +93,7 @@ const getCardShellClass = (index: number) => {
 
 <template>
   <section
-    class="relative px-2 py-4 text-slate-900 dark:text-white sm:px-4 sm:py-5"
+    class="relative px-2 py-2 text-slate-900 dark:text-white sm:px-4 sm:py-5"
   >
     <div
       class="pointer-events-none absolute left-1/2 top-10 h-44 w-44 -translate-x-1/2 rounded-full bg-amber-300/18 blur-3xl dark:bg-amber-300/10"
@@ -112,7 +112,7 @@ const getCardShellClass = (index: number) => {
       </p>
 
       <Transition name="hero-reveal" mode="out-in">
-        <div :key="revealKey" class="mt-6" aria-live="polite">
+        <div :key="revealKey" class="mt-3 sm:mt-6" aria-live="polite">
           <div
             v-if="displayCards.length"
             :class="stackClasses"
@@ -156,8 +156,8 @@ const getCardShellClass = (index: number) => {
         </div>
       </Transition>
 
-      <div class="mx-auto mt-8 max-w-2xl">
-        <h2 class="text-4xl font-semibold text-slate-900 dark:text-white sm:text-[3.15rem]">
+      <div class="mx-auto mt-4 max-w-2xl sm:mt-8">
+        <h2 class="text-3xl font-semibold text-slate-900 dark:text-white sm:text-[3.15rem]">
           {{ heroCardName || stageTitle }}
         </h2>
         <p class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-[1rem]">
