@@ -116,7 +116,7 @@ const closePanel = () => {
 
     <div class="relative z-10">
       <main
-        class="motion-fade-up mx-auto w-full max-w-[88rem] px-4 pb-40 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pb-20 sm:pt-4"
+        class="motion-fade-up mx-auto w-full max-w-[88rem] px-3 pb-44 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-4 sm:pb-20 sm:pt-4"
       >
         <div class="flex min-h-full flex-col gap-6">
           <DrawView />

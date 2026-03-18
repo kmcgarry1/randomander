@@ -125,7 +125,7 @@ const closeSettings = () => {
     ]"
   >
     <header
-      class="flex flex-col gap-3 px-2 py-1 sm:flex-row sm:items-center sm:justify-between"
+      class="flex items-start justify-between gap-3 px-1 py-1 sm:flex-row sm:items-center"
     >
       <div>
         <p
@@ -139,7 +139,7 @@ const closeSettings = () => {
       </div>
       <button
         type="button"
-        class="motion-press rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        class="motion-press min-h-11 rounded-full px-2 py-2 text-sm font-medium text-sky-600 transition hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 sm:border sm:border-slate-200 sm:bg-white sm:px-4 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em] sm:text-slate-600 sm:hover:bg-slate-50 sm:dark:border-slate-700/60 sm:dark:bg-slate-900 sm:dark:text-slate-200 sm:dark:hover:bg-slate-800"
         @click="closeSettings"
       >
         {{ props.panel ? "Close" : "Done" }}
@@ -148,7 +148,7 @@ const closeSettings = () => {
 
     <div class="grid gap-4 sm:grid-cols-[1.2fr_0.8fr]">
       <section
-        class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+        class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
       >
         <p
           class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -160,7 +160,7 @@ const closeSettings = () => {
             v-for="option in themeOptions"
             :key="option.value"
             type="button"
-            class="motion-press flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition"
+            class="motion-press flex min-h-12 items-center justify-between gap-4 rounded-[1.1rem] border px-4 py-3 text-left transition sm:rounded-2xl"
             :class="
               theme === option.value
                 ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
@@ -189,7 +189,7 @@ const closeSettings = () => {
       </section>
 
       <section
-        class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+        class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
       >
         <p
           class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -208,7 +208,7 @@ const closeSettings = () => {
           </p>
           <button
             type="button"
-            class="motion-press inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            class="motion-press inline-flex min-h-11 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
             @click="openHistory"
           >
             Open history
@@ -218,7 +218,7 @@ const closeSettings = () => {
     </div>
 
     <section
-      class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+      class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
     >
       <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -237,7 +237,7 @@ const closeSettings = () => {
         <label
           v-for="item in displayToggles"
           :key="item.key"
-          class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
+          class="flex min-h-12 items-start justify-between gap-4 rounded-[1.1rem] border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60 sm:rounded-2xl"
         >
           <div>
             <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -257,7 +257,7 @@ const closeSettings = () => {
     </section>
 
     <section
-      class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+      class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
     >
       <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -288,7 +288,7 @@ const closeSettings = () => {
           v-for="option in performanceProfiles"
           :key="option.value"
           type="button"
-          class="motion-press rounded-2xl border px-4 py-4 text-left transition"
+          class="motion-press min-h-12 rounded-[1.1rem] border px-4 py-4 text-left transition sm:rounded-2xl"
           :class="
             performancePreset === option.value
               ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
@@ -307,7 +307,7 @@ const closeSettings = () => {
         <label
           v-for="item in performanceToggles"
           :key="item.key"
-          class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
+          class="flex min-h-12 items-start justify-between gap-4 rounded-[1.1rem] border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60 sm:rounded-2xl"
         >
           <div>
             <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -327,7 +327,7 @@ const closeSettings = () => {
     </section>
 
     <section
-      class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+      class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
     >
       <p
         class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -336,7 +336,7 @@ const closeSettings = () => {
       </p>
       <div class="mt-4 grid gap-4 sm:grid-cols-2">
         <label
-          class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
+          class="flex min-h-12 items-start justify-between gap-4 rounded-[1.1rem] border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60 sm:rounded-2xl"
         >
           <div>
             <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -394,7 +394,7 @@ const closeSettings = () => {
           </p>
           <button
             type="button"
-            class="mt-3 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 dark:hover:bg-rose-500/20"
+            class="mt-3 min-h-11 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 dark:hover:bg-rose-500/20 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
             @click="clearCache"
           >
             Clear cache

@@ -84,14 +84,14 @@ const resetFilters = () => {
 
 <template>
   <div
-    class="motion-overlay fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 px-0 pt-6 backdrop-blur sm:items-start sm:px-4 sm:py-6"
+    class="motion-overlay fixed inset-0 z-50 flex items-end justify-center bg-slate-900/28 px-0 pt-4 backdrop-blur-sm sm:items-start sm:px-4 sm:py-6"
     @click.self="close"
   >
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="options-title"
-      class="motion-modal max-h-[90vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200/80 bg-white/95 p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-[0_30px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur sm:max-h-[86vh] sm:max-w-5xl sm:rounded-[2.5rem] sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
+      class="motion-modal max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-slate-200/80 bg-[rgba(248,248,250,0.96)] p-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-[0_30px_90px_-40px_rgba(15,23,42,0.35)] backdrop-blur sm:max-h-[86vh] sm:max-w-5xl sm:rounded-[2.5rem] sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
     >
       <div
         class="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700 sm:hidden"
@@ -116,7 +116,7 @@ const resetFilters = () => {
         </div>
         <button
           type="button"
-          class="motion-press rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 transition hover:bg-slate-50 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800"
+          class="motion-press min-h-11 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
           aria-label="Close options"
           @click="close"
         >
@@ -126,7 +126,7 @@ const resetFilters = () => {
 
       <div class="mt-6 grid gap-6 lg:grid-cols-4">
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -138,7 +138,7 @@ const resetFilters = () => {
               v-for="item in modes"
               :key="item.id"
               type="button"
-              class="motion-press flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition"
+              class="motion-press flex min-h-12 items-center justify-between gap-4 rounded-[1.1rem] border px-4 py-3 text-left transition sm:rounded-2xl"
               :class="
                 mode === item.id
                   ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
@@ -167,7 +167,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -185,7 +185,7 @@ const resetFilters = () => {
               v-for="choice in COLOR_CHOICES"
               :key="choice.symbol"
               type="button"
-              class="motion-chip inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
+              class="motion-chip inline-flex min-h-11 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
               :class="
                 options.selectedColors.includes(choice.symbol)
                   ? choice.chip
@@ -199,7 +199,7 @@ const resetFilters = () => {
             </button>
             <button
               type="button"
-              class="motion-press rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+              class="motion-press min-h-11 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
               @click="clearColors"
             >
               Clear
@@ -208,7 +208,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -220,7 +220,7 @@ const resetFilters = () => {
               v-for="comparison in colorComparisonOptions"
               :key="comparison.value"
               type="button"
-              class="motion-press rounded-2xl border px-4 py-3 text-left transition"
+              class="motion-press min-h-12 rounded-[1.1rem] border px-4 py-3 text-left transition sm:rounded-2xl"
               :class="
                 options.colorCountMode === comparison.value
                   ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
@@ -237,7 +237,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -249,7 +249,7 @@ const resetFilters = () => {
               v-for="option in colorOptions"
               :key="option.value"
               type="button"
-              class="motion-chip rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
+              class="motion-chip min-h-11 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
               :class="
                 options.colorCount === option.value
                   ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
@@ -265,7 +265,7 @@ const resetFilters = () => {
 
       <div class="mt-6 grid gap-6 lg:grid-cols-3">
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -316,7 +316,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -340,7 +340,7 @@ const resetFilters = () => {
         </section>
 
         <section
-          class="rounded-2xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80"
+          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
         >
           <p
             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
@@ -372,14 +372,14 @@ const resetFilters = () => {
         >
           <button
             type="button"
-            class="motion-press w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto"
+            class="motion-press min-h-11 w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
             @click="resetFilters"
           >
             Reset filters
           </button>
           <button
             type="button"
-            class="motion-press w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
+            class="motion-press min-h-11 w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
             @click="close"
           >
             Done
