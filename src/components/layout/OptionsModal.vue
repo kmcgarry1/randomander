@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { storeToRefs } from "pinia";
+import {
+  AdjustmentsHorizontalIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  XMarkIcon,
+} from "@heroicons/vue/24/outline";
 import {
   COLOR_CHOICES,
   colorOptions,
@@ -10,6 +16,8 @@ import {
   type Mode,
 } from "../../stores/randomander";
 import { formatColorIdentity } from "../../lib/scryfall";
+import ScryfallSymbol from "../mtg/ScryfallSymbol.vue";
+import { useModalFocus } from "../../composables/useModalFocus";
 
 const store = useRandomanderStore();
 const { mode, options } = storeToRefs(store);
@@ -77,315 +85,318 @@ const close = () => {
   store.closeOptions();
 };
 
+const dialogRef = ref<HTMLElement | null>(null);
+
 const resetFilters = () => {
   store.resetOptions();
 };
+
+useModalFocus(dialogRef, close);
 </script>
 
 <template>
   <div
-    class="motion-overlay fixed inset-0 z-50 flex items-end justify-center bg-slate-900/28 px-0 pt-4 backdrop-blur-sm sm:items-start sm:px-4 sm:py-6"
+    class="motion-overlay fixed inset-0 z-50 flex items-end justify-center bg-[color-mix(in_srgb,var(--md-sys-color-scrim)_42%,transparent)] sm:items-center sm:p-6"
     @click.self="close"
   >
     <div
+      ref="dialogRef"
       role="dialog"
       aria-modal="true"
       aria-labelledby="options-title"
-      class="motion-modal max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-slate-200/80 bg-[rgba(248,248,250,0.96)] p-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-[0_30px_90px_-40px_rgba(15,23,42,0.35)] backdrop-blur sm:max-h-[86vh] sm:max-w-5xl sm:rounded-[2.5rem] sm:p-8 sm:pb-16 dark:border-slate-700/60 dark:bg-slate-900/90"
+      tabindex="-1"
+      class="motion-modal flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)] sm:max-h-[88dvh] sm:max-w-5xl sm:rounded-[var(--md-sys-shape-corner-extra-large)] sm:border sm:border-[var(--md-sys-color-outline-variant)]"
     >
       <div
-        class="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700 sm:hidden"
+        class="mx-auto mt-2 h-1 w-8 rounded-full bg-[var(--md-sys-color-outline)] sm:hidden"
         aria-hidden="true"
       ></div>
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p
-            class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400"
-          >
-            Customization
-          </p>
-          <h2
-            id="options-title"
-            class="font-heading text-2xl text-slate-900 dark:text-white"
-          >
+
+      <header class="flex items-start gap-4 px-5 pb-4 pt-5 sm:px-8 sm:pt-7">
+        <span
+          class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-[var(--md-sys-shape-corner-large)] bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] sm:inline-flex"
+          aria-hidden="true"
+        >
+          <AdjustmentsHorizontalIcon class="h-6 w-6" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <h2 id="options-title" class="font-heading text-2xl leading-tight sm:text-3xl">
             Randomizer options
           </h2>
-          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Adjust filters here, then return to the draw and randomize again.
+          <p class="mt-1 max-w-2xl text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Shape the next draw without losing the surprise.
           </p>
         </div>
         <button
           type="button"
-          class="motion-press min-h-11 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
+          class="m3-icon-button -mr-2 -mt-2"
           aria-label="Close options"
           @click="close"
         >
-          Close
+          <XMarkIcon class="h-6 w-6" aria-hidden="true" />
         </button>
-      </div>
+      </header>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-4">
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Mode
-          </p>
-          <div class="mt-4 grid gap-3">
+      <div class="overflow-y-auto overscroll-contain px-4 pb-6 sm:px-8">
+        <section class="m3-card m3-card--filled p-4 sm:p-5">
+          <div>
+            <h3 class="text-base font-semibold">Mode</h3>
+            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Choose the kind of inspiration you want to reveal.
+            </p>
+          </div>
+          <div class="mt-4 grid gap-2 md:grid-cols-3">
             <button
               v-for="item in modes"
               :key="item.id"
               type="button"
-              class="motion-press flex min-h-12 items-center justify-between gap-4 rounded-[1.1rem] border px-4 py-3 text-left transition sm:rounded-2xl"
+              class="motion-press flex min-h-20 items-center gap-3 rounded-[var(--md-sys-shape-corner-large)] border px-4 py-3 text-left transition-colors"
               :class="
                 mode === item.id
-                  ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                  ? 'border-transparent bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                  : 'border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)]'
               "
+              :aria-pressed="mode === item.id"
               @click="selectMode(item.id)"
             >
-              <div>
-                <p class="text-sm font-semibold">{{ item.label }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ item.description }}
-                </p>
-              </div>
               <span
-                class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs"
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
                 :class="
                   mode === item.id
-                    ? 'border-amber-400/70 bg-amber-400 text-slate-900'
-                    : 'border-slate-200 text-slate-400 dark:border-slate-700/60 dark:text-slate-400'
+                    ? 'border-transparent bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)]'
+                    : 'border-[var(--md-sys-color-outline)] text-transparent'
                 "
+                aria-hidden="true"
               >
-                ✓
+                <CheckIcon class="h-4 w-4" />
+              </span>
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold">{{ item.label }}</span>
+                <span
+                  class="mt-0.5 block text-xs leading-5"
+                  :class="
+                    mode === item.id
+                      ? 'text-[var(--md-sys-color-on-primary-container)]'
+                      : 'text-[var(--md-sys-color-on-surface-variant)]'
+                  "
+                >
+                  {{ item.description }}
+                </span>
               </span>
             </button>
           </div>
         </section>
 
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Color focus
-          </p>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Palette:
-            <span class="font-semibold text-slate-900 dark:text-white">{{
-              colorSummary
-            }}</span>
-          </p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <button
-              v-for="choice in COLOR_CHOICES"
-              :key="choice.symbol"
-              type="button"
-              class="motion-chip inline-flex min-h-11 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
-              :class="
-                options.selectedColors.includes(choice.symbol)
-                  ? choice.chip
-                  : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
-              "
-              :aria-pressed="options.selectedColors.includes(choice.symbol)"
-              @click="toggleColor(choice.symbol)"
-            >
-              <i class="ms" :class="choice.icon"></i>
-              {{ choice.name }}
-            </button>
-            <button
-              type="button"
-              class="motion-press min-h-11 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
-              @click="clearColors"
-            >
-              Clear
-            </button>
-          </div>
-        </section>
-
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Comparison
-          </p>
-          <div class="mt-4 grid gap-3">
-            <button
-              v-for="comparison in colorComparisonOptions"
-              :key="comparison.value"
-              type="button"
-              class="motion-press min-h-12 rounded-[1.1rem] border px-4 py-3 text-left transition sm:rounded-2xl"
-              :class="
-                options.colorCountMode === comparison.value
-                  ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-              "
-              @click="options.colorCountMode = comparison.value"
-            >
-              <p class="text-sm font-semibold">{{ comparison.label }}</p>
-              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {{ comparison.description }}
+        <div class="mt-4 grid gap-4 lg:grid-cols-[1.45fr_1fr]">
+          <section class="m3-card p-4 sm:p-5">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 class="text-base font-semibold">Color focus</h3>
+                <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+                  Select colors to narrow the card pool.
+                </p>
+              </div>
+              <p
+                class="rounded-full bg-[var(--md-sys-color-secondary-container)] px-3 py-1.5 text-xs font-semibold text-[var(--md-sys-color-on-secondary-container)]"
+                aria-live="polite"
+              >
+                {{ colorSummary }}
               </p>
-            </button>
-          </div>
-        </section>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button
+                v-for="choice in COLOR_CHOICES"
+                :key="choice.symbol"
+                type="button"
+                class="m3-chip min-h-11"
+                :aria-pressed="options.selectedColors.includes(choice.symbol)"
+                @click="toggleColor(choice.symbol)"
+              >
+                <ScryfallSymbol
+                  :symbol="choice.symbol"
+                  decorative
+                  class="text-lg"
+                />
+                {{ choice.name }}
+              </button>
+              <button
+                type="button"
+                class="m3-button m3-button--text min-h-11 px-3"
+                @click="clearColors"
+              >
+                <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+                Clear colors
+              </button>
+            </div>
+          </section>
 
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            {{ store.colorLabel }}
+          <section class="m3-card p-4 sm:p-5">
+            <h3 class="text-base font-semibold">Comparison</h3>
+            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Decide how strictly the color count applies.
+            </p>
+            <div class="m3-segmented mt-4" role="group" aria-label="Color comparison">
+              <button
+                v-for="comparison in colorComparisonOptions"
+                :key="comparison.value"
+                type="button"
+                class="m3-segmented__button px-2"
+                :aria-pressed="options.colorCountMode === comparison.value"
+                :title="comparison.description"
+                @click="options.colorCountMode = comparison.value"
+              >
+                <span class="inline-flex items-center justify-center gap-1.5">
+                  <CheckIcon
+                    v-if="options.colorCountMode === comparison.value"
+                    class="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                  {{ comparison.label }}
+                </span>
+              </button>
+            </div>
+            <p class="mt-3 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+              {{
+                colorComparisonOptions.find(
+                  (item) => item.value === options.colorCountMode,
+                )?.description
+              }}
+            </p>
+          </section>
+        </div>
+
+        <section class="m3-card mt-4 p-4 sm:p-5">
+          <h3 class="text-base font-semibold">{{ store.colorLabel }}</h3>
+          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Set the number of colors allowed in each result.
           </p>
           <div class="mt-4 flex flex-wrap gap-2">
             <button
               v-for="option in colorOptions"
               :key="option.value"
               type="button"
-              class="motion-chip min-h-11 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition"
-              :class="
-                options.colorCount === option.value
-                  ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-              "
+              class="m3-chip min-h-11 px-4"
+              :aria-pressed="options.colorCount === option.value"
               @click="selectColorCount(option.value)"
             >
+              <CheckIcon
+                v-if="options.colorCount === option.value"
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
               {{ store.getColorOptionLabel(option) }}
             </button>
           </div>
         </section>
-      </div>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-3">
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Deck popularity
-          </p>
-          <div class="mt-4 space-y-3">
-            <label class="flex items-center justify-between gap-3">
-              <span class="text-sm text-slate-600 dark:text-slate-300"
-                >Limit by EDHREC decks</span
-              >
-              <input
-                v-model="options.limitByDecks"
-                type="checkbox"
-                class="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-                :disabled="options.useRankCutoff || mode === 'spark'"
-              />
-            </label>
-            <div class="flex items-center gap-3">
-              <input
-                v-model.number="options.maxDecks"
-                type="number"
-                min="100"
-                step="100"
-                class="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-amber-400 focus:outline-none dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200"
-                :disabled="
-                  !options.limitByDecks ||
-                  options.useRankCutoff ||
-                  mode === 'spark'
-                "
-              />
-              <p class="text-xs text-slate-500 dark:text-slate-400">
-                Decks or fewer
-              </p>
+        <div class="mt-4 grid gap-4 lg:grid-cols-3">
+          <section class="m3-card m3-card--filled p-4 sm:p-5">
+            <h3 class="text-base font-semibold">Deck popularity</h3>
+            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Filter familiar commanders using EDHREC activity.
+            </p>
+            <div class="mt-4 space-y-4">
+              <label class="flex min-h-12 items-center justify-between gap-4">
+                <span class="text-sm">Limit by EDHREC decks</span>
+                <input
+                  v-model="options.limitByDecks"
+                  type="checkbox"
+                  class="m3-switch"
+                  :disabled="options.useRankCutoff || mode === 'spark'"
+                />
+              </label>
+              <label class="block" for="max-edhrec-decks">
+                <span class="m3-label">Maximum deck count</span>
+                <span class="mt-1 flex items-center gap-3">
+                  <input
+                    id="max-edhrec-decks"
+                    v-model.number="options.maxDecks"
+                    type="number"
+                    min="100"
+                    step="100"
+                    class="m3-field max-w-32"
+                    :disabled="
+                      !options.limitByDecks ||
+                      options.useRankCutoff ||
+                      mode === 'spark'
+                    "
+                  />
+                  <span class="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+                    Decks or fewer
+                  </span>
+                </span>
+              </label>
+              <label class="flex min-h-12 items-center justify-between gap-4">
+                <span class="text-sm">Skip top 10% (EDHREC rank)</span>
+                <input
+                  v-model="options.useRankCutoff"
+                  type="checkbox"
+                  class="m3-switch"
+                  :disabled="mode === 'spark'"
+                />
+              </label>
             </div>
-            <label class="flex items-center justify-between gap-3">
-              <span class="text-sm text-slate-600 dark:text-slate-300"
-                >Skip top 10% (EDHREC rank)</span
-              >
+          </section>
+
+          <section class="m3-card p-4 sm:p-5">
+            <h3 class="text-base font-semibold">Choice mode</h3>
+            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Reveal an alternative when one card is not enough.
+            </p>
+            <label class="mt-4 flex min-h-12 items-center justify-between gap-4">
+              <span class="text-sm">{{ store.choiceLabel }}</span>
               <input
-                v-model="options.useRankCutoff"
+                v-model="options.twoChoices"
                 type="checkbox"
-                class="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+                class="m3-switch"
                 :disabled="mode === 'spark'"
               />
             </label>
-          </div>
-        </section>
+            <p class="mt-2 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+              Spark draws always return a trio of cards.
+            </p>
+          </section>
 
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Choice mode
-          </p>
-          <label class="mt-3 flex items-center justify-between gap-3">
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{
-              store.choiceLabel
-            }}</span>
-            <input
-              v-model="options.twoChoices"
-              type="checkbox"
-              class="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-              :disabled="mode === 'spark'"
-            />
-          </label>
-          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Spark draws always return a trio of cards.
-          </p>
-        </section>
-
-        <section
-          class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 sm:rounded-2xl sm:p-5"
-        >
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Spark extras
-          </p>
-          <label class="mt-3 flex items-center justify-between gap-3">
-            <span class="text-sm text-slate-600 dark:text-slate-300"
-              >Exclude Game Changers</span
-            >
-            <input
-              v-model="options.excludeGameChangers"
-              type="checkbox"
-              class="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-              :disabled="mode !== 'spark'"
-            />
-          </label>
-          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Applies only to 3-card spark mode.
-          </p>
-        </section>
-      </div>
-
-      <div
-        class="mt-6 border-t border-slate-200/80 pt-4 dark:border-slate-700/60"
-      >
-        <div
-          class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end"
-        >
-          <button
-            type="button"
-            class="motion-press min-h-11 w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-            @click="resetFilters"
-          >
-            Reset filters
-          </button>
-          <button
-            type="button"
-            class="motion-press min-h-11 w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-            @click="close"
-          >
-            Done
-          </button>
+          <section class="m3-card p-4 sm:p-5">
+            <h3 class="text-base font-semibold">Spark extras</h3>
+            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Fine-tune the three-card prompt pool.
+            </p>
+            <label class="mt-4 flex min-h-12 items-center justify-between gap-4">
+              <span class="text-sm">Exclude Game Changers</span>
+              <input
+                v-model="options.excludeGameChangers"
+                type="checkbox"
+                class="m3-switch"
+                :disabled="mode !== 'spark'"
+              />
+            </label>
+            <p class="mt-2 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+              Applies only to 3-card spark mode.
+            </p>
+          </section>
         </div>
       </div>
+
+      <footer
+        class="flex flex-col-reverse gap-2 border-t border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:flex-row sm:justify-end sm:px-8 sm:pb-5"
+      >
+        <button
+          type="button"
+          class="m3-button m3-button--text w-full sm:w-auto"
+          @click="resetFilters"
+        >
+          <ArrowPathIcon class="h-5 w-5" aria-hidden="true" />
+          Reset filters
+        </button>
+        <button
+          type="button"
+          class="m3-button m3-button--filled w-full sm:w-auto sm:min-w-28"
+          @click="close"
+        >
+          Done
+        </button>
+      </footer>
     </div>
   </div>
 </template>

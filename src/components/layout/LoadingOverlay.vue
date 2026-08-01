@@ -1,7 +1,5 @@
 <script setup lang="ts">
-defineProps<{
-  isLoading: boolean;
-}>();
+defineProps<{ isLoading: boolean }>();
 </script>
 
 <template>
@@ -15,30 +13,24 @@ defineProps<{
   >
     <div
       v-if="isLoading"
-      class="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm dark:bg-slate-950/50"
+      class="fixed inset-0 z-50 grid place-items-center bg-[color-mix(in_srgb,var(--md-sys-color-scrim)_36%,transparent)] px-4"
       role="status"
       aria-live="polite"
       aria-label="Loading cards"
     >
       <div
-        class="motion-modal flex flex-col items-center gap-4 rounded-2xl border border-slate-200/60 bg-white/95 px-8 py-6 shadow-2xl backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/95"
+        class="motion-modal flex min-w-56 flex-col items-center gap-5 rounded-[var(--md-sys-shape-corner-large)] bg-[var(--md-sys-color-surface-container-high)] px-8 py-7 text-center text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)]"
       >
-        <div class="relative h-12 w-12">
-          <div
-            class="absolute inset-0 animate-spin rounded-full border-4 border-slate-200 dark:border-slate-700"
-          ></div>
-          <div
-            class="motion-spin-slow absolute inset-0 rounded-full border-4 border-transparent border-b-amber-300/80"
-          ></div>
-          <div
-            class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-amber-400 dark:border-t-amber-300"
-          ></div>
+        <div
+          class="motion-spin-slow h-12 w-12 rounded-[45%_55%_52%_48%] border-[5px] border-[var(--md-sys-color-primary-container)] border-t-[var(--md-sys-color-primary)]"
+          aria-hidden="true"
+        ></div>
+        <div>
+          <p class="text-base font-bold">Shuffling cards...</p>
+          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Asking Scryfall for a fresh pull
+          </p>
         </div>
-        <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-          Shuffling cards<span class="motion-ellipsis" aria-hidden="true"
-            >...</span
-          >
-        </p>
       </div>
     </div>
   </Transition>

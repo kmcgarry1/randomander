@@ -6,6 +6,7 @@ import type {
   colorOptions,
   modes,
 } from "../../../stores/randomander";
+import ScryfallSymbol from "../../../components/mtg/ScryfallSymbol.vue";
 
 const props = defineProps<{
   mode: Mode;
@@ -124,10 +125,9 @@ const onColorCountChange = (event: Event) => {
           type="button"
           class="flex min-w-[3.5rem] items-center justify-center gap-1 rounded-full border px-3 py-2 text-[0.6rem] font-semibold tracking-[0.16em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
           :class="[
-            choice.chip,
             props.isColorSelected(choice.symbol)
-              ? 'ring-2 ring-offset-1 ring-white/70 dark:ring-0'
-              : 'ring-0',
+              ? 'border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]'
+              : 'border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]',
             props.isColorlessActive && choice.symbol !== 'C'
               ? 'cursor-not-allowed opacity-40'
               : '',
@@ -137,11 +137,7 @@ const onColorCountChange = (event: Event) => {
           @click="props.toggleColorFilter(choice.symbol)"
           :aria-label="choice.name"
         >
-          <span
-            class="text-2xl ms"
-            aria-hidden="true"
-            :class="choice.icon"
-          ></span>
+          <ScryfallSymbol :symbol="choice.symbol" decorative class="text-2xl" />
           <span class="sr-only">{{ choice.name }}</span>
         </button>
       </div>

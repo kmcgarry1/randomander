@@ -1,30 +1,34 @@
 <script setup lang="ts">
-defineProps<{
-  label: string;
-}>();
+import { ref } from "vue";
+import { useModalFocus } from "../../composables/useModalFocus";
+
+defineProps<{ label: string }>();
 
 const emit = defineEmits<{
   (event: "close"): void;
 }>();
 
-const handleBackdropClick = () => {
-  emit("close");
-};
+const close = () => emit("close");
+const dialogRef = ref<HTMLElement | null>(null);
+
+useModalFocus(dialogRef, close);
 </script>
 
 <template>
   <div
-    class="motion-overlay fixed inset-0 z-40 flex items-end justify-center bg-slate-900/28 backdrop-blur-sm sm:items-stretch sm:justify-end"
-    role="dialog"
-    aria-modal="true"
-    :aria-label="label"
-    @click.self="handleBackdropClick"
+    class="motion-overlay fixed inset-0 z-40 flex items-end justify-center bg-[color-mix(in_srgb,var(--md-sys-color-scrim)_42%,transparent)] sm:items-stretch sm:justify-end"
+    @click.self="close"
   >
     <div
-      class="motion-modal h-[min(92dvh,48rem)] w-full overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-white/80 bg-[rgba(248,248,250,0.96)] px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-4 shadow-[0_18px_50px_-20px_rgba(15,23,42,0.35)] dark:border-slate-700/60 dark:bg-slate-950/96 sm:h-full sm:max-w-2xl sm:rounded-none sm:rounded-l-[2rem] sm:border-y-0 sm:border-r-0 sm:border-l sm:px-6 sm:pb-8 sm:pt-6"
+      ref="dialogRef"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="label"
+      tabindex="-1"
+      class="motion-modal support-panel-motion h-[min(92dvh,52rem)] w-full overflow-y-auto overscroll-contain rounded-t-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container-low)] px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3 shadow-[var(--md-sys-elevation-3)] sm:h-full sm:max-w-[46rem] sm:rounded-none sm:border-l sm:border-[var(--md-sys-color-outline-variant)] sm:px-8 sm:pb-8 sm:pt-7"
     >
       <div
-        class="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700 sm:hidden"
+        class="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--md-sys-color-outline)] sm:hidden"
         aria-hidden="true"
       ></div>
       <slot />
