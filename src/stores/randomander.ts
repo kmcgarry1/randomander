@@ -14,6 +14,7 @@ import {
   fetchCardByExactName,
   fetchRandomCard,
   fetchRankedRandomCard,
+  isScryfallRequestError,
 } from '../services/scryfall'
 import { fetchCommanderMeta, type EdhrecTag, type EdhrecMeta } from '../services/edhrec'
 import { readStorage, writeStorage } from '../lib/storage'
@@ -784,6 +785,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
+          throw error
+        }
+        if (isScryfallRequestError(error)) {
           throw error
         }
       }
