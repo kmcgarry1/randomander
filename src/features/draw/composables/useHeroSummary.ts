@@ -64,9 +64,9 @@ export function useHeroSummary() {
   });
 
   const heroSubtitle = computed(() => {
-    if (cards.value.length > 1) return `${cards.value.length} cards ready`;
-    if (heroCard.value) return "Commander ready to reveal";
-    return "Tap randomise to draw";
+    if (cards.value.length > 1) return `${cards.value.length} cards ready to build from`;
+    if (heroCard.value) return "A fresh commander to build around";
+    return "Tap Randomize to draw";
   });
 
   const heroBackgroundStyle = computed<Record<string, string>>(() => {
