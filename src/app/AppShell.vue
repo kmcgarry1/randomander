@@ -1,6 +1,19 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, type Component } from "vue";
 import { storeToRefs } from "pinia";
+import {
+  AdjustmentsHorizontalIcon,
+  BookmarkIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  RectangleStackIcon,
+} from "@heroicons/vue/24/outline";
+import {
+  BookmarkIcon as BookmarkIconSolid,
+  ClockIcon as ClockIconSolid,
+  Cog6ToothIcon as Cog6ToothIconSolid,
+  RectangleStackIcon as RectangleStackIconSolid,
+} from "@heroicons/vue/24/solid";
 import { useRandomanderStore } from "../stores/randomander";
 import DrawView from "../features/draw/DrawView.vue";
 import HistoryView from "../features/history/HistoryView.vue";
@@ -14,8 +27,7 @@ import { useTheme } from "../composables/useTheme";
 useTheme();
 
 const store = useRandomanderStore();
-const { activePanel, isOptionsOpen, isLoading, display, performance } =
-  storeToRefs(store);
+const { activePanel, isOptionsOpen, isLoading, performance } = storeToRefs(store);
 
 const performanceMode = computed(() => {
   if (
@@ -35,20 +47,63 @@ const performanceMode = computed(() => {
   return "standard";
 });
 
-const openSettings = () => {
-  store.openSettingsPanel();
+const modalOpen = computed(
+  () => Boolean(activePanel.value) || isOptionsOpen.value,
+);
+
+type Destination = "draw" | "history" | "saved" | "settings";
+
+const destinations: Array<{
+  id: Destination;
+  label: string;
+  icon: Component;
+  activeIcon: Component;
+}> = [
+  {
+    id: "draw",
+    label: "Draw",
+    icon: RectangleStackIcon,
+    activeIcon: RectangleStackIconSolid,
+  },
+  { id: "history", label: "History", icon: ClockIcon, activeIcon: ClockIconSolid },
+  { id: "saved", label: "Saved", icon: BookmarkIcon, activeIcon: BookmarkIconSolid },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Cog6ToothIcon,
+    activeIcon: Cog6ToothIconSolid,
+  },
+];
+
+const activeDestination = computed<Destination>(() => {
+  if (
+    activePanel.value === "history" ||
+    activePanel.value === "saved" ||
+    activePanel.value === "settings"
+  ) {
+    return activePanel.value;
+  }
+  return "draw";
+});
+
+const openDestination = (destination: Destination) => {
+  if (destination === "draw") {
+    store.closePanel();
+    return;
+  }
+  if (destination === "history") store.openHistoryPanel();
+  if (destination === "saved") store.openSavedPanel();
+  if (destination === "settings") store.openSettingsPanel();
 };
 
-const closePanel = () => {
-  store.closePanel();
-};
+const closePanel = () => store.closePanel();
 </script>
 
 <template>
   <div
     data-testid="app-shell"
     :data-performance-mode="performanceMode"
-    class="relative min-h-screen overflow-hidden antialiased text-slate-900 dark:text-slate-100"
+    class="min-h-screen bg-[var(--md-sys-color-surface)] text-[var(--md-sys-color-on-surface)] antialiased"
     :class="{
       'app-reduced-motion': performance.reduceMotion,
       'app-simplified-backdrop': performance.simplifyBackdrop,
@@ -56,72 +111,136 @@ const closePanel = () => {
     }"
   >
     <div
-      v-if="display.showAmbient && !performance.simplifyBackdrop"
-      class="pointer-events-none absolute inset-0 opacity-60 dark:opacity-70"
-      aria-hidden="true"
+      :inert="modalOpen ? true : undefined"
+      :aria-hidden="modalOpen ? 'true' : undefined"
     >
-      <div
-        class="motion-ambient absolute -left-20 top-10 h-48 w-48 rounded-full bg-amber-300/40 blur-3xl"
-      ></div>
-      <div
-        class="motion-ambient motion-ambient-slow absolute right-10 top-20 h-56 w-56 rounded-full bg-sky-300/30 blur-3xl"
-      ></div>
-      <div
-        class="motion-ambient motion-ambient-slower absolute bottom-10 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-rose-300/20 blur-3xl"
-      ></div>
-    </div>
-
-    <header class="sticky top-0 z-30 hidden px-4 pb-3 pt-4 sm:block">
-      <div class="mx-auto w-full max-w-[88rem]">
-        <div
-          class="flex items-center justify-between gap-4 rounded-full border border-white/70 bg-white/58 px-4 py-3 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/58 sm:px-5"
-        >
-          <div class="flex items-center gap-3">
-            <div
-              class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold uppercase tracking-[0.35em] text-white shadow-sm dark:bg-white dark:text-slate-900"
-            >
-              R
-            </div>
-            <div>
-              <p
-                class="text-[0.58rem] uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400"
-              >
-                Commander studio
-              </p>
-              <h1 class="font-heading text-base text-slate-900 dark:text-white sm:text-lg">
-                Randomander
-              </h1>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="motion-press rounded-full border border-amber-200/80 bg-amber-100/82 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-amber-950 shadow-sm transition hover:bg-amber-200/82 dark:border-amber-300/40 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/20"
-              @click="store.openOptions()"
-            >
-              Filters
-            </button>
-            <button
-              type="button"
-              class="motion-press rounded-full border border-white/75 bg-white/70 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-200 dark:hover:bg-slate-900"
-              @click="openSettings"
-            >
-              Settings
-            </button>
-          </div>
-        </div>
-      </div>
+    <header
+      class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface)] px-4 sm:hidden"
+    >
+      <button
+        type="button"
+        class="flex items-center gap-3 rounded-xl text-left"
+        aria-label="Go to draw"
+        @click="openDestination('draw')"
+      >
+        <span
+          class="grid h-9 w-9 place-items-center rounded-[0.8rem_0.8rem_0.8rem_0.3rem] bg-[var(--md-sys-color-primary)] text-sm font-extrabold text-[var(--md-sys-color-on-primary)]"
+          aria-hidden="true"
+        >R</span>
+        <span>
+          <span class="block text-base font-bold leading-tight">Randomander</span>
+          <span class="block text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            Commander discovery
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="m3-icon-button"
+        aria-label="Filters"
+        @click="store.openOptions()"
+      >
+        <AdjustmentsHorizontalIcon class="h-6 w-6" aria-hidden="true" />
+      </button>
     </header>
 
-    <div class="relative z-10">
-      <main
-        class="motion-fade-up mx-auto w-full max-w-[88rem] px-3 pb-44 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-4 sm:pb-20 sm:pt-4"
+    <aside
+      class="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] px-2 py-5 sm:flex"
+      aria-label="Primary navigation"
+    >
+      <button
+        type="button"
+        class="grid h-12 w-12 place-items-center rounded-[1.1rem_1.1rem_1.1rem_0.4rem] bg-[var(--md-sys-color-primary)] text-lg font-extrabold text-[var(--md-sys-color-on-primary)] shadow-[var(--md-sys-elevation-1)]"
+        aria-label="Randomander draw"
+        @click="openDestination('draw')"
       >
-        <div class="flex min-h-full flex-col gap-6">
-          <DrawView />
-        </div>
-      </main>
+        R
+      </button>
+
+      <nav class="mt-10 flex w-full flex-1 flex-col items-center gap-2">
+        <button
+          v-for="destination in destinations"
+          :key="destination.id"
+          type="button"
+          class="group flex min-h-[4.25rem] w-full flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[0.7rem] font-semibold transition-colors"
+          :class="
+            activeDestination === destination.id
+              ? 'text-[var(--md-sys-color-on-primary-container)]'
+              : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
+          "
+          :aria-current="activeDestination === destination.id ? 'page' : undefined"
+          @click="openDestination(destination.id)"
+        >
+          <span
+            class="grid h-8 w-14 place-items-center rounded-full transition-colors"
+            :class="
+              activeDestination === destination.id
+                ? 'bg-[var(--md-sys-color-primary-container)]'
+                : ''
+            "
+          >
+            <component
+              :is="
+                activeDestination === destination.id
+                  ? destination.activeIcon
+                  : destination.icon
+              "
+              class="h-5 w-5"
+              aria-hidden="true"
+            />
+          </span>
+          {{ destination.label }}
+        </button>
+      </nav>
+
+      <p
+        class="m3-label -rotate-90 whitespace-nowrap pb-2 text-[0.62rem]"
+        aria-hidden="true"
+      >
+        Built for Commander
+      </p>
+    </aside>
+
+    <main class="min-h-screen pb-44 sm:ml-24 sm:pb-0">
+      <DrawView />
+    </main>
+
+    <nav
+      class="fixed inset-x-0 bottom-0 z-30 grid h-[calc(5rem+env(safe-area-inset-bottom))] grid-cols-4 border-t border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container)] px-2 pb-[env(safe-area-inset-bottom)] sm:hidden"
+      aria-label="Primary navigation"
+    >
+      <button
+        v-for="destination in destinations"
+        :key="`mobile-${destination.id}`"
+        type="button"
+        class="flex flex-col items-center justify-center gap-1 rounded-2xl text-[0.7rem] font-semibold text-[var(--md-sys-color-on-surface-variant)]"
+        :class="{
+          'text-[var(--md-sys-color-on-primary-container)]':
+            activeDestination === destination.id,
+        }"
+        :aria-current="activeDestination === destination.id ? 'page' : undefined"
+        @click="openDestination(destination.id)"
+      >
+        <span
+          class="grid h-8 w-14 place-items-center rounded-full"
+          :class="{
+            'bg-[var(--md-sys-color-primary-container)]':
+              activeDestination === destination.id,
+          }"
+        >
+          <component
+            :is="
+              activeDestination === destination.id
+                ? destination.activeIcon
+                : destination.icon
+            "
+            class="h-5 w-5"
+            aria-hidden="true"
+          />
+        </span>
+        {{ destination.label }}
+      </button>
+    </nav>
     </div>
 
     <SupportPanel
