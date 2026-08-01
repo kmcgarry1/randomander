@@ -498,4 +498,35 @@ describe('Randomander', () => {
       })
     ).not.toBeChecked()
   })
+
+  it('stops a partner search when Scryfall rate-limits the request', async () => {
+    const primary = createCard({
+      id: 'partner-primary',
+      name: 'Prava of the Steel Legion',
+      color_identity: ['W'],
+      oracle_text: 'Partner',
+      keywords: ['Partner'],
+    })
+    let requestCount = 0
+    const fetchMock = vi.fn(() => {
+      requestCount += 1
+      if (requestCount === 1) return Promise.resolve(mockResponse(primary))
+      return Promise.resolve({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '60' }),
+      } as Response)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getAllByRole('button', { name: /partner pair/i })[0]!)
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    expect(
+      await screen.findByText(/Scryfall is rate-limiting this connection/i)
+    ).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
 })
