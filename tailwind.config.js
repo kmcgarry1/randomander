@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['"Fraunces"', 'serif'],
-        body: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        heading: ['"Google Sans Flex"', 'Roboto', 'system-ui', 'sans-serif'],
+        body: ['"Google Sans Flex"', 'Roboto', 'system-ui', 'sans-serif'],
       },
     },
   },

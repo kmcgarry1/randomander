@@ -2,6 +2,21 @@
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import {
+  ArrowRightIcon,
+  BoltIcon,
+  CheckIcon,
+  CircleStackIcon,
+  ClockIcon,
+  ComputerDesktopIcon,
+  EyeIcon,
+  MoonIcon,
+  PaintBrushIcon,
+  SparklesIcon,
+  SunIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/vue/24/outline";
+import {
   useRandomanderStore,
   type ThemeMode,
 } from "../../stores/randomander";
@@ -23,13 +38,41 @@ const themeOptions: Array<{
   value: ThemeMode;
   label: string;
   description: string;
+  icon: typeof ComputerDesktopIcon;
 }> = [
-  { value: "system", label: "System", description: "Match your device theme." },
-  { value: "light", label: "Light", description: "Always light mode." },
-  { value: "dark", label: "Dark", description: "Always dark mode." },
+  {
+    value: "system",
+    label: "System",
+    description: "Match your device theme.",
+    icon: ComputerDesktopIcon,
+  },
+  {
+    value: "light",
+    label: "Light",
+    description: "Always light mode.",
+    icon: SunIcon,
+  },
+  {
+    value: "dark",
+    label: "Dark",
+    description: "Always dark mode.",
+    icon: MoonIcon,
+  },
 ];
 
+const activeThemeDescription = computed(
+  () =>
+    themeOptions.find((option) => option.value === theme.value)?.description ??
+    "Match your device theme.",
+);
+
 const displayToggles = computed(() => [
+  {
+    key: "enablePrestigeReveal" as const,
+    label: "Prestige reveal animation",
+    description:
+      "Turn this off to skip future card-back reveals until you re-enable it here.",
+  },
   {
     key: "showLinks" as const,
     label: "External links",
@@ -42,8 +85,8 @@ const displayToggles = computed(() => [
   },
   {
     key: "showAmbient" as const,
-    label: "Ambient glow",
-    description: "Enable the background glow treatment behind the app shell.",
+    label: "Card-art atmosphere",
+    description: "Strengthen the revealed card art tint behind the result stage.",
   },
 ]);
 
@@ -69,14 +112,25 @@ const performanceProfiles = [
   {
     value: "standard" as const,
     label: "Standard",
-    description: "Keep the full reveal effects and glass treatment.",
+    description: "Keep the full motion, artwork, and surface treatments.",
   },
   {
     value: "low-power" as const,
     label: "Low power",
-    description: "Cut motion, simplify the backdrop, and reduce blur.",
+    description: "Cut motion and simplify heavier visual effects.",
   },
 ];
+
+const activePerformanceDescription = computed(() => {
+  if (performancePreset.value === "custom") {
+    return "Choose individual controls below for a custom setup.";
+  }
+  return (
+    performanceProfiles.find(
+      (profile) => profile.value === performancePreset.value,
+    )?.description ?? "Keep the full motion, artwork, and surface treatments."
+  );
+});
 
 const performanceToggles = computed(() => [
   {
@@ -87,12 +141,12 @@ const performanceToggles = computed(() => [
   {
     key: "simplifyBackdrop" as const,
     label: "Simplify backdrop",
-    description: "Use a single static card-art wash instead of layered animated art.",
+    description: "Use a flatter, lower-cost card-art treatment behind results.",
   },
   {
     key: "reduceTransparency" as const,
-    label: "Reduce blur and glass",
-    description: "Disable expensive backdrop blur on panels and overlays.",
+    label: "Reduce transparency",
+    description: "Disable expensive blur and translucent surface effects.",
   },
 ]);
 
@@ -120,287 +174,384 @@ const closeSettings = () => {
 <template>
   <section
     :class="[
-      'motion-fade-up mx-auto max-w-3xl space-y-5',
+      'mx-auto max-w-4xl space-y-6 pb-4 sm:space-y-8',
       props.panel ? '' : 'mt-6',
     ]"
   >
-    <header
-      class="flex items-start justify-between gap-3 px-1 py-1 sm:flex-row sm:items-center"
-    >
-      <div>
-        <p
-          class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400"
+    <header class="flex items-start gap-3 px-1 sm:items-center sm:gap-4">
+      <div
+        class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-[1rem_1rem_1rem_0.4rem] bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] sm:flex"
+        aria-hidden="true"
+      >
+        <PaintBrushIcon class="h-6 w-6" />
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <h2
+          class="text-[1.75rem] font-medium leading-tight text-[var(--md-sys-color-on-surface)] sm:text-3xl"
         >
-          Preferences
-        </p>
-        <h2 class="font-heading text-2xl text-slate-900 dark:text-white">
           Settings
         </h2>
+        <p
+          class="mt-1 max-w-2xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+        >
+          Tune how Randomander looks, reveals cards, and stores network data on
+          this device.
+        </p>
       </div>
+
       <button
         type="button"
-        class="motion-press min-h-11 rounded-full px-2 py-2 text-sm font-medium text-sky-600 transition hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 sm:border sm:border-slate-200 sm:bg-white sm:px-4 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em] sm:text-slate-600 sm:hover:bg-slate-50 sm:dark:border-slate-700/60 sm:dark:bg-slate-900 sm:dark:text-slate-200 sm:dark:hover:bg-slate-800"
+        class="m3-button m3-button--text shrink-0"
         @click="closeSettings"
       >
+        <XMarkIcon v-if="props.panel" class="h-5 w-5" aria-hidden="true" />
+        <CheckIcon v-else class="h-5 w-5" aria-hidden="true" />
         {{ props.panel ? "Close" : "Done" }}
       </button>
     </header>
 
-    <div class="grid gap-4 sm:grid-cols-[1.2fr_0.8fr]">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <section
-        class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
+        class="m3-card p-4 sm:p-6 lg:col-span-2"
+        aria-labelledby="settings-theme-title"
       >
-        <p
-          class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-        >
-          Theme
-        </p>
-        <div class="mt-4 grid gap-3">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]"
+            aria-hidden="true"
+          >
+            <PaintBrushIcon class="h-5 w-5" />
+          </div>
+          <div>
+            <h3
+              id="settings-theme-title"
+              class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
+            >
+              Theme
+            </h3>
+            <p
+              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              Choose a comfortable color appearance for this device.
+            </p>
+          </div>
+        </div>
+
+        <div class="m3-segmented mt-5" aria-label="Theme">
           <button
             v-for="option in themeOptions"
             :key="option.value"
             type="button"
-            class="motion-press flex min-h-12 items-center justify-between gap-4 rounded-[1.1rem] border px-4 py-3 text-left transition sm:rounded-2xl"
-            :class="
-              theme === option.value
-                ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-            "
+            class="m3-segmented__button flex items-center justify-center gap-2 px-2"
+            :aria-pressed="theme === option.value"
             @click="setTheme(option.value)"
           >
-            <div>
-              <p class="text-sm font-semibold">{{ option.label }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">
-                {{ option.description }}
-              </p>
-            </div>
-            <span
-              class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs"
-              :class="
-                theme === option.value
-                  ? 'border-amber-400/70 bg-amber-400 text-slate-900'
-                  : 'border-slate-200 text-slate-400 dark:border-slate-700/60 dark:text-slate-400'
-              "
+            <component :is="option.icon" class="h-4 w-4" aria-hidden="true" />
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+        <p
+          class="mt-3 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+          aria-live="polite"
+        >
+          {{ activeThemeDescription }}
+        </p>
+      </section>
+
+      <section
+        class="m3-card overflow-hidden"
+        aria-labelledby="settings-display-title"
+      >
+        <div class="flex items-start gap-3 p-4 pb-3 sm:p-6 sm:pb-4">
+          <div
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]"
+            aria-hidden="true"
+          >
+            <EyeIcon class="h-5 w-5" />
+          </div>
+          <div>
+            <h3
+              id="settings-display-title"
+              class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
             >
-              ✓
+              Display controls
+            </h3>
+            <p
+              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              Decide what appears with each result.
+            </p>
+          </div>
+        </div>
+
+        <div class="px-4 pb-2 sm:px-6 sm:pb-3">
+          <label
+            v-for="item in displayToggles"
+            :key="item.key"
+            :class="[
+              'flex min-h-20 cursor-pointer items-center gap-4 border-t border-[var(--md-sys-color-outline-variant)] py-4',
+              item.key === 'enablePrestigeReveal'
+                ? 'rounded-2xl border-0 bg-[var(--md-sys-color-tertiary-container)] px-4 text-[var(--md-sys-color-on-tertiary-container)]'
+                : '',
+            ]"
+          >
+            <SparklesIcon
+              v-if="item.key === 'enablePrestigeReveal'"
+              class="h-6 w-6 shrink-0"
+              aria-hidden="true"
+            />
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm font-semibold">{{ item.label }}</span>
+              <span
+                :id="`display-${item.key}-description`"
+                class="mt-1 block text-sm leading-5 opacity-80"
+              >
+                {{ item.description }}
+              </span>
             </span>
+            <input
+              v-model="display[item.key]"
+              type="checkbox"
+              class="m3-switch"
+              :aria-describedby="`display-${item.key}-description`"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section
+        class="m3-card overflow-hidden"
+        aria-labelledby="settings-performance-title"
+      >
+        <div class="flex items-start gap-3 p-4 pb-3 sm:p-6 sm:pb-4">
+          <div
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)]"
+            aria-hidden="true"
+          >
+            <BoltIcon class="h-5 w-5" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3
+                id="settings-performance-title"
+                class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
+              >
+                Performance
+              </h3>
+              <span class="m3-chip">
+                {{
+                  performancePreset === "custom"
+                    ? "Custom"
+                    : performancePreset === "low-power"
+                      ? "Low power"
+                      : "Standard"
+                }}
+              </span>
+            </div>
+            <p
+              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              Balance expressive motion with battery and device needs.
+            </p>
+          </div>
+        </div>
+
+        <div class="px-4 pb-4 sm:px-6">
+          <div class="m3-segmented" aria-label="Performance profile">
+            <button
+              v-for="option in performanceProfiles"
+              :key="option.value"
+              type="button"
+              class="m3-segmented__button px-3"
+              :aria-pressed="performancePreset === option.value"
+              @click="setPerformancePreset(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          <p
+            class="mt-3 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+          >
+            {{ activePerformanceDescription }}
+          </p>
+
+          <div class="mt-4">
+            <label
+              v-for="item in performanceToggles"
+              :key="item.key"
+              class="flex min-h-20 cursor-pointer items-center gap-4 border-t border-[var(--md-sys-color-outline-variant)] py-4"
+            >
+              <span class="min-w-0 flex-1">
+                <span
+                  class="block text-sm font-semibold text-[var(--md-sys-color-on-surface)]"
+                >
+                  {{ item.label }}
+                </span>
+                <span
+                  :id="`performance-${item.key}-description`"
+                  class="mt-1 block text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+                >
+                  {{ item.description }}
+                </span>
+              </span>
+              <input
+                v-model="performance[item.key]"
+                type="checkbox"
+                class="m3-switch"
+                :aria-describedby="`performance-${item.key}-description`"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="m3-card overflow-hidden lg:col-span-2"
+        aria-labelledby="settings-cache-title"
+      >
+        <div class="flex items-start gap-3 p-4 pb-3 sm:p-6 sm:pb-4">
+          <div
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]"
+            aria-hidden="true"
+          >
+            <CircleStackIcon class="h-5 w-5" />
+          </div>
+          <div>
+            <h3
+              id="settings-cache-title"
+              class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
+            >
+              Cache
+            </h3>
+            <p
+              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              Reuse Scryfall and EDHREC responses to make repeat visits faster.
+            </p>
+          </div>
+        </div>
+
+        <div class="grid gap-4 px-4 pb-5 sm:grid-cols-2 sm:px-6 sm:pb-6 lg:grid-cols-3">
+          <label
+            class="flex min-h-20 cursor-pointer items-center gap-4 rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-surface-container)] p-4"
+          >
+            <span class="min-w-0 flex-1">
+              <span
+                class="block text-sm font-semibold text-[var(--md-sys-color-on-surface)]"
+              >
+                Enable cache
+              </span>
+              <span
+                id="cache-enabled-description"
+                class="mt-1 block text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+              >
+                Reuse card details and EDHREC data.
+              </span>
+            </span>
+            <input
+              v-model="cacheSettings.enabled"
+              type="checkbox"
+              class="m3-switch"
+              aria-describedby="cache-enabled-description"
+            />
+          </label>
+
+          <label for="cache-ttl" class="block">
+            <span
+              class="mb-2 block text-sm font-semibold text-[var(--md-sys-color-on-surface)]"
+            >
+              Cache TTL (hours)
+            </span>
+            <input
+              id="cache-ttl"
+              v-model.number="cacheSettings.ttlHours"
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              class="m3-field"
+            />
+          </label>
+
+          <label for="cache-max-entries" class="block">
+            <span
+              class="mb-2 block text-sm font-semibold text-[var(--md-sys-color-on-surface)]"
+            >
+              Max cache entries
+            </span>
+            <input
+              id="cache-max-entries"
+              v-model.number="cacheSettings.maxEntries"
+              type="number"
+              min="20"
+              step="10"
+              inputmode="numeric"
+              class="m3-field"
+            />
+          </label>
+        </div>
+
+        <div
+          class="flex flex-col gap-3 border-t border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+        >
+          <div>
+            <p class="text-sm font-semibold text-[var(--md-sys-color-on-surface)]">
+              Clear cache
+            </p>
+            <p
+              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              Remove cached responses stored locally. Your settings stay intact.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="m3-button m3-button--danger shrink-0"
+            @click="clearCache"
+          >
+            <TrashIcon class="h-5 w-5" aria-hidden="true" />
+            Clear cache
           </button>
         </div>
       </section>
 
       <section
-        class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
+        class="m3-card m3-card--filled flex flex-col gap-5 p-4 sm:flex-row sm:items-center sm:p-6 lg:col-span-2"
+        aria-labelledby="settings-history-title"
       >
-        <p
-          class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+        <div
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.1rem_1.1rem_1.1rem_0.4rem] bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]"
+          aria-hidden="true"
         >
-          History
-        </p>
-        <div class="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-          <p>
-            History entries:
-            <span class="font-semibold text-slate-900 dark:text-white">{{
-              history.length
-            }}</span>
-          </p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            Stored locally on this device.
-          </p>
-          <button
-            type="button"
-            class="motion-press inline-flex min-h-11 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-            @click="openHistory"
-          >
-            Open history
-          </button>
+          <ClockIcon class="h-6 w-6" />
         </div>
+        <div class="min-w-0 flex-1">
+          <h3
+            id="settings-history-title"
+            class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
+          >
+            History
+          </h3>
+          <p
+            class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+          >
+            History entries:
+            <strong class="font-semibold text-[var(--md-sys-color-on-surface)]">
+              {{ history.length }}
+            </strong>
+            · Stored locally on this device.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="m3-button m3-button--tonal w-full shrink-0 sm:w-auto"
+          @click="openHistory"
+        >
+          Open history
+          <ArrowRightIcon class="h-5 w-5" aria-hidden="true" />
+        </button>
       </section>
     </div>
-
-    <section
-      class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
-    >
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Display controls
-          </p>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Only active controls are shown here until the richer result metadata
-            surfaces return.
-          </p>
-        </div>
-      </div>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
-        <label
-          v-for="item in displayToggles"
-          :key="item.key"
-          class="flex min-h-12 items-start justify-between gap-4 rounded-[1.1rem] border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60 sm:rounded-2xl"
-        >
-          <div>
-            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              {{ item.label }}
-            </p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              {{ item.description }}
-            </p>
-          </div>
-          <input
-            v-model="display[item.key]"
-            type="checkbox"
-            class="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-          />
-        </label>
-      </div>
-    </section>
-
-    <section
-      class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
-    >
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-          >
-            Performance
-          </p>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Trim the heavier visual effects for older laptops and lower-power devices.
-          </p>
-        </div>
-        <span
-          class="rounded-full border border-slate-200/70 bg-slate-50/80 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300"
-        >
-          {{
-            performancePreset === "custom"
-              ? "Custom"
-              : performancePreset === "low-power"
-                ? "Low power"
-                : "Standard"
-          }}
-        </span>
-      </div>
-
-      <div class="mt-4 grid gap-3 sm:grid-cols-2">
-        <button
-          v-for="option in performanceProfiles"
-          :key="option.value"
-          type="button"
-          class="motion-press min-h-12 rounded-[1.1rem] border px-4 py-4 text-left transition sm:rounded-2xl"
-          :class="
-            performancePreset === option.value
-              ? 'border-amber-400/70 bg-amber-200/40 text-amber-900 dark:text-amber-100'
-              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-          "
-          @click="setPerformancePreset(option.value)"
-        >
-          <p class="text-sm font-semibold">{{ option.label }}</p>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {{ option.description }}
-          </p>
-        </button>
-      </div>
-
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
-        <label
-          v-for="item in performanceToggles"
-          :key="item.key"
-          class="flex min-h-12 items-start justify-between gap-4 rounded-[1.1rem] border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60 sm:rounded-2xl"
-        >
-          <div>
-            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              {{ item.label }}
-            </p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              {{ item.description }}
-            </p>
-          </div>
-          <input
-            v-model="performance[item.key]"
-            type="checkbox"
-            class="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-          />
-        </label>
-      </div>
-    </section>
-
-    <section
-      class="rounded-[1.4rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/76 sm:rounded-[2rem] sm:p-5 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] sm:backdrop-blur-md"
-    >
-      <p
-        class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-      >
-        Cache
-      </p>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
-        <label
-          class="flex min-h-12 items-start justify-between gap-4 rounded-[1.1rem] border border-slate-200/70 bg-white px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60 sm:rounded-2xl"
-        >
-          <div>
-            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              Enable cache
-            </p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              Reuse card details and EDHREC data.
-            </p>
-          </div>
-          <input
-            v-model="cacheSettings.enabled"
-            type="checkbox"
-            class="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-          />
-        </label>
-
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
-        >
-          <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Cache TTL (hours)
-          </p>
-          <input
-            v-model.number="cacheSettings.ttlHours"
-            type="number"
-            min="1"
-            step="1"
-            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-amber-400 focus:outline-none dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200"
-          />
-        </div>
-
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
-        >
-          <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Max cache entries
-          </p>
-          <input
-            v-model.number="cacheSettings.maxEntries"
-            type="number"
-            min="20"
-            step="10"
-            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-amber-400 focus:outline-none dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200"
-          />
-        </div>
-
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/60"
-        >
-          <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Clear cache
-          </p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            Remove cached responses stored locally.
-          </p>
-          <button
-            type="button"
-            class="mt-3 min-h-11 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 dark:hover:bg-rose-500/20 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-            @click="clearCache"
-          >
-            Clear cache
-          </button>
-        </div>
-      </div>
-    </section>
   </section>
 </template>

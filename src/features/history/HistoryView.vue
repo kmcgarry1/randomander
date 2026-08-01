@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BookmarkIcon,
+  CheckIcon,
+  ClockIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/vue/24/outline";
 import { useRandomanderStore, modes } from "../../stores/randomander";
-import { formatColorIdentity, getCardImageUrl } from "../../lib/scryfall";
+import { getCardImageUrl } from "../../lib/scryfall";
 import type { PullRecord } from "../../stores/randomander";
+import ManaIdentity from "../../components/mtg/ManaIdentity.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -27,10 +37,10 @@ const getModeLabel = (mode: PullRecord["mode"]) =>
 
 const buildSummary = (record: PullRecord) => {
   const chips: string[] = [];
-  chips.push(getModeLabel(record.mode));
-  if (record.options.selectedColors.length) {
-    chips.push(formatColorIdentity(record.options.selectedColors));
-  } else if (record.options.colorCount !== "any") {
+  if (
+    record.options.selectedColors.length === 0 &&
+    record.options.colorCount !== "any"
+  ) {
     chips.push(`Colors: ${record.options.colorCount}`);
   }
   if (record.mode === "spark" && record.options.excludeGameChangers) {
@@ -78,142 +88,180 @@ const handleClear = () => {
 
 <template>
   <section
-    :class="['motion-fade-up mx-auto max-w-5xl space-y-5', props.panel ? '' : 'mt-6']"
+    :class="['mx-auto max-w-6xl space-y-6', props.panel ? '' : 'mt-6']"
   >
-    <header
-      class="flex flex-col gap-3 px-1 py-1 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
-    >
-      <div>
-        <p
-          class="text-[0.65rem] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400"
+    <header class="flex items-start gap-3 px-1 sm:gap-4">
+      <div
+        class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] sm:flex"
+        aria-hidden="true"
+      >
+        <ClockIcon class="h-6 w-6" />
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <h2
+          class="text-[1.75rem] font-medium leading-tight text-[var(--md-sys-color-on-surface)] sm:text-3xl"
         >
-          Timeline
-        </p>
-        <h2 class="font-heading text-2xl text-slate-900 dark:text-white">
           History
         </h2>
-        <p class="text-xs text-slate-500 dark:text-slate-400">
-          Entries stored locally on this device.
+        <p
+          class="mt-1 max-w-xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+        >
+          Revisit recent pulls stored locally on this device.
         </p>
+        <div class="m3-chip mt-3 w-fit" aria-label="History entry count">
+          <ClockIcon class="h-4 w-4" aria-hidden="true" />
+          <span>{{ history.length }} pull{{ history.length === 1 ? "" : "s" }}</span>
+        </div>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+
+      <div class="flex shrink-0 items-center gap-1 sm:gap-2">
         <button
           type="button"
-          class="motion-press rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          class="m3-button m3-button--text text-[var(--md-sys-color-error)]"
           :disabled="history.length === 0"
           @click="handleClear"
         >
+          <TrashIcon class="h-5 w-5" aria-hidden="true" />
           Clear history
         </button>
         <button
           type="button"
-          class="motion-press rounded-full border border-white/30 bg-slate-900/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-slate-900/90 dark:border-slate-100/40 dark:bg-slate-900"
+          class="m3-icon-button"
+          :aria-label="props.panel ? 'Close' : 'Back to draw'"
           @click="handleClose"
         >
-          {{ props.panel ? "Close" : "Back to draw" }}
+          <XMarkIcon v-if="props.panel" class="h-6 w-6" aria-hidden="true" />
+          <ArrowLeftIcon v-else class="h-6 w-6" aria-hidden="true" />
         </button>
-        <span
-          v-if="!props.panel"
-          class="text-[0.65rem] font-semibold text-slate-500 dark:text-slate-400"
-        >
-          Reset view to start over
-        </span>
       </div>
     </header>
 
-    <div
+    <section
       v-if="history.length === 0"
-      class="rounded-[2rem] border border-white/80 bg-white/76 p-10 text-center shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+      class="m3-card flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center"
+      aria-labelledby="empty-history-title"
     >
-      <p class="font-heading text-xl text-slate-900 dark:text-white">
+      <div
+        class="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]"
+        aria-hidden="true"
+      >
+        <ClockIcon class="h-8 w-8" />
+      </div>
+      <h3
+        id="empty-history-title"
+        class="mt-5 text-xl font-medium text-[var(--md-sys-color-on-surface)]"
+      >
         No pulls yet.
-      </p>
-      <p class="mt-2 text-sm text-slate-500 dark:text-slate-300">
+      </h3>
+      <p
+        class="mt-2 max-w-sm text-sm leading-6 text-[var(--md-sys-color-on-surface-variant)]"
+      >
         Start randomizing to build a history of commanders and sparks.
       </p>
-    </div>
+    </section>
 
-    <div v-else class="motion-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4" role="list">
       <article
         v-for="record in history"
         :key="record.id"
-        class="rounded-[2rem] border border-white/80 bg-white/76 p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/76"
+        class="m3-card flex min-w-0 flex-col p-4 sm:p-5"
+        role="listitem"
       >
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p
-              class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <h3
+              class="text-lg font-medium leading-6 text-[var(--md-sys-color-on-surface)]"
             >
-              {{ formatDate(record.createdAt) }}
-            </p>
-            <h3 class="font-heading text-lg text-slate-900 dark:text-white">
               {{ getModeLabel(record.mode) }}
             </h3>
+            <time
+              :datetime="record.createdAt"
+              class="mt-1 block text-xs text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              {{ formatDate(record.createdAt) }}
+            </time>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              class="motion-press rounded-full border border-amber-300 bg-amber-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-900 shadow-sm transition hover:bg-amber-300"
-              @click="handleLoad(record)"
-            >
-              Load
-            </button>
-            <button
-              type="button"
-              class="motion-press rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              :class="isRecordSaved(record) ? 'motion-pop' : ''"
-              :disabled="isRecordSaved(record)"
-              @click="handleSave(record)"
-            >
-              {{ isRecordSaved(record) ? "Saved" : "Save" }}
-            </button>
+          <span v-if="record.choices?.length" class="m3-chip shrink-0">
+            {{ record.choices.length }} options
+          </span>
+        </div>
+
+        <div class="mt-4 grid gap-2.5">
+          <div
+            v-for="(group, index) in getGroups(record)"
+            :key="`${record.id}-${index}`"
+            class="flex min-w-0 items-center gap-4 rounded-[1.25rem] bg-[var(--md-sys-color-surface-container)] p-3"
+          >
+            <div class="flex shrink-0 -space-x-5" role="group">
+              <img
+                v-for="card in group"
+                :key="card.id"
+                :src="getCardImageUrl(card)"
+                :alt="card.name"
+                class="h-20 w-[3.6rem] rounded-[0.65rem] border-2 border-[var(--md-sys-color-surface-container)] object-cover shadow-sm sm:h-24 sm:w-[4.3rem]"
+                loading="lazy"
+              />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="m3-label text-[var(--md-sys-color-primary)]">
+                {{ record.choices?.length ? `Option ${index + 1}` : "Pull" }}
+              </p>
+              <p
+                class="mt-1 line-clamp-2 text-sm font-medium leading-5 text-[var(--md-sys-color-on-surface)]"
+              >
+                {{ getGroupLabel(group) }}
+              </p>
+              <p
+                class="mt-1 text-xs text-[var(--md-sys-color-on-surface-variant)]"
+              >
+                {{ group.length }} card{{ group.length === 1 ? "" : "s" }}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-          <span
-            v-for="chip in buildSummary(record)"
-            :key="chip"
-            class="motion-chip rounded-full border border-slate-200 bg-white px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300"
-          >
+        <div
+          v-if="record.options.selectedColors.length || buildSummary(record).length"
+          class="mt-4 flex flex-wrap items-center gap-2"
+          aria-label="Pull filters"
+        >
+          <ManaIdentity
+            v-if="record.options.selectedColors.length"
+            class="m3-chip"
+            :colors="record.options.selectedColors"
+            compact
+          />
+          <span v-for="chip in buildSummary(record)" :key="chip" class="m3-chip">
             {{ chip }}
           </span>
         </div>
 
-        <div class="mt-5 grid gap-4">
-          <div
-            v-for="(group, index) in getGroups(record)"
-            :key="`${record.id}-${index}`"
-            class="rounded-[1.7rem] border border-white/75 bg-white/72 p-4 dark:border-slate-700/60 dark:bg-slate-900/72"
+        <div
+          class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--md-sys-color-outline-variant)] pt-4"
+        >
+          <button
+            type="button"
+            class="m3-button m3-button--tonal"
+            :disabled="isRecordSaved(record)"
+            @click="handleSave(record)"
           >
-            <p
-              class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-            >
-              {{ record.choices?.length ? `Option ${index + 1}` : "Pull" }}
-            </p>
-            <div class="mt-4 flex flex-col items-center gap-4 text-center">
-              <div class="flex justify-center -space-x-5">
-                <img
-                  v-for="card in group"
-                  :key="card.id"
-                  :src="getCardImageUrl(card)"
-                  :alt="card.name"
-                  class="h-24 w-[4.25rem] rounded-2xl border border-white object-cover shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)] dark:border-slate-800"
-                  loading="lazy"
-                />
-              </div>
-              <div>
-                <p
-                  class="text-sm font-semibold text-slate-800 dark:text-slate-100"
-                >
-                  {{ getGroupLabel(group) }}
-                </p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ group.length }} card{{ group.length === 1 ? "" : "s" }}
-                </p>
-              </div>
-            </div>
-          </div>
+            <CheckIcon
+              v-if="isRecordSaved(record)"
+              class="h-5 w-5"
+              aria-hidden="true"
+            />
+            <BookmarkIcon v-else class="h-5 w-5" aria-hidden="true" />
+            {{ isRecordSaved(record) ? "Saved" : "Save" }}
+          </button>
+          <button
+            type="button"
+            class="m3-button m3-button--filled"
+            @click="handleLoad(record)"
+          >
+            Load
+            <ArrowRightIcon class="h-5 w-5" aria-hidden="true" />
+          </button>
         </div>
       </article>
     </div>

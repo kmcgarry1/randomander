@@ -1,24 +1,43 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  watchEffect,
+} from "vue";
 import { storeToRefs } from "pinia";
 import {
   AdjustmentsHorizontalIcon,
+  ArrowPathIcon,
+  BookmarkIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  Cog6ToothIcon,
+  LightBulbIcon,
+  SparklesIcon,
 } from "@heroicons/vue/24/outline";
 import {
   modes,
   type Mode,
   useRandomanderStore,
 } from "../../stores/randomander";
-import { getPartnerKind, type ScryfallCard } from "../../lib/scryfall";
+import {
+  formatColorIdentity,
+  getCardImageUrl,
+  getEdhrecCommanderUrl,
+  getPartnerKind,
+  type ScryfallCard,
+} from "../../lib/scryfall";
 import HeroStage from "./components/HeroStage.vue";
 import ChoiceOptionsSection from "./components/ChoiceOptionsSection.vue";
 import DrawBackdrop from "./components/DrawBackdrop.vue";
 import ResultDetailsSection from "./components/ResultDetailsSection.vue";
 import { useHeroSummary } from "./composables/useHeroSummary";
-import { formatColorIdentity, getEdhrecCommanderUrl } from "../../lib/scryfall";
+
+const REVEAL_TOTAL_MS = 2400;
+const REVEAL_PRELOAD_TIMEOUT_MS = 4000;
 
 const store = useRandomanderStore();
 const {
@@ -27,14 +46,13 @@ const {
   display,
   errorMessage,
   hasResults,
+  history,
   isChoiceMode,
   isLoading,
   options,
-  stageTitle,
   performance,
 } = storeToRefs(store);
 
-const heroSummary = useHeroSummary();
 const {
   heroCard,
   heroCards,
@@ -43,7 +61,7 @@ const {
   heroHasCompanionSlot,
   heroCompanionButtonLabel,
   heroGroup,
-} = heroSummary;
+} = useHeroSummary();
 
 const heroScryfallUrl = computed(() => heroCard.value?.scryfall_uri ?? "");
 const heroEdhrecUrl = computed(() =>
@@ -57,7 +75,7 @@ const heroEdhrecUrl = computed(() =>
 const heroTitle = computed(() =>
   heroGroup.value.length > 1
     ? heroGroup.value.map((card) => card.name).join(" + ")
-    : heroCard.value?.name ?? stageTitle.value,
+    : heroCard.value?.name ?? "Your next commander",
 );
 
 const filterChips = computed(() => {
@@ -67,17 +85,11 @@ const filterChips = computed(() => {
   } else if (options.value.colorCount !== "any") {
     chips.push(`Colors ${options.value.colorCount}`);
   }
-  if (options.value.colorCountMode === "exactly") {
-    chips.push("Exact colors");
-  }
-  if (options.value.twoChoices && mode.value !== "spark") {
-    chips.push("Two choices");
-  }
-  if (options.value.useRankCutoff) {
-    chips.push("Skip top 10% EDHREC");
-  }
+  if (options.value.colorCountMode === "exactly") chips.push("Exact colors");
+  if (options.value.twoChoices && mode.value !== "spark") chips.push("Two choices");
+  if (options.value.useRankCutoff) chips.push("Outside EDHREC top 10%");
   if (options.value.limitByDecks && !options.value.useRankCutoff) {
-    chips.push(`Decks < ${options.value.maxDecks}`);
+    chips.push(`Under ${options.value.maxDecks} decks`);
   }
   if (mode.value === "spark" && options.value.excludeGameChangers) {
     chips.push("No Game Changers");
@@ -85,15 +97,21 @@ const filterChips = computed(() => {
   return chips;
 });
 
-const stageChips = computed(() => filterChips.value);
-
-const detailsOpen = ref(false);
-const detailsToggleLabel = computed(() =>
-  detailsOpen.value ? "Hide details" : "Show details",
-);
-const detailsSectionLabel = "Details";
 const activeFilterCount = computed(() => filterChips.value.length);
-const isMobileViewport = ref(false);
+const detailsOpen = ref(false);
+const isWideViewport = ref(false);
+const systemReducedMotion = ref(true);
+const motionAvailable = ref(false);
+const isRevealActive = ref(false);
+const revealComplete = ref(false);
+let revealTimer: number | undefined;
+let revealStartTimer: number | undefined;
+let revealPreloadController: AbortController | undefined;
+let revealRequestId = 0;
+let handledResultKey = "";
+let wideViewportQuery: MediaQueryList | null = null;
+let motionQuery: MediaQueryList | null = null;
+
 const showHeroCompanion = computed(
   () =>
     !isChoiceMode.value &&
@@ -101,21 +119,29 @@ const showHeroCompanion = computed(
     heroGroup.value.length === 1 &&
     heroHasCompanionSlot.value,
 );
-const showActionCard = computed(
-  () => !isMobileViewport.value || hasResults.value || showHeroCompanion.value,
-);
 
 const activeResultKey = computed(() => {
-  if (isChoiceMode.value) {
-    return choices.value
-      .map((choice) => choice.cards.map((card) => card.id).join("|"))
-      .join("::");
-  }
-  return heroGroup.value.map((card) => card.id).join("|");
+  const cardKey = isChoiceMode.value
+    ? choices.value
+        .map((choice) => choice.cards.map((card) => card.id).join("|"))
+        .join("::")
+    : heroGroup.value.map((card) => card.id).join("|");
+  const sessionKey = history.value[0]?.id ?? "";
+  return cardKey ? `${cardKey}--${sessionKey}` : "";
 });
 
+const cardsForReveal = computed(() =>
+  isChoiceMode.value
+    ? choices.value.flatMap((choice) => choice.cards)
+    : heroCards.value,
+);
+
 const backdropCards = computed(() =>
-  isChoiceMode.value ? choices.value.flatMap((choice) => choice.cards) : heroCards.value,
+  revealComplete.value
+    ? isChoiceMode.value
+      ? choices.value.flatMap((choice) => choice.cards)
+      : heroCards.value
+    : [],
 );
 
 const pairLinkUrl = computed(() =>
@@ -123,310 +149,507 @@ const pairLinkUrl = computed(() =>
     ? `https://edhrec.com/commanders/${store.getPartnerSlugForGroup(heroGroup.value)}`
     : "",
 );
-const heroLinksVisible = computed(
-  () => display.value.showLinks && (!isMobileViewport.value || !detailsOpen.value),
+
+const revealEnabled = computed(
+  () =>
+    display.value.enablePrestigeReveal &&
+    !performance.value.reduceMotion &&
+    motionAvailable.value &&
+    !systemReducedMotion.value,
 );
 
+const revealInProgress = computed(
+  () => hasResults.value && !revealComplete.value && revealEnabled.value,
+);
+
+const clearRevealTimer = () => {
+  if (revealTimer !== undefined) {
+    window.clearTimeout(revealTimer);
+    revealTimer = undefined;
+  }
+};
+
+const clearRevealStartTimer = () => {
+  if (revealStartTimer !== undefined) {
+    window.clearTimeout(revealStartTimer);
+    revealStartTimer = undefined;
+  }
+};
+
+const clearRevealPreload = () => {
+  revealPreloadController?.abort();
+  revealPreloadController = undefined;
+};
+
+const finishReveal = () => {
+  revealRequestId += 1;
+  clearRevealPreload();
+  clearRevealStartTimer();
+  clearRevealTimer();
+  isRevealActive.value = false;
+  revealComplete.value = hasResults.value;
+  if (revealComplete.value && isWideViewport.value && !isChoiceMode.value) {
+    detailsOpen.value = true;
+  }
+};
+
+const beginReveal = async () => {
+  revealStartTimer = undefined;
+  clearRevealTimer();
+  detailsOpen.value = false;
+  revealComplete.value = false;
+
+  if (!hasResults.value) {
+    isRevealActive.value = false;
+    return;
+  }
+
+  if (!revealEnabled.value) {
+    await nextTick();
+    finishReveal();
+    return;
+  }
+
+  isRevealActive.value = true;
+  await nextTick();
+  revealTimer = window.setTimeout(finishReveal, REVEAL_TOTAL_MS);
+};
+
+const preloadCardImage = (source: string, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (typeof Image === "undefined" || signal.aborted) {
+      resolve();
+      return;
+    }
+
+    const image = new Image();
+    let settled = false;
+    let timeoutId: number | undefined;
+
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      signal.removeEventListener("abort", settle);
+      image.onload = null;
+      image.onerror = null;
+      resolve();
+    };
+
+    image.onload = () => {
+      if (typeof image.decode === "function") {
+        void image.decode().catch(() => undefined).finally(settle);
+      } else {
+        settle();
+      }
+    };
+    image.onerror = settle;
+    signal.addEventListener("abort", settle, { once: true });
+    timeoutId = window.setTimeout(settle, REVEAL_PRELOAD_TIMEOUT_MS);
+    image.src = source;
+  });
+
+const prepareReveal = async (key: string) => {
+  const requestId = ++revealRequestId;
+  clearRevealPreload();
+
+  if (!revealEnabled.value) {
+    await beginReveal();
+    return;
+  }
+
+  const controller = new AbortController();
+  revealPreloadController = controller;
+  const sources = Array.from(
+    new Set(cardsForReveal.value.map(getCardImageUrl).filter(Boolean)),
+  );
+  await Promise.all(
+    sources.map((source) => preloadCardImage(source, controller.signal)),
+  );
+
+  if (revealPreloadController === controller) {
+    revealPreloadController = undefined;
+  }
+  if (
+    controller.signal.aborted ||
+    requestId !== revealRequestId ||
+    key !== activeResultKey.value ||
+    revealComplete.value
+  ) {
+    return;
+  }
+
+  revealStartTimer = window.setTimeout(() => {
+    if (
+      requestId === revealRequestId &&
+      key === activeResultKey.value &&
+      !revealComplete.value
+    ) {
+      void beginReveal();
+    }
+  }, 170);
+};
+
 const updateMode = (value: Mode) => {
+  if (revealInProgress.value) return;
   mode.value = value;
 };
 
 const handleRandomize = () => {
+  if (revealInProgress.value) finishReveal();
   store.randomize();
 };
 
 const handleChoicePartner = (index: number) => {
-  store.randomizePartnerForChoice(index);
+  if (!revealInProgress.value) store.randomizePartnerForChoice(index);
 };
 
 const canRandomizeChoicePartner = (card: ScryfallCard) =>
   getPartnerKind(card) !== null;
 
 const handleHeroCompanion = () => {
-  if (heroIsBackground.value) {
-    store.randomizeCommanderForBackground();
-  } else {
-    store.randomizePartnerForPrimary();
-  }
-};
-
-const openFilters = () => {
-  store.openOptions();
-};
-
-const openSettings = () => {
-  store.openSettingsPanel();
+  if (revealInProgress.value) return;
+  if (heroIsBackground.value) store.randomizeCommanderForBackground();
+  else store.randomizePartnerForPrimary();
 };
 
 const toggleDetails = () => {
   detailsOpen.value = !detailsOpen.value;
 };
 
-let viewportQuery: MediaQueryList | null = null;
+const skipReveal = async () => {
+  finishReveal();
+  await nextTick();
+  document
+    .querySelector<HTMLElement>("[data-result-heading]")
+    ?.focus({ preventScroll: true });
+};
 
-const syncViewport = (event?: MediaQueryListEvent) => {
-  if (event) {
-    isMobileViewport.value = event.matches;
-    return;
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === "Escape" && revealInProgress.value) void skipReveal();
+};
+
+const syncWideViewport = (event?: MediaQueryListEvent) => {
+  isWideViewport.value = event?.matches ?? wideViewportQuery?.matches ?? false;
+};
+
+const syncMotionPreference = (event?: MediaQueryListEvent) => {
+  systemReducedMotion.value = event?.matches ?? motionQuery?.matches ?? true;
+  if (
+    systemReducedMotion.value &&
+    hasResults.value &&
+    !revealComplete.value
+  ) {
+    finishReveal();
   }
-  isMobileViewport.value = viewportQuery?.matches ?? false;
 };
 
 onMounted(() => {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return;
-  }
+  window.addEventListener("keydown", handleKeydown);
+  if (typeof window.matchMedia !== "function") return;
 
-  viewportQuery = window.matchMedia("(max-width: 639px)");
-  syncViewport();
-
-  if (typeof viewportQuery.addEventListener === "function") {
-    viewportQuery.addEventListener("change", syncViewport);
-    return;
-  }
-
-  viewportQuery.addListener(syncViewport);
+  motionAvailable.value = true;
+  wideViewportQuery = window.matchMedia("(min-width: 1280px)");
+  motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  syncWideViewport();
+  syncMotionPreference();
+  wideViewportQuery.addEventListener?.("change", syncWideViewport);
+  motionQuery.addEventListener?.("change", syncMotionPreference);
 });
 
 onBeforeUnmount(() => {
-  if (!viewportQuery) return;
-
-  if (typeof viewportQuery.removeEventListener === "function") {
-    viewportQuery.removeEventListener("change", syncViewport);
-    return;
-  }
-
-  viewportQuery.removeListener(syncViewport);
+  revealRequestId += 1;
+  clearRevealPreload();
+  clearRevealStartTimer();
+  clearRevealTimer();
+  store.setMetadataSurfaceVisible(false);
+  window.removeEventListener("keydown", handleKeydown);
+  wideViewportQuery?.removeEventListener?.("change", syncWideViewport);
+  motionQuery?.removeEventListener?.("change", syncMotionPreference);
 });
 
-watch(activeResultKey, () => {
+watch(activeResultKey, (key) => {
+  revealRequestId += 1;
+  clearRevealPreload();
+  clearRevealStartTimer();
+  clearRevealTimer();
   detailsOpen.value = false;
+  isRevealActive.value = false;
+  revealComplete.value = false;
+  if (!key) handledResultKey = "";
+});
+
+watch(
+  [activeResultKey, isLoading],
+  ([key, loading]) => {
+    if (!key || loading || key === handledResultKey) return;
+    handledResultKey = key;
+    clearRevealStartTimer();
+    void prepareReveal(key);
+  },
+  { immediate: true },
+);
+watch(revealEnabled, (enabled) => {
+  if (!enabled && hasResults.value && !revealComplete.value) finishReveal();
+});
+
+watchEffect(() => {
+  store.setMetadataSurfaceVisible(
+    revealComplete.value &&
+      hasResults.value &&
+      !isChoiceMode.value &&
+      display.value.showTags,
+  );
 });
 </script>
 
 <template>
-  <section class="motion-fade-up relative isolate mt-1 sm:mt-6">
-    <DrawBackdrop :cards="backdropCards" :simplified="performance.simplifyBackdrop" />
-
-    <div class="relative z-10 mx-auto flex max-w-[76rem] flex-col items-center gap-4 pt-1 sm:gap-6 sm:pt-3">
-      <div class="order-2 hidden max-w-3xl flex-col items-center gap-3 text-center sm:order-1 sm:flex">
-        <div
-          v-if="stageChips.length"
-          class="flex flex-wrap justify-center gap-2"
-        >
-          <span
-            v-for="chip in stageChips"
-            :key="chip"
-            class="motion-chip rounded-full border border-white/80 bg-white/78 px-3 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-slate-600 shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-950/78 dark:text-slate-300"
-          >
-            {{ chip }}
-          </span>
-        </div>
+  <section class="relative mx-auto w-full max-w-[100rem] overflow-x-clip px-3 py-4 sm:px-6 sm:py-8">
+    <header class="mb-6 hidden items-end justify-between gap-8 sm:flex">
+      <div class="max-w-2xl">
+        <p class="m3-label">COMMANDER DISCOVERY</p>
+        <h1 class="mt-2 text-[clamp(2rem,4vw,3.5rem)] font-[750] leading-[0.98] tracking-[-0.035em]">
+          Find a deck worth building.
+        </h1>
+        <p class="mt-3 max-w-xl text-base text-[var(--md-sys-color-on-surface-variant)]">
+          Pull a legal commander, explore a compatible pairing, or start from three unlikely cards.
+        </p>
       </div>
-
-      <div class="order-1 w-full max-w-[30rem] sm:order-2 sm:max-w-full">
-        <div
-          v-if="isMobileViewport"
-          class="rounded-[1.7rem] border border-white/80 bg-white/80 p-3 shadow-[0_22px_50px_-36px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/78 sm:hidden"
+      <button
+        type="button"
+        class="m3-button m3-button--tonal shrink-0"
+        @click="store.openOptions()"
+      >
+        <AdjustmentsHorizontalIcon class="h-5 w-5" aria-hidden="true" />
+        Filters
+        <span
+          v-if="activeFilterCount"
+          class="grid min-w-6 place-items-center rounded-full bg-[var(--md-sys-color-on-secondary-container)] px-1.5 py-0.5 text-xs text-[var(--md-sys-color-secondary-container)]"
         >
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-[0.82rem] font-semibold text-slate-900 dark:text-white">
-                Draw mode
-              </p>
-              <p class="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                Choose how the next pull should be generated.
-              </p>
-            </div>
-            <span
-              v-if="stageChips.length"
-              class="rounded-full bg-slate-100 px-3 py-1 text-[0.7rem] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-300"
-            >
-              {{ stageChips.length }} filter{{ stageChips.length === 1 ? "" : "s" }}
-            </span>
-          </div>
+          {{ activeFilterCount }}
+        </span>
+      </button>
+    </header>
 
-          <div
-            v-if="stageChips.length"
-            class="mt-3 flex flex-wrap gap-2"
+    <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(22rem,1fr)_22rem] xl:gap-5">
+      <aside class="m3-card m3-card--filled min-w-0 overflow-hidden p-4 lg:sticky lg:top-8 lg:p-5">
+        <div>
+          <p class="m3-label">DRAW MODE</p>
+          <h2 class="mt-1 text-xl font-bold">What should we find?</h2>
+        </div>
+
+        <div class="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-1" role="group" aria-label="Draw mode">
+          <button
+            v-for="option in modes"
+            :key="option.id"
+            type="button"
+            class="min-h-16 min-w-0 rounded-2xl border px-1.5 py-3 text-left transition-all lg:px-4"
+            :class="
+              mode === option.id
+                ? 'rounded-[1.5rem_1.5rem_1.5rem_0.65rem] border-transparent bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                : 'border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
+            "
+            :aria-pressed="mode === option.id"
+            :disabled="revealInProgress"
+            @click="updateMode(option.id)"
           >
-            <span
-              v-for="chip in stageChips"
-              :key="`mobile-${chip}`"
-              class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[0.7rem] font-medium text-slate-600 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300"
+            <span class="block break-words text-center text-[0.7rem] font-bold leading-4 sm:text-xs lg:text-left lg:text-sm">
+              {{ option.label }}
+            </span>
+            <span class="mt-1 hidden text-xs leading-4 opacity-80 lg:block">
+              {{ option.description }}
+            </span>
+          </button>
+        </div>
+
+        <div class="mt-5 border-t border-[var(--md-sys-color-outline-variant)] pt-4">
+          <div class="flex items-center justify-between gap-3">
+            <p class="m3-label">ACTIVE FILTERS</p>
+            <button
+              type="button"
+              class="m3-button m3-button--text min-h-8 px-2 py-1 text-xs"
+              @click="store.openOptions()"
             >
+              Edit
+            </button>
+          </div>
+          <div v-if="filterChips.length" class="mt-3 flex flex-wrap gap-2">
+            <span v-for="chip in filterChips" :key="chip" class="m3-chip">
               {{ chip }}
             </span>
           </div>
-
-          <div class="mt-3 rounded-[1.35rem] bg-slate-100/90 p-1.5 dark:bg-slate-900/80">
-            <div class="grid grid-cols-3 gap-1.5">
-              <button
-                v-for="option in modes"
-                :key="`mobile-${option.id}`"
-                type="button"
-                class="motion-nav motion-press min-h-11 rounded-[1rem] px-2 py-2 text-center text-[0.78rem] font-semibold transition"
-                :class="
-                  mode === option.id
-                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-50 dark:text-slate-950'
-                    : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
-                "
-                :aria-pressed="mode === option.id"
-                @click="updateMode(option.id)"
-              >
-                <span class="block leading-tight">
-                  {{ option.label }}
-                </span>
-              </button>
-            </div>
-          </div>
+          <p v-else class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Open draw. Every legal card is in play.
+          </p>
         </div>
 
-        <div
-          v-else
-          class="hidden w-full justify-center sm:flex"
+        <button
+          type="button"
+          class="m3-button m3-button--filled m3-button--large fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-20 shadow-[var(--md-sys-elevation-3)] sm:relative sm:inset-auto sm:mt-6 sm:flex sm:w-full"
+          :disabled="isLoading"
+          @click="handleRandomize"
         >
-          <div
-            class="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/80 bg-white/74 p-1.5 shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-950/74"
-          >
-            <button
-              v-for="option in modes"
-              :key="option.id"
-              type="button"
-              class="motion-nav motion-press rounded-full px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.22em] transition"
-              :class="
-                mode === option.id
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-              "
-              :aria-pressed="mode === option.id"
-              @click="updateMode(option.id)"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="order-3 w-full max-w-[44rem] sm:order-3">
-        <ChoiceOptionsSection
-          v-if="isChoiceMode && choices.length"
-          :choices="choices"
-          :is-loading="isLoading"
-          :show-links="display.showLinks"
-          :can-randomize-choice-partner="canRandomizeChoicePartner"
-          :on-choice-partner="handleChoicePartner"
-          :get-partner-button-label="store.getPartnerButtonLabel"
-        />
-        <HeroStage
-          v-else
-          :stage-title="stageTitle"
-          :hero-card-name="heroTitle"
-          :hero-subtitle="heroSubtitle"
-          :hero-cards="heroCards"
-          :hero-scryfall-url="heroScryfallUrl"
-          :hero-edhrec-url="heroEdhrecUrl"
-          :show-links="heroLinksVisible"
-          :mode="mode"
-        />
-      </div>
-
-      <div
-        v-if="errorMessage"
-        class="order-5 w-full max-w-[30rem] rounded-[1.35rem] border border-rose-200 bg-rose-50/92 px-4 py-3 text-center text-rose-900 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.28)] backdrop-blur-lg dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 sm:max-w-xl sm:rounded-[1.5rem] sm:px-5 sm:order-5"
-      >
-        <p class="text-sm leading-relaxed">
-          {{ errorMessage }}
-        </p>
-      </div>
+          <ArrowPathIcon class="h-5 w-5" aria-hidden="true" />
+          {{ isLoading ? "Shuffling..." : "Randomize" }}
+        </button>
+      </aside>
 
       <section
-        v-if="showActionCard"
-        class="order-6 w-full max-w-[30rem] sm:order-6 sm:max-w-[58rem]"
+        class="relative min-w-0 overflow-hidden rounded-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container-lowest)] p-3 shadow-[var(--md-sys-elevation-1)] sm:p-6"
+        aria-label="Randomizer result"
       >
-        <div
-          class="overflow-hidden rounded-[1.75rem] border border-white/85 bg-white/80 shadow-[0_22px_50px_-38px_rgba(15,23,42,0.3)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/76 sm:rounded-[2rem] sm:bg-white/52 sm:shadow-[0_28px_70px_-42px_rgba(15,23,42,0.3)] sm:backdrop-blur-2xl sm:dark:bg-slate-950/54"
-        >
-          <div class="flex flex-col gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-4">
-            <div
-              v-if="isMobileViewport"
-              class="grid gap-2"
-            >
-              <button
-                v-if="showHeroCompanion"
-                type="button"
-                class="motion-press flex min-h-12 w-full items-center justify-between rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                @click="handleHeroCompanion"
-                :disabled="isLoading"
-              >
-                <span>{{ heroCompanionButtonLabel }}</span>
-              </button>
-              <button
-                v-if="!isChoiceMode && hasResults"
-                type="button"
-                class="motion-press flex min-h-12 w-full items-center justify-between rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                @click="toggleDetails"
-                :aria-expanded="detailsOpen"
-                aria-controls="result-details-panel"
-              >
-                <span>{{ detailsSectionLabel }}</span>
-                <component
-                  :is="detailsOpen ? ChevronUpIcon : ChevronDownIcon"
-                  class="h-5 w-5 text-slate-400 dark:text-slate-500"
-                  aria-hidden="true"
-                />
-              </button>
-            </div>
+        <DrawBackdrop
+          :cards="backdropCards"
+          :simplified="performance.simplifyBackdrop"
+          :ambient="display.showAmbient"
+        />
 
+        <div class="relative z-10">
+          <div
+            v-if="revealInProgress"
+            class="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-[var(--md-sys-color-inverse-surface)] px-4 py-3 text-[var(--md-sys-color-inverse-on-surface)]"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <SparklesIcon class="h-5 w-5" aria-hidden="true" />
+              Revealing your pull
+            </span>
             <button
-              v-if="!isMobileViewport"
               type="button"
-              class="motion-press motion-pulse flex min-h-12 w-full items-center justify-center rounded-full border border-amber-300 bg-amber-400 px-8 py-3 text-base font-semibold text-slate-900 shadow-[0_22px_45px_-28px_rgba(251,191,36,0.62)] transition hover:bg-amber-300 disabled:opacity-60 sm:min-w-[15rem] sm:w-auto sm:self-center sm:text-[0.72rem] sm:uppercase sm:tracking-[0.35em]"
-              :disabled="isLoading"
-              @click="handleRandomize"
+              class="m3-button min-h-9 bg-[var(--md-sys-color-inverse-on-surface)] px-4 py-1.5 text-xs text-[var(--md-sys-color-inverse-surface)]"
+              @click="skipReveal"
             >
-              {{ isLoading ? "Shuffling..." : "Randomize" }}
+              Skip reveal
             </button>
-
-            <div
-              v-if="!isMobileViewport"
-              class="hidden sm:flex sm:flex-row sm:flex-wrap sm:justify-center sm:gap-2"
-            >
-              <button
-                v-if="!isChoiceMode && hasResults"
-                type="button"
-                class="motion-press inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/82 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-950/82 dark:text-slate-200 dark:hover:bg-slate-900 sm:min-h-0 sm:text-[0.6rem] sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-                @click="toggleDetails"
-                :aria-expanded="detailsOpen"
-                aria-controls="result-details-panel"
-              >
-                {{ detailsToggleLabel }}
-              </button>
-              <button
-                v-if="showHeroCompanion"
-                type="button"
-                class="motion-press inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/82 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-700/60 dark:bg-slate-950/82 dark:text-slate-200 dark:hover:bg-slate-900 sm:min-h-0 sm:text-[0.6rem] sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-                @click="handleHeroCompanion"
-                :disabled="isLoading"
-              >
-                {{ heroCompanionButtonLabel }}
-              </button>
-              <button
-                type="button"
-                class="motion-press hidden min-h-11 rounded-full border border-slate-200/80 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-slate-700/60 dark:bg-slate-950/82 dark:text-slate-200 dark:hover:bg-slate-900 sm:inline-flex sm:min-h-0 sm:text-[0.6rem] sm:font-semibold sm:uppercase sm:tracking-[0.2em]"
-                @click="openSettings"
-              >
-                Settings
-              </button>
-            </div>
           </div>
 
-          <Transition name="details-sheet">
-            <div
-              v-if="detailsOpen && !isChoiceMode && hasResults"
-              id="result-details-panel"
-              class="border-t border-white/70 bg-slate-50/55 px-3 py-3 dark:border-slate-700/60 dark:bg-slate-900/35 sm:bg-transparent sm:px-5 sm:py-4 sm:dark:bg-transparent"
+          <ChoiceOptionsSection
+            v-if="isChoiceMode && choices.length"
+            :choices="choices"
+            :is-loading="isLoading || revealInProgress"
+            :show-links="display.showLinks && revealComplete"
+            :can-randomize-choice-partner="canRandomizeChoicePartner"
+            :on-choice-partner="handleChoicePartner"
+            :get-partner-button-label="store.getPartnerButtonLabel"
+            :reveal-active="isRevealActive"
+            :reveal-complete="revealComplete"
+            :reveal-duration-ms="REVEAL_TOTAL_MS"
+          />
+          <HeroStage
+            v-else
+            :hero-card-name="heroTitle"
+            :hero-subtitle="heroSubtitle"
+            :hero-cards="heroCards"
+            :hero-scryfall-url="heroScryfallUrl"
+            :hero-edhrec-url="heroEdhrecUrl"
+            :show-links="display.showLinks && revealComplete"
+            :mode="mode"
+            :reveal-active="isRevealActive"
+            :reveal-complete="revealComplete"
+            :reveal-duration-ms="REVEAL_TOTAL_MS"
+          />
+
+          <div
+            v-if="errorMessage"
+            class="mt-4 flex items-start gap-3 rounded-2xl bg-[var(--md-sys-color-error-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-error-container)]"
+            role="alert"
+          >
+            <span class="font-bold">Draw failed.</span>
+            <span>{{ errorMessage }}</span>
+          </div>
+
+          <div
+            v-if="revealComplete && hasResults && !isChoiceMode"
+            class="mt-4 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--md-sys-color-outline-variant)] pt-4"
+          >
+            <button
+              v-if="showHeroCompanion"
+              type="button"
+              class="m3-button m3-button--tonal"
+              :disabled="isLoading"
+              @click="handleHeroCompanion"
             >
+              <SparklesIcon class="h-5 w-5" aria-hidden="true" />
+              {{ heroCompanionButtonLabel }}
+            </button>
+            <button
+              type="button"
+              class="m3-button m3-button--outlined"
+              :disabled="store.isCurrentSaved"
+              @click="store.saveCurrent()"
+            >
+              <BookmarkIcon class="h-5 w-5" aria-hidden="true" />
+              {{ store.isCurrentSaved ? "Pull kept" : "Keep pull" }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside
+        class="m3-card m3-card--filled min-w-0 p-4 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-8 xl:p-5"
+        aria-labelledby="inspiration-title"
+      >
+        <div class="flex items-start gap-3">
+          <span
+            class="grid h-10 w-10 shrink-0 place-items-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)]"
+          >
+            <LightBulbIcon class="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="m3-label">EDHREC</p>
+            <h2 id="inspiration-title" class="text-xl font-bold">Deck inspiration</h2>
+            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Themes and popularity arrive after the reveal.
+            </p>
+          </div>
+        </div>
+
+        <div v-if="!hasResults" class="mt-5 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-4">
+          <p class="text-sm font-semibold">Nothing drawn yet</p>
+          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Randomize a commander to open its deckbuilding context.
+          </p>
+        </div>
+
+        <div
+          v-else-if="isRevealActive || !revealComplete"
+          class="mt-5 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-4"
+        >
+          <p class="text-sm font-semibold">Waiting for the reveal</p>
+          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Inspiration stays hidden until the cards turn over.
+          </p>
+        </div>
+
+        <div
+          v-else-if="isChoiceMode"
+          class="mt-5 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-4"
+        >
+          <p class="text-sm font-semibold">Compare your options first</p>
+          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            Each choice includes direct Scryfall and EDHREC links.
+          </p>
+        </div>
+
+        <div v-else class="mt-5">
+          <button
+            type="button"
+            class="m3-button m3-button--tonal w-full justify-between"
+            :aria-expanded="detailsOpen"
+            aria-controls="result-details-panel"
+            @click="toggleDetails"
+          >
+            <span>{{ detailsOpen ? "Hide details" : "Show details" }}</span>
+            <component
+              :is="detailsOpen ? ChevronUpIcon : ChevronDownIcon"
+              class="h-5 w-5"
+              aria-hidden="true"
+            />
+          </button>
+
+          <Transition name="details-sheet">
+            <div v-if="detailsOpen" id="result-details-panel" class="mt-4">
               <ResultDetailsSection
                 :cards="heroCards"
                 :group="heroGroup"
@@ -437,52 +660,7 @@ watch(activeResultKey, () => {
             </div>
           </Transition>
         </div>
-      </section>
+      </aside>
     </div>
-
   </section>
-
-  <Teleport to="body">
-    <div
-      v-if="isMobileViewport"
-      class="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:hidden"
-    >
-      <div
-        class="mx-auto flex max-w-[30rem] items-center gap-3 rounded-[1.55rem] border border-white/85 bg-white/84 px-3 py-3 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.32)] backdrop-blur-2xl dark:border-slate-700/60 dark:bg-slate-950/88"
-      >
-        <button
-          type="button"
-          class="motion-press relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/12 dark:bg-white/6 dark:text-slate-100 dark:hover:bg-white/10"
-          @click="openFilters"
-          aria-label="Filters"
-        >
-          <AdjustmentsHorizontalIcon class="h-5 w-5" aria-hidden="true" />
-          <span
-            v-if="activeFilterCount"
-            class="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-slate-900"
-          >
-            {{ activeFilterCount }}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          class="motion-press motion-pulse flex min-h-12 flex-1 items-center justify-center rounded-full border border-amber-300 bg-amber-400 px-6 py-3 text-base font-semibold text-slate-900 shadow-[0_22px_45px_-28px_rgba(251,191,36,0.62)] transition hover:bg-amber-300 disabled:opacity-60"
-          :disabled="isLoading"
-          @click="handleRandomize"
-        >
-          {{ isLoading ? "Shuffling..." : "Randomize" }}
-        </button>
-
-        <button
-          type="button"
-          class="motion-press inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/12 dark:bg-white/6 dark:text-slate-100 dark:hover:bg-white/10"
-          @click="openSettings"
-          aria-label="Settings"
-        >
-          <Cog6ToothIcon class="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-  </Teleport>
 </template>

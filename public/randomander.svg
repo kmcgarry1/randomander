@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Randomander">
+  <path fill="#62458f" d="M10 4h34c8.8 0 16 7.2 16 16v34c0 3.3-2.7 6-6 6H20C11.2 60 4 52.8 4 44V10c0-3.3 2.7-6 6-6Z"/>
+  <rect width="25" height="36" x="23" y="13" fill="none" stroke="#eadcff" stroke-width="3" rx="5" transform="rotate(7 35.5 31)"/>
+  <rect width="25" height="36" x="15" y="15" fill="#62458f" stroke="#fff" stroke-width="3" rx="5"/>
+  <path fill="#fff" d="M22 23h7.4c4.9 0 8 2.5 8 6.7 0 2.8-1.4 4.9-3.8 5.9l4.8 8.4h-6.1l-3.9-7.3h-.8V44H22V23Zm5.6 4.5v4.8h1.5c1.8 0 2.8-.8 2.8-2.4 0-1.6-1-2.4-2.8-2.4h-1.5Z"/>
+</svg>

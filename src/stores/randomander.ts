@@ -54,6 +54,7 @@ export type DisplaySettings = {
   showTags: boolean
   usePairTags: boolean
   showAmbient: boolean
+  enablePrestigeReveal: boolean
 }
 
 export type CacheSettings = {
@@ -131,44 +132,26 @@ export const COLOR_CHOICES = [
   {
     symbol: 'C',
     name: 'Colorless',
-    icon: 'ms-c',
-    chip:
-      'border-slate-200 text-slate-700 bg-white dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-200',
   },
   {
     symbol: 'W',
     name: 'White',
-    icon: 'ms-w',
-    chip:
-      'border-amber-200 text-amber-800 bg-amber-50 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100',
   },
   {
     symbol: 'U',
     name: 'Blue',
-    icon: 'ms-u',
-    chip:
-      'border-sky-200 text-sky-800 bg-sky-50 dark:border-sky-400/40 dark:bg-sky-400/10 dark:text-sky-100',
   },
   {
     symbol: 'B',
     name: 'Black',
-    icon: 'ms-b',
-    chip:
-      'border-slate-300 text-slate-800 bg-slate-100 dark:border-slate-600/70 dark:bg-slate-800 dark:text-slate-100',
   },
   {
     symbol: 'R',
     name: 'Red',
-    icon: 'ms-r',
-    chip:
-      'border-rose-200 text-rose-800 bg-rose-50 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100',
   },
   {
     symbol: 'G',
     name: 'Green',
-    icon: 'ms-g',
-    chip:
-      'border-emerald-200 text-emerald-800 bg-emerald-50 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100',
   },
 ] as const
 
@@ -193,6 +176,7 @@ const defaultDisplay: DisplaySettings = {
   showTags: true,
   usePairTags: true,
   showAmbient: false,
+  enablePrestigeReveal: true,
 }
 
 const defaultCache: CacheSettings = {

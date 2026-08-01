@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import type { PropType } from "vue";
+import { computed, type PropType } from "vue";
+import { ArrowTopRightOnSquareIcon, SparklesIcon } from "@heroicons/vue/24/outline";
 import type { ScryfallCard } from "../../../lib/scryfall";
-import { getCardImageUrl } from "../../../lib/scryfall";
+import { getTypeLine } from "../../../lib/scryfall";
 import type { Mode } from "../../../stores/randomander";
+import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
+import PrestigeCard from "./PrestigeCard.vue";
 
 const props = defineProps({
-  stageTitle: { type: String, required: true },
   heroCardName: { type: String, default: "" },
   heroSubtitle: { type: String, default: "" },
   heroCards: { type: Array as PropType<ScryfallCard[]>, required: true },
@@ -14,179 +15,162 @@ const props = defineProps({
   heroEdhrecUrl: { type: String, default: "" },
   showLinks: { type: Boolean, default: true },
   mode: { type: String as PropType<Mode>, required: true },
+  revealActive: { type: Boolean, default: false },
+  revealComplete: { type: Boolean, default: false },
+  revealDurationMs: { type: Number, default: 2400 },
 });
-
-const edhrecLabel = computed(() =>
-  props.mode === "partner" || props.heroCards.length === 2
-    ? "EDHREC pair"
-    : "EDHREC commander",
-);
 
 const desiredCount = computed(() => {
   if (props.mode === "partner") return 2;
   if (props.mode === "spark") return 3;
-  const count = Math.max(props.heroCards.length, 1);
-  return Math.min(count, 2);
+  return Math.min(Math.max(props.heroCards.length, 1), 2);
 });
 
+const displayCards = computed(() => props.heroCards.slice(0, desiredCount.value));
 const layoutVariant = computed(() => {
   if (desiredCount.value === 1) return "single";
   if (desiredCount.value === 2) return "dual";
   return "trio";
 });
 
-const displayCards = computed(() =>
-  props.heroCards.slice(0, desiredCount.value),
-);
-const revealKey = computed(
-  () =>
-    displayCards.value.map((card) => card.id).join("|") ||
-    `${props.mode}-${props.stageTitle}`,
-);
-
-const placeholderLabel = computed(() => {
-  if (props.mode === "partner") return "Pull partner cards";
-  if (props.mode === "spark") return "Pull spark cards";
-  return "Pull a commander";
+const eyebrow = computed(() => {
+  if (props.mode === "partner") return "PARTNER PAIR";
+  if (props.mode === "spark") return "THREE-CARD SPARK";
+  return "COMMAND ZONE";
 });
 
-const stageEyebrow = computed(() => {
-  if (props.mode === "partner") return "Partner forge";
-  if (props.mode === "spark") return "Spark spread";
-  return "Command zone";
+const placeholderTitle = computed(() => {
+  if (props.mode === "partner") return "Find a compatible pairing";
+  if (props.mode === "spark") return "Deal three deckbuilding sparks";
+  return "Meet your next commander";
 });
 
-const stackClasses = computed(() => {
+const listClasses = computed(() => {
+  if (layoutVariant.value === "single") return "flex justify-center";
   if (layoutVariant.value === "dual") {
-    return "mx-auto flex max-w-4xl flex-wrap items-end justify-center gap-4 lg:gap-3";
+    return "flex flex-wrap items-end justify-center gap-3 sm:gap-5";
   }
-  if (layoutVariant.value === "trio") {
-    return "mx-auto flex max-w-5xl flex-wrap items-end justify-center gap-3 lg:gap-2";
-  }
-  return "mx-auto flex justify-center";
+  return "grid grid-cols-3 items-end justify-center gap-2 sm:gap-4";
 });
 
-const getCardFrameClass = (index: number) => {
+const cardFrameClass = (index: number) => {
   if (layoutVariant.value === "single") {
-    return "w-full max-w-[18.5rem] sm:max-w-[24rem] lg:max-w-[27rem]";
+    return "w-full max-w-[17rem] sm:max-w-[20rem]";
   }
   if (layoutVariant.value === "dual") {
     return index === 0
-      ? "w-[10.8rem] sm:w-[14.75rem] lg:w-[16.6rem] lg:translate-x-3 lg:translate-y-4 lg:rotate-[-4deg]"
-      : "w-[11.2rem] sm:w-[15.4rem] lg:w-[17.2rem] lg:-translate-x-3 lg:rotate-[4deg]";
+      ? "w-[9.6rem] sm:w-[14rem] lg:w-[15rem] sm:translate-y-3 sm:-rotate-2"
+      : "w-[9.6rem] sm:w-[14rem] lg:w-[15rem] sm:rotate-2";
   }
-  if (index === 1) {
-    return "relative z-10 w-[11rem] sm:w-[14.85rem] lg:w-[17rem]";
-  }
-  return index === 0
-    ? "w-[8.6rem] sm:w-[11.5rem] lg:w-[13.1rem] lg:translate-x-2 lg:translate-y-6 lg:rotate-[-6deg]"
-    : "w-[8.6rem] sm:w-[11.5rem] lg:w-[13.1rem] lg:-translate-x-2 lg:translate-y-6 lg:rotate-[6deg]";
+  return index === 1
+    ? "relative z-10 w-full max-w-[12rem] sm:max-w-[14rem]"
+    : "w-full max-w-[10rem] translate-y-2 sm:max-w-[12rem] sm:translate-y-5";
 };
 
-const getCardShellClass = (index: number) => {
-  if (layoutVariant.value === "single" || (layoutVariant.value === "trio" && index === 1)) {
-    return "border-white/70 bg-white/95 shadow-[0_32px_80px_-36px_rgba(15,23,42,0.6)] dark:border-slate-600/60 dark:bg-slate-900/94";
-  }
-  return "border-white/60 bg-white/86 shadow-[0_24px_60px_-34px_rgba(15,23,42,0.45)] dark:border-slate-700/60 dark:bg-slate-900/86";
-};
+const edhrecLabel = computed(() =>
+  props.mode === "partner" || props.heroCards.length === 2
+    ? "Open pair on EDHREC"
+    : "Open commander on EDHREC",
+);
 </script>
 
 <template>
-  <section
-    class="relative rounded-[2rem] border border-white/70 bg-white/32 px-3 py-4 text-slate-900 shadow-[0_20px_45px_-36px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/36 dark:text-white sm:rounded-none sm:border-0 sm:bg-transparent sm:px-4 sm:py-5 sm:shadow-none sm:backdrop-blur-none"
-  >
-    <div
-      class="pointer-events-none absolute left-1/2 top-10 hidden h-44 w-44 -translate-x-1/2 rounded-full bg-amber-300/18 blur-3xl dark:bg-amber-300/10 sm:block"
-      aria-hidden="true"
-    ></div>
-    <div
-      class="pointer-events-none absolute inset-x-0 bottom-8 mx-auto hidden h-16 w-[72%] rounded-full bg-slate-900/12 blur-3xl dark:bg-slate-100/8 sm:block"
-      aria-hidden="true"
-    ></div>
+  <div class="mx-auto max-w-4xl px-1 py-3 text-center sm:px-4 sm:py-5">
+    <p class="m3-label">{{ eyebrow }}</p>
 
-    <div class="relative z-10 text-center">
-      <p
-        class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-slate-500/90 dark:text-slate-400 sm:text-[0.58rem] sm:tracking-[0.42em]"
+    <div v-if="displayCards.length" class="mt-4 sm:mt-6">
+      <div
+        :class="listClasses"
+        role="list"
+        :aria-label="displayCards.length === 1 ? 'Commander card' : 'Commander cards'"
       >
-        {{ stageEyebrow }}
-      </p>
-
-      <Transition name="hero-reveal" mode="out-in">
-        <div :key="revealKey" class="mt-3 sm:mt-6" aria-live="polite">
-          <div
-            v-if="displayCards.length"
-            :class="stackClasses"
-            role="list"
-            :aria-label="displayCards.length === 1 ? 'Commander card' : 'Commander cards'"
-          >
-            <article
-              v-for="(card, index) in displayCards"
-              :key="card.id"
-              class="motion-card motion-card-hover relative"
-              :class="getCardFrameClass(index)"
-              role="listitem"
-            >
-              <div
-                class="absolute inset-4 rounded-[2rem] bg-white/45 blur-3xl dark:bg-slate-700/20"
-                aria-hidden="true"
-              ></div>
-              <div
-                class="relative aspect-[63/88] overflow-hidden rounded-[1.9rem] border"
-                :class="getCardShellClass(index)"
-              >
-                <img
-                  :src="getCardImageUrl(card)"
-                  :alt="card.name"
-                  class="h-full w-full object-cover"
-                />
-                <div
-                  class="hero-card-glint pointer-events-none absolute inset-y-0 left-[-35%] w-[38%] rotate-[14deg] bg-white/35"
-                  aria-hidden="true"
-                ></div>
-              </div>
-            </article>
-          </div>
-          <div v-else class="flex justify-center">
-            <article
-              class="motion-ghost flex h-[420px] w-full max-w-sm items-center justify-center rounded-[2rem] border border-dashed border-slate-300/80 bg-white/60 px-8 text-center text-[0.75rem] uppercase tracking-[0.3em] text-slate-500 dark:border-slate-600/70 dark:bg-slate-900/60 dark:text-slate-400"
-            >
-              {{ placeholderLabel }}
-            </article>
-          </div>
-        </div>
-      </Transition>
-
-      <div class="mx-auto mt-4 max-w-2xl sm:mt-8">
-        <h2 class="text-[2.35rem] leading-[1.05] font-semibold text-slate-900 dark:text-white sm:text-[3.15rem] sm:leading-none">
-          {{ heroCardName || stageTitle }}
-        </h2>
-        <p class="mt-3 text-[0.98rem] leading-6 text-slate-600 dark:text-slate-300 sm:text-[1rem]">
-          {{ heroSubtitle }}
-        </p>
-        <div
-          v-if="showLinks && (heroScryfallUrl || heroEdhrecUrl)"
-          class="mt-4 grid max-w-sm grid-cols-1 gap-2 text-sm sm:flex sm:max-w-none sm:flex-wrap sm:justify-center sm:gap-2 sm:text-[0.62rem]"
+        <article
+          v-for="(card, index) in displayCards"
+          :key="card.id"
+          :class="cardFrameClass(index)"
+          role="listitem"
         >
-          <a
-            v-if="heroScryfallUrl"
-            :href="heroScryfallUrl"
-            target="_blank"
-            rel="noreferrer"
-            class="motion-chip inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 px-4 py-2 font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900/78 dark:text-slate-300 dark:hover:border-slate-400 sm:min-h-0 sm:bg-white/78 sm:px-4 sm:py-1.5 sm:text-[0.62rem] sm:uppercase sm:tracking-[0.2em]"
+          <PrestigeCard
+            :card="card"
+            :revealing="revealActive"
+            :concealed="!revealComplete"
+            :index="index"
+            :total="displayCards.length"
+            :total-duration-ms="revealDurationMs"
+          />
+        </article>
+      </div>
+
+      <div class="mx-auto mt-6 max-w-2xl sm:mt-8" aria-live="polite">
+        <template v-if="revealComplete">
+          <h2
+            data-result-heading
+            tabindex="-1"
+            class="text-[clamp(1.9rem,5vw,3.25rem)] font-[760] leading-[1.02] tracking-[-0.035em]"
           >
-            Scryfall
-          </a>
-          <a
-            v-if="heroEdhrecUrl"
-            :href="heroEdhrecUrl"
-            target="_blank"
-            rel="noreferrer"
-            class="motion-chip inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 px-4 py-2 font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900/78 dark:text-slate-300 dark:hover:border-slate-400 sm:min-h-0 sm:bg-white/78 sm:px-4 sm:py-1.5 sm:text-[0.62rem] sm:uppercase sm:tracking-[0.2em]"
-          >
-            {{ edhrecLabel }}
-          </a>
-        </div>
+            {{ heroCardName }}
+          </h2>
+          <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            {{ heroSubtitle }}
+          </p>
+
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <div
+              v-for="card in displayCards"
+              :key="`${card.id}-identity`"
+              class="flex items-center gap-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              <ManaIdentity :colors="card.color_identity ?? []" compact />
+              <span class="max-w-xs truncate">{{ getTypeLine(card) }}</span>
+            </div>
+          </div>
+
+          <div v-if="showLinks" class="mt-5 flex flex-wrap justify-center gap-2">
+            <a
+              v-if="heroScryfallUrl"
+              :href="heroScryfallUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="m3-button m3-button--text"
+            >
+              Scryfall
+              <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+            </a>
+            <a
+              v-if="heroEdhrecUrl"
+              :href="heroEdhrecUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="m3-button m3-button--text"
+              :aria-label="edhrecLabel"
+            >
+              {{ props.heroCards.length === 2 ? "EDHREC pair" : "EDHREC commander" }}
+              <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+            </a>
+          </div>
+        </template>
+        <template v-else>
+          <p class="text-2xl font-bold">
+            {{ revealActive ? "The cards are turning..." : "Preparing your pull..." }}
+          </p>
+          <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            The result stays hidden until the reveal completes.
+          </p>
+        </template>
       </div>
     </div>
-  </section>
+
+    <div v-else class="mx-auto mt-4 max-w-xl rounded-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container)] px-6 py-10 sm:mt-6 sm:py-14">
+      <span
+        class="mx-auto grid h-20 w-16 place-items-center rounded-[1rem] border-2 border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-primary)] shadow-[var(--md-sys-elevation-1)]"
+        aria-hidden="true"
+      >
+        <SparklesIcon class="h-8 w-8" />
+      </span>
+      <h2 class="mt-5 text-2xl font-bold">{{ placeholderTitle }}</h2>
+      <p class="mx-auto mt-2 max-w-sm text-sm text-[var(--md-sys-color-on-surface-variant)]">
+        Tune the draw or leave it wide open, then let Scryfall choose the cards.
+      </p>
+    </div>
+  </div>
 </template>

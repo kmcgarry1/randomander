@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, onUnmounted, watchEffect } from "vue";
-import type { PropType } from "vue";
+import { computed, type PropType } from "vue";
+import { ArrowTopRightOnSquareIcon, TagIcon } from "@heroicons/vue/24/outline";
 import type { ScryfallCard } from "../../../lib/scryfall";
 import type { EdhrecTag } from "../../../services/edhrec";
 import {
-  formatColorIdentity,
   getEdhrecCardUrl,
   getEdhrecCommanderUrl,
   getTypeLine,
 } from "../../../lib/scryfall";
 import { useRandomanderStore } from "../../../stores/randomander";
+import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
 
 const props = defineProps({
   cards: { type: Array as PropType<ScryfallCard[]>, required: true },
@@ -20,19 +20,9 @@ const props = defineProps({
 });
 
 const store = useRandomanderStore();
-
-watchEffect(() => {
-  store.setMetadataSurfaceVisible(props.showMetadata && props.group.length > 0);
-});
-
-onUnmounted(() => {
-  store.setMetadataSurfaceVisible(false);
-});
-
 const detailCards = computed(() => props.cards.slice(0, 3));
-const detailCount = computed(() => detailCards.value.length);
-const combinedPairCard = computed(() =>
-  detailCards.value.length === 2 && !!props.pairLinkUrl ? detailCards.value : null,
+const combinedPair = computed(() =>
+  detailCards.value.length === 2 && props.pairLinkUrl ? detailCards.value : null,
 );
 
 const getEdhrecUrl = (card: ScryfallCard) =>
@@ -40,124 +30,100 @@ const getEdhrecUrl = (card: ScryfallCard) =>
     ? getEdhrecCommanderUrl(card)
     : getEdhrecCardUrl(card);
 
-const isLeadCard = (index: number) =>
-  detailCount.value === 1 || (detailCount.value >= 3 && index === 0);
-
-const getCardPanelClass = (index: number) => {
-  if (detailCount.value === 1) {
-    return "flex-[1_1_100%]";
-  }
-  if (detailCount.value === 2) {
-    return "flex-[1_1_22rem]";
-  }
-  return index === 0 ? "flex-[1.35_1_24rem]" : "flex-[1_1_18rem]";
-};
-
-const getTitleClass = (index: number) =>
-  isLeadCard(index) ? "text-lg sm:text-xl" : "text-base sm:text-lg";
-
 const getTagUrl = (card: ScryfallCard, tag: EdhrecTag) =>
   store.getTagUrlForCard(card, props.group, tag);
 
-const getCombinedDeckCount = (cards: ScryfallCard[]) =>
-  store.getDeckCountForCard(cards[0]!, props.group);
+const pairDeckCount = computed(() =>
+  combinedPair.value
+    ? store.getDeckCountForCard(combinedPair.value[0]!, props.group)
+    : null,
+);
 
-const getCombinedColors = (cards: ScryfallCard[]) =>
-  formatColorIdentity(
-    Array.from(
-      new Set(cards.flatMap((card) => card.color_identity ?? [])),
-    ),
-  );
-
-const getCombinedTags = (cards: ScryfallCard[]) =>
-  store.getTagsForCard(cards[0]!, props.group);
+const pairTags = computed(() =>
+  combinedPair.value
+    ? store.getTagsForCard(combinedPair.value[0]!, props.group)
+    : [],
+);
 </script>
 
 <template>
   <div class="space-y-4">
-    <article
-      v-if="combinedPairCard"
-      class="rounded-[1.5rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/64 sm:rounded-[1.9rem] sm:border-white/75 sm:bg-white/64 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.18)] sm:backdrop-blur-md"
-    >
-      <div class="flex h-full flex-col gap-4">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div class="min-w-0 flex-1 space-y-2">
-            <p class="text-lg font-semibold text-slate-900 dark:text-white">
-              {{ combinedPairCard.map((card) => card.name).join(" + ") }}
-            </p>
-            <div class="space-y-1.5">
-              <p
-                v-for="card in combinedPairCard"
-                :key="`${card.id}-type`"
-                class="text-sm leading-6 text-slate-500 dark:text-slate-400"
-              >
-                {{ card.name }} · {{ getTypeLine(card) }}
-              </p>
-            </div>
-          </div>
-          <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400 sm:text-right">
-            <p
-              v-if="props.showMetadata && getCombinedDeckCount(combinedPairCard) != null"
-            >
-              {{ getCombinedDeckCount(combinedPairCard)?.toLocaleString() }} decks
-            </p>
-            <p>{{ getCombinedColors(combinedPairCard) }}</p>
-          </div>
-        </div>
-
-        <div
-          v-if="props.showLinks"
-          class="grid gap-2 sm:flex sm:flex-wrap"
+    <article v-if="combinedPair" class="space-y-4">
+      <div>
+        <p class="m3-label">PAIR PROFILE</p>
+        <h3 class="mt-1 text-base font-bold leading-snug">
+          {{ combinedPair.map((card) => card.name).join(" + ") }}
+        </h3>
+        <p
+          v-if="showMetadata && pairDeckCount != null"
+          class="mt-2 inline-flex rounded-lg bg-[var(--md-sys-color-tertiary-container)] px-2.5 py-1 text-sm font-bold text-[var(--md-sys-color-on-tertiary-container)]"
         >
-          <a
-            v-for="card in combinedPairCard"
-            :key="`${card.id}-scryfall`"
-            :href="card.scryfall_uri"
-            target="_blank"
-            rel="noreferrer"
-            class="motion-chip inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white px-4 py-2 text-[0.72rem] font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 sm:min-h-0 sm:justify-start sm:bg-transparent sm:px-3 sm:py-1 sm:text-[0.65rem] sm:uppercase sm:tracking-[0.2em]"
-          >
-            {{ card.name }} Scryfall
-          </a>
-          <a
-            :href="props.pairLinkUrl"
-            target="_blank"
-            rel="noreferrer"
-            class="motion-chip inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white px-4 py-2 text-[0.72rem] font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900/72 dark:text-slate-300 dark:hover:border-slate-400 sm:min-h-0 sm:justify-start sm:px-3 sm:py-1 sm:text-[0.65rem] sm:uppercase sm:tracking-[0.2em]"
-          >
-            EDHREC pair
-          </a>
-        </div>
+          {{ pairDeckCount.toLocaleString() }} decks
+        </p>
+      </div>
 
+      <div class="space-y-3">
         <div
-          v-if="props.showMetadata"
-          class="flex min-h-8 flex-wrap items-center gap-2"
+          v-for="card in combinedPair"
+          :key="`${card.id}-detail`"
+          class="rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-3"
         >
-          <p
-            v-if="
-              store.shouldRenderTagPanel(combinedPairCard[0]!) &&
-              !store.hasTagEntry(combinedPairCard[0]!, props.group)
-            "
-            class="text-sm text-slate-500 dark:text-slate-400"
-          >
-            Loading tags...
+          <p class="text-sm font-bold">{{ card.name }}</p>
+          <p class="mt-1 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+            {{ getTypeLine(card) }}
           </p>
-          <p
-            v-else-if="
-              store.hasTagEntry(combinedPairCard[0]!, props.group) &&
-              getCombinedTags(combinedPairCard).length === 0
-            "
-            class="text-sm text-slate-500 dark:text-slate-400"
-          >
-            No tags yet
-          </p>
+          <ManaIdentity class="mt-2" :colors="card.color_identity ?? []" compact />
+        </div>
+      </div>
+
+      <div v-if="showLinks" class="flex flex-wrap gap-1">
+        <a
+          v-for="card in combinedPair"
+          :key="`${card.id}-scryfall`"
+          :href="card.scryfall_uri"
+          target="_blank"
+          rel="noreferrer"
+          class="m3-button m3-button--text min-h-9 px-2 py-1 text-xs"
+        >
+          {{ card.name }} Scryfall
+          <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+        <a
+          :href="pairLinkUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="m3-button m3-button--text min-h-9 px-2 py-1 text-xs"
+        >
+          EDHREC pair
+          <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+      </div>
+
+      <div v-if="showMetadata" class="border-t border-[var(--md-sys-color-outline-variant)] pt-4">
+        <p class="m3-label flex items-center gap-1.5">
+          <TagIcon class="h-4 w-4" aria-hidden="true" />
+          DECK THEMES
+        </p>
+        <p
+          v-if="!store.hasTagEntry(combinedPair[0]!, group)"
+          class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+        >
+          Loading EDHREC themes...
+        </p>
+        <p
+          v-else-if="pairTags.length === 0"
+          class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+        >
+          No themes available yet.
+        </p>
+        <div v-else class="mt-2 flex flex-wrap gap-2">
           <a
-            v-for="tag in getCombinedTags(combinedPairCard)"
+            v-for="tag in pairTags"
             :key="tag.href"
-            :href="getTagUrl(combinedPairCard[0]!, tag)"
+            :href="getTagUrl(combinedPair[0]!, tag)"
             target="_blank"
             rel="noreferrer"
-            class="motion-chip rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400"
+            class="m3-chip"
           >
             {{ tag.label }}
           </a>
@@ -165,99 +131,84 @@ const getCombinedTags = (cards: ScryfallCard[]) =>
       </div>
     </article>
 
-    <div
-      v-else
-      class="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:gap-4"
+    <template v-else>
+    <article
+      v-for="card in detailCards"
+      :key="card.id"
+      class="space-y-4"
     >
-      <article
-        v-for="(card, index) in detailCards"
-        :key="card.id"
-        class="min-w-0 rounded-[1.5rem] border border-slate-200/80 bg-slate-50/92 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/64 sm:min-w-[16rem] sm:rounded-[1.8rem] sm:border-white/75 sm:bg-white/64 sm:shadow-[0_18px_45px_-34px_rgba(15,23,42,0.18)] sm:backdrop-blur-md"
-        :class="getCardPanelClass(index)"
-      >
-        <div class="flex h-full flex-col gap-4">
-          <div class="space-y-3">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p
-                  class="font-semibold text-slate-900 dark:text-white"
-                  :class="getTitleClass(index)"
-                >
-                  {{ card.name }}
-                </p>
-                <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  {{ getTypeLine(card) }}
-                </p>
-              </div>
-            </div>
-            <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
-              <p
-                v-if="props.showMetadata && store.getDeckCountForCard(card, props.group) != null"
-              >
-                {{ store.getDeckCountForCard(card, props.group)?.toLocaleString() }}
-                decks
-              </p>
-              <p>{{ formatColorIdentity(card.color_identity) }}</p>
-            </div>
-          </div>
-
-          <div
-            v-if="props.showLinks"
-            class="grid gap-2 sm:flex sm:flex-wrap"
+      <div>
+        <p class="m3-label">CARD PROFILE</p>
+        <h3 class="mt-1 text-base font-bold leading-snug">{{ card.name }}</h3>
+        <p class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+          {{ getTypeLine(card) }}
+        </p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <ManaIdentity :colors="card.color_identity ?? []" compact />
+          <span
+            v-if="showMetadata && store.getDeckCountForCard(card, group) != null"
+            class="rounded-lg bg-[var(--md-sys-color-tertiary-container)] px-2.5 py-1 text-sm font-bold text-[var(--md-sys-color-on-tertiary-container)]"
           >
-            <a
-              :href="card.scryfall_uri"
-              target="_blank"
-              rel="noreferrer"
-              class="motion-chip inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white px-4 py-2 text-[0.72rem] font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 sm:min-h-0 sm:justify-start sm:bg-transparent sm:px-3 sm:py-1 sm:text-[0.65rem] sm:uppercase sm:tracking-[0.2em]"
-            >
-              Scryfall
-            </a>
-            <a
-              :href="getEdhrecUrl(card)"
-              target="_blank"
-              rel="noreferrer"
-              class="motion-chip inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200/80 bg-white px-4 py-2 text-[0.72rem] font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 sm:min-h-0 sm:justify-start sm:bg-transparent sm:px-3 sm:py-1 sm:text-[0.65rem] sm:uppercase sm:tracking-[0.2em]"
-            >
-              EDHREC
-            </a>
-          </div>
-
-          <div
-            v-if="props.showMetadata && store.shouldShowTags(card)"
-            class="flex min-h-8 flex-wrap items-center gap-2"
-          >
-            <p
-              v-if="
-                store.shouldRenderTagPanel(card) &&
-                !store.hasTagEntry(card, props.group)
-              "
-              class="text-sm text-slate-500 dark:text-slate-400"
-            >
-              Loading tags...
-            </p>
-            <p
-              v-else-if="
-                store.hasTagEntry(card, props.group) &&
-                store.getTagsForCard(card, props.group).length === 0
-              "
-              class="text-sm text-slate-500 dark:text-slate-400"
-            >
-              No tags yet
-            </p>
-            <a
-              v-for="tag in store.getTagsForCard(card, props.group)"
-              :key="tag.href"
-              :href="getTagUrl(card, tag)"
-              target="_blank"
-              rel="noreferrer"
-              class="motion-chip rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-400 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400"
-            >
-              {{ tag.label }}
-            </a>
-          </div>
+            {{ store.getDeckCountForCard(card, group)?.toLocaleString() }} decks
+          </span>
         </div>
-      </article>
-    </div>
+      </div>
+
+      <div v-if="showLinks" class="flex flex-wrap gap-1">
+        <a
+          :href="card.scryfall_uri"
+          target="_blank"
+          rel="noreferrer"
+          class="m3-button m3-button--text min-h-9 px-2 py-1 text-xs"
+        >
+          Scryfall
+          <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+        <a
+          :href="getEdhrecUrl(card)"
+          target="_blank"
+          rel="noreferrer"
+          class="m3-button m3-button--text min-h-9 px-2 py-1 text-xs"
+        >
+          EDHREC
+          <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+      </div>
+
+      <div
+        v-if="showMetadata && store.shouldShowTags(card)"
+        class="border-t border-[var(--md-sys-color-outline-variant)] pt-4"
+      >
+        <p class="m3-label flex items-center gap-1.5">
+          <TagIcon class="h-4 w-4" aria-hidden="true" />
+          DECK THEMES
+        </p>
+        <p
+          v-if="!store.hasTagEntry(card, group)"
+          class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+        >
+          Loading EDHREC themes...
+        </p>
+        <p
+          v-else-if="store.getTagsForCard(card, group).length === 0"
+          class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+        >
+          No themes available yet.
+        </p>
+        <div v-else class="mt-2 flex flex-wrap gap-2">
+          <a
+            v-for="tag in store.getTagsForCard(card, group)"
+            :key="tag.href"
+            :href="getTagUrl(card, tag)"
+            target="_blank"
+            rel="noreferrer"
+            class="m3-chip"
+          >
+            {{ tag.label }}
+          </a>
+        </div>
+      </div>
+    </article>
+    </template>
   </div>
 </template>

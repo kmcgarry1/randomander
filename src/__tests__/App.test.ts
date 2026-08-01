@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import App from '../App.vue'
 import type { ScryfallCard } from '../lib/scryfall'
+import { clearCache } from '../lib/cache'
 
 const createCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
   id: 'card-1',
@@ -84,12 +85,40 @@ const expectNoEdhrecMetadataFetch = (fetchMock: ReturnType<typeof vi.fn>) => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  clearCache()
   if (typeof localStorage !== 'undefined' && typeof localStorage.clear === 'function') {
     localStorage.clear()
   }
 })
 
 describe('Randomander', () => {
+  it('moves focus into modal surfaces and restores the opener on close', async () => {
+    renderApp()
+    const user = userEvent.setup()
+    const opener = screen.getAllByRole('button', { name: /filters/i })[0]!
+
+    await user.click(opener)
+    const dialog = await screen.findByRole('dialog', {
+      name: /randomizer options/i,
+    })
+
+    await vi.waitFor(() => {
+      expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    })
+
+    await user.click(within(dialog).getByRole('button', { name: /done/i }))
+    await vi.waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('contains the Randomize state layer at desktop breakpoints', () => {
+    renderApp()
+    const randomize = screen.getByRole('button', { name: /^randomize$/i })
+
+    expect(randomize).toHaveClass('fixed', 'sm:relative', 'sm:inset-auto')
+    expect(randomize).not.toHaveClass('sm:static')
+  })
+
   it('fetches a commander, shows external links, and renders visible EDHREC metadata', async () => {
     const fetchMock = createFetchMock(createCard({ name: 'Atraxa, Praetors Voice' }))
     vi.stubGlobal('fetch', fetchMock)
@@ -220,7 +249,11 @@ describe('Randomander', () => {
     expect(
       screen.getByRole('img', { name: 'Agent of the Iron Throne' })
     ).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const requestedUrls = fetchMock.mock.calls.map(([input]) =>
+      typeof input === 'string' ? input : input.toString()
+    )
+    expect(requestedUrls.filter((url) => url.includes('api.scryfall.com'))).toHaveLength(2)
+    expect(requestedUrls.some((url) => url.includes('json.edhrec.com'))).toBe(true)
   })
 
   it('draws three cards in 3-card spark mode', async () => {
@@ -268,7 +301,65 @@ describe('Randomander', () => {
     })
   })
 
+  it('keeps the result and EDHREC inspiration concealed until a prestige reveal is skipped', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+    )
+    const fetchMock = createFetchMock(
+      createCard({ name: 'Atraxa, Praetors Voice' })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    const skipButton = await screen.findByRole('button', { name: /skip reveal/i })
+    expect(screen.queryByText('Atraxa, Praetors Voice')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('img', { name: 'Atraxa, Praetors Voice' })
+    ).not.toBeInTheDocument()
+    expectNoEdhrecMetadataFetch(fetchMock)
+
+    await user.click(skipButton)
+
+    const revealedHeading = await screen.findByText('Atraxa, Praetors Voice')
+    expect(revealedHeading).toBeInTheDocument()
+    expect(revealedHeading).toHaveFocus()
+    await vi.waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input]) => {
+          const url = typeof input === 'string' ? input : input.toString()
+          return url.includes('json.edhrec.com')
+        })
+      ).toBe(true)
+    })
+  })
+
   it('renders both options in two-choice mode', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+    )
     const fetchMock = createFetchMock(
       createCard({ id: 'card-1', name: 'Tymna the Weaver' }),
       createCard({ id: 'card-2', name: 'Kraum, Ludevic\'s Opus' })
@@ -286,6 +377,8 @@ describe('Randomander', () => {
 
     expect(await screen.findByText(/option 1/i)).toBeInTheDocument()
     expect(screen.getByText(/option 2/i)).toBeInTheDocument()
+    expect(screen.queryByText('Tymna the Weaver')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /skip reveal/i }))
     expect(screen.getAllByText('Tymna the Weaver').length).toBeGreaterThan(0)
     expect(screen.getAllByText("Kraum, Ludevic's Opus").length).toBeGreaterThan(0)
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -372,5 +465,37 @@ describe('Randomander', () => {
       'data-mode',
       'simplified'
     )
+  })
+
+  it('persists the choice to skip future prestige reveals', async () => {
+    const firstRender = renderApp()
+    const user = userEvent.setup()
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+    const revealToggle = within(settingsDialog).getByRole('checkbox', {
+      name: /prestige reveal animation/i,
+    })
+
+    expect(revealToggle).toBeChecked()
+    await user.click(revealToggle)
+
+    await vi.waitFor(() => {
+      const persisted = JSON.parse(
+        localStorage.getItem('randomander:state:v2') ?? '{}'
+      ) as { display?: { enablePrestigeReveal?: boolean } }
+      expect(persisted.display?.enablePrestigeReveal).toBe(false)
+    })
+
+    firstRender.unmount()
+    renderApp()
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const reopenedDialog = await screen.findByRole('dialog', { name: /settings/i })
+
+    expect(
+      within(reopenedDialog).getByRole('checkbox', {
+        name: /prestige reveal animation/i,
+      })
+    ).not.toBeChecked()
   })
 })
