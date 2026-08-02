@@ -27,8 +27,95 @@ export type ScryfallCard = {
     component: string
     uri: string
   }>
+  prices?: {
+    usd?: string | null
+    usd_foil?: string | null
+    usd_etched?: string | null
+    eur?: string | null
+    eur_foil?: string | null
+    tix?: string | null
+  }
+  purchase_uris?: {
+    cardmarket?: string
+    tcgplayer?: string
+    cardhoarder?: string
+  }
   object?: string
   details?: string
+}
+
+export const PRICE_PROVIDERS = [
+  { value: 'cardmarket', label: 'Cardmarket', unit: 'EUR' },
+  { value: 'tcgplayer', label: 'TCGplayer', unit: 'USD' },
+  { value: 'cardhoarder', label: 'Cardhoarder', unit: 'tix' },
+] as const
+
+export type PriceProvider = (typeof PRICE_PROVIDERS)[number]['value']
+export type PriceFinish = 'regular' | 'foil' | 'etched'
+
+export type CardPrice = {
+  provider: PriceProvider
+  providerLabel: string
+  formatted: string
+  finish: PriceFinish
+  purchaseUrl: string | null
+}
+
+type PriceKey = keyof NonNullable<ScryfallCard['prices']>
+
+const PRICE_FIELDS: Record<
+  PriceProvider,
+  Array<{ key: PriceKey; finish: PriceFinish }>
+> = {
+  cardmarket: [
+    { key: 'eur', finish: 'regular' },
+    { key: 'eur_foil', finish: 'foil' },
+  ],
+  tcgplayer: [
+    { key: 'usd', finish: 'regular' },
+    { key: 'usd_foil', finish: 'foil' },
+    { key: 'usd_etched', finish: 'etched' },
+  ],
+  cardhoarder: [{ key: 'tix', finish: 'regular' }],
+}
+
+export const isPriceProvider = (value: unknown): value is PriceProvider =>
+  PRICE_PROVIDERS.some((provider) => provider.value === value)
+
+const formatMarketplacePrice = (amount: number, provider: PriceProvider) => {
+  if (provider === 'cardhoarder') return `${amount.toFixed(2)} tix`
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: provider === 'cardmarket' ? 'EUR' : 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+export const getCardPrice = (
+  card: ScryfallCard,
+  provider: PriceProvider
+): CardPrice | null => {
+  const fields = PRICE_FIELDS[provider]
+  const selected = fields.find(({ key }) => {
+    const raw = card.prices?.[key]
+    if (typeof raw !== 'string' || raw.trim() === '') return false
+    const amount = Number(raw)
+    return Number.isFinite(amount) && amount > 0
+  })
+  if (!selected) return null
+
+  const amount = Number(card.prices?.[selected.key])
+  const providerLabel =
+    PRICE_PROVIDERS.find((option) => option.value === provider)?.label ?? provider
+
+  return {
+    provider,
+    providerLabel,
+    formatted: formatMarketplacePrice(amount, provider),
+    finish: selected.finish,
+    purchaseUrl: card.purchase_uris?.[provider] ?? null,
+  }
 }
 
 const COLOR_ORDER = ['C', 'W', 'U', 'B', 'R', 'G']

@@ -10,6 +10,7 @@ import {
 } from "../../../lib/scryfall";
 import { useRandomanderStore } from "../../../stores/randomander";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
+import CardPriceBadge from "./CardPriceBadge.vue";
 
 const props = defineProps({
   cards: { type: Array as PropType<ScryfallCard[]>, required: true },
@@ -72,7 +73,14 @@ const pairTags = computed(() =>
           <p class="mt-1 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
             {{ getTypeLine(card) }}
           </p>
-          <ManaIdentity class="mt-2" :colors="card.color_identity ?? []" compact />
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <ManaIdentity :colors="card.color_identity ?? []" compact />
+            <CardPriceBadge
+              :card="card"
+              :provider="store.display.priceProvider"
+              :show-link="showLinks"
+            />
+          </div>
         </div>
       </div>
 
@@ -146,6 +154,11 @@ const pairTags = computed(() =>
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <ManaIdentity :colors="card.color_identity ?? []" compact />
+          <CardPriceBadge
+            :card="card"
+            :provider="store.display.priceProvider"
+            :show-link="showLinks"
+          />
           <span
             v-if="showMetadata && store.getDeckCountForCard(card, group) != null"
             class="rounded-lg bg-[var(--md-sys-color-tertiary-container)] px-2.5 py-1 text-sm font-bold text-[var(--md-sys-color-on-tertiary-container)]"

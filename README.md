@@ -33,9 +33,9 @@ There is no account or project backend. Preferences, history, and saved pulls st
 | Choice mode | Compare two commanders or two partner-pair options in one draw. |
 | Card filters | Focus on selected colors, mode-aware color-count limits, less-common commanders, or ranked results outside EDHREC's top 10%. |
 | Pairing rules | Supports Partner, Partner with, Friends forever, Choose a Background, Background cards, and Doctor's companion. |
-| Deck inspiration | Shows card or pair profiles, color identities, links, available deck counts, and up to four EDHREC themes after reveal. |
+| Deck inspiration | Shows card or pair profiles, color identities, a compact marketplace price, available deck counts, links, and up to four EDHREC themes after reveal. |
 | Personal library | Keeps up to 40 recent pulls and 40 saved pulls in local browser storage. |
-| Display controls | Offers system/light/dark themes, optional card reveals and ambient art, and reduced-motion/low-power controls. |
+| Display controls | Offers system/light/dark themes, a Cardmarket/TCGplayer/Cardhoarder price selector, optional card reveals and ambient art, and reduced-motion/low-power controls. |
 | Responsive UI | Uses a compact, collapsible draw-mode card and fixed primary action/navigation on small screens. |
 
 ### Draw modes
@@ -108,6 +108,8 @@ The optional card-back reveal is presentation-only. Use **Skip reveal** or press
 
 Deck inspiration loads after the result is visible, so metadata traffic does not block the reveal. When choice mode is active, each choice has its own body section and its own card/pair metadata. EDHREC data can be absent when no matching page or theme data is available; that does not invalidate the Scryfall result.
 
+Each card can show one compact Scryfall-supplied marketplace estimate for its exact printing. Cardmarket/EUR is the default; Settings can switch to TCGplayer/USD or Cardhoarder/tix. Prices are snapshots from the card response, not live checkout quotes, and are omitted when unavailable.
+
 For a complete walkthrough, see the [User guide](docs/user-guide.md).
 
 ## Development
@@ -161,7 +163,7 @@ randomander/
 │   │   ├── draw/            # Draw orchestration, reveal, choices, and details
 │   │   ├── history/         # Recent-pull panel
 │   │   ├── saved/           # Kept-pull panel
-│   │   └── settings/        # Appearance, performance, and cache controls
+│   │   └── settings/        # Appearance, prices, performance, and cache controls
 │   ├── lib/                 # Card helpers, storage, and persistent cache
 │   ├── services/            # Scryfall, EDHREC, and HTTP adapters
 │   ├── stores/              # Pinia application/domain store
@@ -180,14 +182,14 @@ Randomander has no repository-owned API server and does not require a login. It 
 
 | Service | Used for |
 | --- | --- |
-| [Scryfall](https://scryfall.com/docs/api) | Random/search/exact card data, legality, images, and mana-symbol assets. |
+| [Scryfall](https://scryfall.com/docs/api) | Random/search/exact card data, legality, images, mana-symbol assets, marketplace price estimates, and purchase links. |
 | [EDHREC](https://edhrec.com/) | Optional commander/pair deck counts, themes, and outbound inspiration links. |
 | Google Fonts | The Google Sans Flex web font loaded by the stylesheet. |
 | Vercel Analytics | Analytics initialized by the client application. |
 
 Browser storage is split into two keys:
 
-- `randomander:state:v2` stores mode, options, display/performance/cache settings, theme, history, and saved pulls.
+- `randomander:state:v2` stores mode, options, display/performance/cache settings (including the price marketplace), theme, history, and saved pulls.
 - `randomander:cache:v1` stores eligible HTTP responses subject to the configured TTL and entry limit.
 
 The default response-cache settings are 24 hours and 120 entries. Random Scryfall draws are live requests; persistent caching primarily benefits EDHREC metadata and exact-name card lookups. Clearing the network cache does not clear settings, history, or saved pulls.

@@ -149,7 +149,16 @@ describe('Randomander', () => {
   })
 
   it('fetches a commander, shows external links, and renders visible EDHREC metadata', async () => {
-    const fetchMock = createFetchMock(createCard({ name: 'Atraxa, Praetors Voice' }))
+    const fetchMock = createFetchMock(
+      createCard({
+        name: 'Atraxa, Praetors Voice',
+        prices: { eur: '1.25', usd: '2.50' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/example',
+          tcgplayer: 'https://www.tcgplayer.com/product/example',
+        },
+      })
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderApp()
@@ -178,6 +187,24 @@ describe('Randomander', () => {
         )
     ).toBe(true)
     await user.click(screen.getByRole('button', { name: /show details/i }))
+    const inspiration = screen.getByRole('complementary', {
+      name: /deck inspiration/i,
+    })
+    expect(
+      within(inspiration).getByRole('link', {
+        name: /cardmarket price for atraxa.*€1\.25/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/example'
+    )
+    expect(within(inspiration).queryByText('$2.50')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        return url.includes('cardmarket.com')
+      })
+    ).toBe(false)
     expect(await screen.findByText(/500 decks/i)).toBeInTheDocument()
     expect(screen.getByText('DECK THEMES')).toBeInTheDocument()
     expect(await screen.findByText('Infect')).toBeInTheDocument()
@@ -197,6 +224,10 @@ describe('Randomander', () => {
         type_line: 'Legendary Creature - Cat Soldier',
         oracle_text: 'Partner',
         keywords: ['Partner'],
+        prices: { eur: '0.35' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/prava',
+        },
       }),
       createCard({
         id: 'card-2',
@@ -206,6 +237,10 @@ describe('Randomander', () => {
         type_line: 'Legendary Creature - Siren Pirate',
         oracle_text: 'Partner',
         keywords: ['Partner'],
+        prices: { eur: '0.80' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/malcolm',
+        },
       })
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -229,6 +264,22 @@ describe('Randomander', () => {
     await user.click(screen.getByRole('button', { name: /show details/i }))
 
     expect(screen.getAllByText(/500 decks/i)).toHaveLength(1)
+    expect(
+      screen.getByRole('link', {
+        name: /cardmarket price for prava.*€0\.35/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/prava'
+    )
+    expect(
+      screen.getByRole('link', {
+        name: /cardmarket price for malcolm.*€0\.80/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/malcolm'
+    )
     expect(
       screen
         .getAllByRole('link')
@@ -466,12 +517,20 @@ describe('Randomander', () => {
         name: 'Tymna the Weaver',
         type_line: 'Legendary Creature - Human Cleric',
         color_identity: ['W', 'B'],
+        prices: { eur: '3.10' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/tymna',
+        },
       }),
       createCard({
         id: 'card-2',
         name: 'Kraum, Ludevic\'s Opus',
         type_line: 'Legendary Creature - Zombie Horror',
         color_identity: ['U', 'R'],
+        prices: { eur: '4.20' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/kraum',
+        },
       })
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -527,6 +586,15 @@ describe('Randomander', () => {
       within(optionOne).getByText('Legendary Creature - Human Cleric')
     ).toBeInTheDocument()
     expect(within(optionOne).getByText(/500 decks/i)).toBeInTheDocument()
+    expect(
+      within(optionOne).getByRole('link', {
+        name: /cardmarket price for tymna.*€3\.10/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/tymna'
+    )
+    expect(within(optionOne).queryByText('€4.20')).not.toBeInTheDocument()
     expect(within(optionOne).getByText('DECK THEMES')).toBeInTheDocument()
     expect(within(optionOne).getByRole('link', { name: 'Infect' })).toHaveAttribute(
       'href',
@@ -543,6 +611,15 @@ describe('Randomander', () => {
       within(optionTwo).getByText('Legendary Creature - Zombie Horror')
     ).toBeInTheDocument()
     expect(within(optionTwo).getByText(/500 decks/i)).toBeInTheDocument()
+    expect(
+      within(optionTwo).getByRole('link', {
+        name: /cardmarket price for kraum.*€4\.20/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/kraum'
+    )
+    expect(within(optionTwo).queryByText('€3.10')).not.toBeInTheDocument()
     expect(within(optionTwo).getByText('DECK THEMES')).toBeInTheDocument()
     expect(within(optionTwo).getByRole('link', { name: 'Infect' })).toHaveAttribute(
       'href',
@@ -803,6 +880,146 @@ describe('Randomander', () => {
       'data-mode',
       'simplified'
     )
+  })
+
+  it('defaults price data to Cardmarket and persists another marketplace', async () => {
+    localStorage.setItem(
+      'randomander:state:v2',
+      JSON.stringify({ display: { showLinks: true } })
+    )
+    const firstRender = renderApp()
+    const user = userEvent.setup()
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+    const providerSelect = within(settingsDialog).getByRole('combobox', {
+      name: /marketplace/i,
+    })
+
+    expect(providerSelect).toHaveValue('cardmarket')
+    expect(
+      within(providerSelect)
+        .getAllByRole('option')
+        .map((option) => ({
+          label: option.textContent?.trim(),
+          value: option.getAttribute('value'),
+        }))
+    ).toEqual([
+      { label: 'Cardmarket (EUR)', value: 'cardmarket' },
+      { label: 'TCGplayer (USD)', value: 'tcgplayer' },
+      { label: 'Cardhoarder (tix)', value: 'cardhoarder' },
+    ])
+    await user.selectOptions(providerSelect, 'tcgplayer')
+
+    await vi.waitFor(() => {
+      const persisted = JSON.parse(
+        localStorage.getItem('randomander:state:v2') ?? '{}'
+      ) as { display?: { priceProvider?: string } }
+      expect(persisted.display?.priceProvider).toBe('tcgplayer')
+    })
+
+    firstRender.unmount()
+    renderApp()
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const reopenedDialog = await screen.findByRole('dialog', { name: /settings/i })
+
+    expect(
+      within(reopenedDialog).getByRole('combobox', { name: /marketplace/i })
+    ).toHaveValue('tcgplayer')
+  })
+
+  it('repairs an invalid persisted marketplace to Cardmarket', async () => {
+    localStorage.setItem(
+      'randomander:state:v2',
+      JSON.stringify({ display: { priceProvider: 'retired-marketplace' } })
+    )
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+
+    expect(
+      within(settingsDialog).getByRole('combobox', { name: /marketplace/i })
+    ).toHaveValue('cardmarket')
+    await vi.waitFor(() => {
+      const persisted = JSON.parse(
+        localStorage.getItem('randomander:state:v2') ?? '{}'
+      ) as { display?: { priceProvider?: string } }
+      expect(persisted.display?.priceProvider).toBe('cardmarket')
+    })
+  })
+
+  it('switches visible price data to the selected marketplace', async () => {
+    const fetchMock = createFetchMock(
+      createCard({
+        name: 'Atraxa, Praetors Voice',
+        prices: { eur: '1.25', usd: '2.50' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/example',
+          tcgplayer: 'https://www.tcgplayer.com/product/example',
+        },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+    await screen.findAllByText('Atraxa, Praetors Voice')
+    await user.click(screen.getByRole('button', { name: /show details/i }))
+
+    const inspiration = screen.getByRole('complementary', {
+      name: /deck inspiration/i,
+    })
+    expect(
+      within(inspiration).getByRole('link', {
+        name: /cardmarket price for atraxa.*€1\.25/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/example'
+    )
+
+    const scryfallRequestsBeforeSwitch = fetchMock.mock.calls.filter(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      return url.includes('api.scryfall.com')
+    }).length
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+    await user.selectOptions(
+      within(settingsDialog).getByRole('combobox', { name: /marketplace/i }),
+      'tcgplayer'
+    )
+    await user.click(within(settingsDialog).getByRole('button', { name: /^close$/i }))
+
+    expect(
+      within(inspiration).getByRole('link', {
+        name: /tcgplayer price for atraxa.*\$2\.50/i,
+      })
+    ).toHaveAttribute('href', 'https://www.tcgplayer.com/product/example')
+    expect(within(inspiration).queryByText('€1.25')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.filter(([input]) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        return url.includes('api.scryfall.com')
+      })
+    ).toHaveLength(scryfallRequestsBeforeSwitch)
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const reopenedSettings = await screen.findByRole('dialog', { name: /settings/i })
+    await user.click(
+      within(reopenedSettings).getByRole('checkbox', { name: /external links/i })
+    )
+    await user.click(
+      within(reopenedSettings).getByRole('button', { name: /^close$/i })
+    )
+
+    expect(
+      within(inspiration).queryByRole('link', { name: /tcgplayer price/i })
+    ).not.toBeInTheDocument()
+    expect(within(inspiration).getByText('$2.50')).toBeInTheDocument()
   })
 
   it('persists the choice to skip future card reveals', async () => {

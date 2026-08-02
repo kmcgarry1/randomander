@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import {
   ArrowRightIcon,
+  BanknotesIcon,
   BoltIcon,
   CheckIcon,
   CircleStackIcon,
@@ -20,6 +21,7 @@ import {
   useRandomanderStore,
   type ThemeMode,
 } from "../../stores/randomander";
+import { PRICE_PROVIDERS } from "../../lib/scryfall";
 
 const props = withDefaults(
   defineProps<{
@@ -65,7 +67,7 @@ const displayToggles = computed(() => [
   {
     key: "showLinks" as const,
     label: "External links",
-    description: "Show Scryfall and EDHREC links.",
+    description: "Show Scryfall, EDHREC, and marketplace links.",
   },
   {
     key: "showTags" as const,
@@ -347,6 +349,60 @@ const closeSettings = () => {
               />
             </label>
           </div>
+        </div>
+      </section>
+
+      <section
+        class="m3-card overflow-hidden lg:col-span-2"
+        aria-labelledby="settings-prices-title"
+      >
+        <div class="flex items-start gap-3 p-4 pb-3 sm:p-6 sm:pb-4">
+          <div
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]"
+            aria-hidden="true"
+          >
+            <BanknotesIcon class="h-5 w-5" />
+          </div>
+          <div>
+            <h3
+              id="settings-prices-title"
+              class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
+            >
+              Prices
+            </h3>
+          </div>
+        </div>
+
+        <div
+          class="grid gap-3 px-4 pb-5 sm:grid-cols-[minmax(0,18rem)_1fr] sm:items-end sm:px-6 sm:pb-6"
+        >
+          <label for="price-provider" class="block">
+            <span
+              class="mb-2 block text-sm font-semibold text-[var(--md-sys-color-on-surface)]"
+            >
+              Marketplace
+            </span>
+            <select
+              id="price-provider"
+              v-model="display.priceProvider"
+              class="m3-field"
+              aria-describedby="price-provider-description"
+            >
+              <option
+                v-for="provider in PRICE_PROVIDERS"
+                :key="provider.value"
+                :value="provider.value"
+              >
+                {{ provider.label }} ({{ provider.unit }})
+              </option>
+            </select>
+          </label>
+          <p
+            id="price-provider-description"
+            class="text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+          >
+            Scryfall estimate for the selected printing. Missing prices stay hidden.
+          </p>
         </div>
       </section>
 

@@ -133,6 +133,12 @@ Each choice should have a separate **Option 1** or **Option 2** body under Deck 
 
 If content is crossed or combined, report both complete choices, which follow-up pairing action was used, and whether the problem started before or after loading from History.
 
+### A marketplace price is missing or outdated
+
+Prices are estimates included in the Scryfall payload for the exact printing that was drawn. They are not fetched directly from Cardmarket, TCGplayer, or Cardhoarder and can be absent. Randomander omits an unavailable price instead of substituting another marketplace.
+
+Check **Settings → Prices → Marketplace** if the currency is unexpected. Loading a History or Saved record restores its stored price snapshot. Only a future fresh Scryfall draw of that printing can provide a newer snapshot; loading History or Saved does not refresh it. Changing the marketplace can only show a value that exists in that stored card object.
+
 ### Metadata looks stale after Clear cache
 
 **Settings → Clear cache** clears persistent `randomander:cache:v1`, but metadata already loaded in the current Pinia session can remain in memory. After clearing:

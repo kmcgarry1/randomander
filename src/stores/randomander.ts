@@ -8,7 +8,9 @@ import {
   getPartnerWithName,
   getTypeLine,
   isBackgroundCard,
+  isPriceProvider,
   type PartnerKind,
+  type PriceProvider,
   type ScryfallCard,
 } from '../lib/scryfall'
 import {
@@ -57,6 +59,7 @@ export type DisplaySettings = {
   usePairTags: boolean
   showAmbient: boolean
   enablePrestigeReveal: boolean
+  priceProvider: PriceProvider
 }
 
 export type CacheSettings = {
@@ -179,6 +182,7 @@ const defaultDisplay: DisplaySettings = {
   usePairTags: true,
   showAmbient: false,
   enablePrestigeReveal: true,
+  priceProvider: 'cardmarket',
 }
 
 const defaultCache: CacheSettings = {
@@ -215,6 +219,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     ...defaultDisplay,
     ...(persisted.display ?? {}),
   })
+  if (!isPriceProvider(display.priceProvider)) {
+    display.priceProvider = defaultDisplay.priceProvider
+  }
   const cacheSettings = reactive<CacheSettings>({
     ...defaultCache,
     ...(persisted.cache ?? {}),
@@ -1305,7 +1312,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       }
       writeStorage(STORAGE_KEY, payload)
     },
-    { deep: true }
+    { deep: true, immediate: true }
   )
 
   const getColorOptionLabel = (option: { value: ColorCount; label: string }) => {

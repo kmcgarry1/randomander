@@ -635,7 +635,6 @@ watchEffect(() => {
             <LightBulbIcon class="h-5 w-5" aria-hidden="true" />
           </span>
           <div class="min-w-0 flex-1">
-            <p class="m3-label">EDHREC</p>
             <h2 id="inspiration-title" class="text-xl font-bold">Deck inspiration</h2>
           </div>
         </div>

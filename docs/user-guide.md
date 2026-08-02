@@ -133,7 +133,7 @@ During the reveal:
 
 After a non-choice reveal, **Keep pull** saves the current result. Once saved, it changes to **Pull kept**. A commander with a supported pairing mechanic also shows the appropriate pairing action.
 
-External Scryfall and EDHREC links open in a new tab when External links are enabled in Settings.
+External Scryfall, EDHREC, and marketplace links open in a new tab when External links are enabled in Settings. Price text remains visible without a link when that setting is off.
 
 ## Deck inspiration
 
@@ -141,6 +141,7 @@ Deck inspiration is supplemental context, not part of card selection. It may con
 
 - a card or combined pair name;
 - card type lines and color identities;
+- one selected-marketplace price estimate per card when available;
 - a combined EDHREC deck count when available;
 - up to four EDHREC theme links;
 - Scryfall links for each card;
@@ -149,6 +150,8 @@ Deck inspiration is supplemental context, not part of card selection. It may con
 For single, non-choice results, use **Show details** and **Hide details** to control the panel. Choice results show one body section per option because each may have a different pair slug, count, and theme set.
 
 EDHREC's public page data changes independently of Randomander and is not guaranteed for every card or pair. “No themes available” can mean that a page has no recognized theme data or that the optional metadata request failed. The Scryfall result remains usable.
+
+Price estimates come from the existing Scryfall card response and correspond to the exact printing that was drawn. Partner prices stay attached to each card rather than being presented as a potentially misleading pair total. Choice options keep their own prices inside their separate bodies.
 
 ## History
 
@@ -161,7 +164,7 @@ From History you can:
 - see the mode, time, a summary of selected filters, and recorded cards or choices;
 - clear all history.
 
-Loading a record restores its draw mode, filter snapshot, cards, and choice groups. It does not recreate old EDHREC metadata; current metadata is fetched when the loaded result becomes visible.
+Loading a record restores its draw mode, filter snapshot, cards, and choice groups. It does not recreate old EDHREC metadata; current metadata is fetched when the loaded result becomes visible. Any stored card price is the snapshot included in that historical Scryfall payload and may no longer match the marketplace.
 
 History is capped at 40 records. Once full, a new record removes the oldest one. Clearing History does not clear Saved pulls.
 
@@ -187,7 +190,7 @@ Equivalent results are deduplicated using their mode and card/group identity. Sa
 | Setting | Effect |
 | --- | --- |
 | Card reveal animation | Enables the staged card-back reveal. Turn it off for immediate results. |
-| External links | Shows or hides Scryfall and EDHREC actions. |
+| External links | Shows or hides Scryfall, EDHREC, and marketplace actions; price text remains. |
 | EDHREC metadata | Enables deck counts and themes after reveal. |
 | Card-art backdrop | Uses result artwork to tint the result surface. |
 
@@ -198,6 +201,16 @@ Equivalent results are deduplicated using their mode and card/group identity. Sa
 - Changing one of those controls directly creates a **Custom** profile.
 
 The app also respects the operating system's `prefers-reduced-motion` setting for reveal behavior.
+
+### Prices
+
+The **Marketplace** dropdown controls the single compact estimate shown for each card in Deck inspiration:
+
+- **Cardmarket (EUR)** is the default;
+- **TCGplayer (USD)** uses dollar prices;
+- **Cardhoarder (tix)** uses Magic Online ticket prices.
+
+Randomander does not call those marketplaces for pricing. Scryfall supplies price and purchase-link fields with the selected printing, and the badge links to the selected marketplace when Scryfall supplies a purchase URI. A regular price is preferred; a foil or etched fallback is clearly labelled, and missing values are omitted. Changing the marketplace updates the visible result without another card request.
 
 ### Cache
 

@@ -48,7 +48,7 @@ When a modal is open, the shell marks the underlying application content inert a
 | `src/features/draw/` | Main draw experience, reveal state machine, result layout, choices, deck inspiration, and draw-specific presentation helpers. |
 | `src/features/history/` | Recent-record list and load/save/clear actions. |
 | `src/features/saved/` | Saved-record list and load/remove/clear actions. |
-| `src/features/settings/` | Theme, display, performance, cache, and history entry points. |
+| `src/features/settings/` | Theme, display, price, performance, cache, and history entry points. |
 | `src/components/layout/` | Reusable modal/panel/loading layout primitives. |
 | `src/components/mtg/` | Mana identity and Scryfall symbol presentation. |
 | `src/composables/` | Cross-feature UI behavior such as theme application and modal focus. |
@@ -56,7 +56,7 @@ When a modal is open, the shell marks the underlying application content inert a
 | `src/services/http.ts` | JSON fetch boundary, optional persistent cache, and normalized HTTP errors. |
 | `src/services/scryfall.ts` | Scryfall endpoints, request pacing/cooldown, ranked selection, and abort behavior. |
 | `src/services/edhrec.ts` | EDHREC URL construction, response parsing, deck counts, and themes. |
-| `src/lib/scryfall.ts` | Scryfall card model and pure card/type/pair/slug helpers. |
+| `src/lib/scryfall.ts` | Scryfall card model and pure card/type/pair/slug/marketplace-price helpers. |
 | `src/lib/cache.ts` | TTL-based persistent response cache and entry pruning. |
 | `src/lib/storage.ts` | Safe local-storage parsing/writing/removal wrappers. |
 | `src/__tests__/` | App behavior, service policy, parsing, helpers, and focused components. |
@@ -73,7 +73,7 @@ The store contains three broad categories.
 These values are serialized to `randomander:state:v2`:
 
 - current mode and filter options;
-- display preferences;
+- display preferences, including the selected price marketplace;
 - cache settings;
 - performance preferences;
 - theme;
@@ -257,6 +257,8 @@ Keep endpoint-specific schema handling out of this generic layer.
 
 The pacing queue and cooldown are module-level state. Service tests reset modules and use fake timers so cases cannot contaminate one another.
 
+Scryfall card payloads also carry nullable marketplace price fields and purchase URIs. `getCardPrice` maps Cardmarket to EUR, TCGplayer to USD, and Cardhoarder to tix, with labelled same-marketplace finish fallbacks. This is pure presentation data from the existing draw response; selecting another marketplace does not start a request.
+
 ### EDHREC adapter
 
 `src/services/edhrec.ts` requests commander JSON pages and tolerates more than one observed response schema. It extracts:
@@ -275,7 +277,7 @@ EDHREC is not used as a legality authority. Scryfall card data and the store's c
 
 Key: `randomander:state:v2`
 
-The serialized payload includes full card snapshots inside History and Saved records. This makes old records resilient to immediate network availability, although artwork URLs and reloaded metadata still depend on external hosts.
+The serialized payload includes full card snapshots inside History and Saved records. This makes old records resilient to immediate network availability, although artwork URLs and reloaded metadata still depend on external hosts. Price fields in those snapshots can become stale; they are not refreshed when a record is loaded.
 
 New History and Saved insertions are each capped at 40. Saves are deduplicated by a fingerprint built from mode and sorted card/group identities.
 
@@ -321,6 +323,7 @@ The main result components are:
 - `PrestigeCard` for card art and reveal state;
 - `DrawBackdrop` for optional ambient artwork;
 - `ResultDetailsSection` for card/pair profile, links, counts, and themes.
+- `CardPriceBadge` for a compact per-card estimate and optional marketplace link.
 
 Avoid introducing a second metadata presentation path. Improvements to deck details should usually happen in `ResultDetailsSection`, with grouping decisions left to `DrawView`.
 

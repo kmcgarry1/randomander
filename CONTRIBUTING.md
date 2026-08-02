@@ -143,6 +143,8 @@ The service queue and cooldown live at module scope. Reset modules and fake time
 
 Use Scryfall search syntax to reduce the candidate pool, but retain client-side validation where the API cannot express a compatibility rule exactly.
 
+Marketplace prices use the nullable `prices` and `purchase_uris` fields already present on Scryfall card payloads. Keep provider mapping in the pure Scryfall helper, never fetch or scrape a marketplace from the browser, label foil/etched fallbacks, and test missing values without coercing them to zero. Historical records contain price snapshots rather than live quotes.
+
 ### EDHREC
 
 Treat post-reveal deck inspiration as optional: parser and display-loader changes should cover every supported schema fixture and degrade to `null`/empty themes rather than invalidating an otherwise successful Scryfall result.
