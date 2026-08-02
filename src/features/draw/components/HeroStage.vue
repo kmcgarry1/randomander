@@ -2,14 +2,13 @@
 import { computed, type PropType } from "vue";
 import { ArrowTopRightOnSquareIcon, SparklesIcon } from "@heroicons/vue/24/outline";
 import type { ScryfallCard } from "../../../lib/scryfall";
-import { getTypeLine } from "../../../lib/scryfall";
+import { getTypeLine, isBackgroundCard } from "../../../lib/scryfall";
 import type { Mode } from "../../../stores/randomander";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
 import PrestigeCard from "./PrestigeCard.vue";
 
 const props = defineProps({
   heroCardName: { type: String, default: "" },
-  heroSubtitle: { type: String, default: "" },
   heroCards: { type: Array as PropType<ScryfallCard[]>, required: true },
   heroScryfallUrl: { type: String, default: "" },
   heroEdhrecUrl: { type: String, default: "" },
@@ -40,9 +39,9 @@ const eyebrow = computed(() => {
 });
 
 const placeholderTitle = computed(() => {
-  if (props.mode === "partner") return "Find a compatible pairing";
-  if (props.mode === "spark") return "Deal three deckbuilding sparks";
-  return "Meet your next commander";
+  if (props.mode === "partner") return "Find a partner pair";
+  if (props.mode === "spark") return "Draw three cards";
+  return "Draw a commander";
 });
 
 const listClasses = computed(() => {
@@ -70,8 +69,16 @@ const cardFrameClass = (index: number) => {
 const edhrecLabel = computed(() =>
   props.mode === "partner" || props.heroCards.length === 2
     ? "Open pair on EDHREC"
-    : "Open commander on EDHREC",
+    : isBackgroundCard(props.heroCards[0])
+      ? "Open Background on EDHREC"
+      : "Open commander on EDHREC",
 );
+
+const edhrecLinkText = computed(() => {
+  if (props.heroCards.length === 2) return "EDHREC pair";
+  if (isBackgroundCard(props.heroCards[0])) return "EDHREC card";
+  return "EDHREC commander";
+});
 </script>
 
 <template>
@@ -110,9 +117,6 @@ const edhrecLabel = computed(() =>
           >
             {{ heroCardName }}
           </h2>
-          <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            {{ heroSubtitle }}
-          </p>
 
           <div class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <div
@@ -144,7 +148,7 @@ const edhrecLabel = computed(() =>
               class="m3-button m3-button--text"
               :aria-label="edhrecLabel"
             >
-              {{ props.heroCards.length === 2 ? "EDHREC pair" : "EDHREC commander" }}
+              {{ edhrecLinkText }}
               <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
             </a>
           </div>
@@ -152,9 +156,6 @@ const edhrecLabel = computed(() =>
         <template v-else>
           <p class="text-2xl font-bold">
             {{ revealActive ? "The cards are turning..." : "Preparing your pull..." }}
-          </p>
-          <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            The result stays hidden until the reveal completes.
           </p>
         </template>
       </div>
@@ -168,9 +169,6 @@ const edhrecLabel = computed(() =>
         <SparklesIcon class="h-8 w-8" />
       </span>
       <h2 class="mt-5 text-2xl font-bold">{{ placeholderTitle }}</h2>
-      <p class="mx-auto mt-2 max-w-sm text-sm text-[var(--md-sys-color-on-surface-variant)]">
-        Tune the draw or leave it wide open, then let Scryfall choose the cards.
-      </p>
     </div>
   </div>
 </template>

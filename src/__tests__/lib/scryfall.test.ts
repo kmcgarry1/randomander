@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getCardSlug, getPartnerVariant } from "../../lib/scryfall";
+import {
+  getCardSlug,
+  getPartnerVariant,
+  isBackgroundCard,
+} from "../../lib/scryfall";
 import type { ScryfallCard } from "../../lib/scryfall";
 
 const createCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
@@ -30,6 +34,19 @@ describe('scryfall helper utilities', () => {
         name: "Jeska, Thrice Reborn",
       })
       expect(getCardSlug(card)).toBe('jeska-thrice-reborn')
+    })
+  })
+
+  describe('isBackgroundCard', () => {
+    it('recognizes the Background subtype with a Unicode type-line separator', () => {
+      expect(
+        isBackgroundCard(
+          createCard({ type_line: 'Legendary Enchantment — Background' })
+        )
+      ).toBe(true)
+      expect(
+        isBackgroundCard(createCard({ type_line: 'Legendary Creature — Orc' }))
+      ).toBe(false)
     })
   })
 

@@ -26,8 +26,10 @@ import {
 import {
   formatColorIdentity,
   getCardImageUrl,
+  getEdhrecCardUrl,
   getEdhrecCommanderUrl,
   getPartnerKind,
+  isBackgroundCard,
   type ScryfallCard,
 } from "../../lib/scryfall";
 import HeroStage from "./components/HeroStage.vue";
@@ -57,7 +59,6 @@ const {
   heroCard,
   heroCards,
   heroIsBackground,
-  heroSubtitle,
   heroHasCompanionSlot,
   heroCompanionButtonLabel,
   heroGroup,
@@ -68,7 +69,9 @@ const heroEdhrecUrl = computed(() =>
   heroGroup.value.length === 2
     ? `https://edhrec.com/commanders/${store.getPartnerSlugForGroup(heroGroup.value)}`
     : heroCard.value
-      ? getEdhrecCommanderUrl(heroCard.value)
+      ? isBackgroundCard(heroCard.value)
+        ? getEdhrecCardUrl(heroCard.value)
+        : getEdhrecCommanderUrl(heroCard.value)
       : "",
 );
 
@@ -148,11 +151,12 @@ const backdropCards = computed(() =>
     : [],
 );
 
-const pairLinkUrl = computed(() =>
-  heroGroup.value.length === 2
-    ? `https://edhrec.com/commanders/${store.getPartnerSlugForGroup(heroGroup.value)}`
-    : "",
-);
+const getPairLinkUrl = (group: ScryfallCard[]) =>
+  group.length === 2
+    ? `https://edhrec.com/commanders/${store.getPartnerSlugForGroup(group)}`
+    : "";
+
+const pairLinkUrl = computed(() => getPairLinkUrl(heroGroup.value));
 
 const revealEnabled = computed(
   () =>
@@ -313,7 +317,7 @@ const handleChoicePartner = (index: number) => {
 };
 
 const canRandomizeChoicePartner = (card: ScryfallCard) =>
-  getPartnerKind(card) !== null;
+  isBackgroundCard(card) || getPartnerKind(card) !== null;
 
 const handleHeroCompanion = () => {
   if (revealInProgress.value) return;
@@ -405,7 +409,6 @@ watchEffect(() => {
   store.setMetadataSurfaceVisible(
     revealComplete.value &&
       hasResults.value &&
-      !isChoiceMode.value &&
       display.value.showTags,
   );
 });
@@ -415,13 +418,9 @@ watchEffect(() => {
   <section class="relative mx-auto w-full max-w-[100rem] overflow-x-clip px-3 py-4 sm:px-6 sm:py-8">
     <header class="mb-6 hidden items-end justify-between gap-8 sm:flex">
       <div class="max-w-2xl">
-        <p class="m3-label">COMMANDER DISCOVERY</p>
-        <h1 class="mt-2 text-[clamp(2rem,4vw,3.5rem)] font-[750] leading-[0.98] tracking-[-0.035em]">
+        <h1 class="text-[clamp(2rem,4vw,3.5rem)] font-[750] leading-[0.98] tracking-[-0.035em]">
           Find a deck worth building.
         </h1>
-        <p class="mt-3 max-w-xl text-base text-[var(--md-sys-color-on-surface-variant)]">
-          Pull a legal commander, explore a compatible pairing, or start from three unlikely cards.
-        </p>
       </div>
       <button
         type="button"
@@ -446,8 +445,7 @@ watchEffect(() => {
             <p class="m3-label">DRAW MODE</p>
             <div class="mt-1 flex min-w-0 items-center gap-2">
               <h2 class="min-w-0 truncate text-lg font-bold lg:text-xl">
-                <span class="lg:hidden">{{ activeModeLabel }}</span>
-                <span class="hidden lg:inline">What should we find?</span>
+                {{ activeModeLabel }}
               </h2>
               <span
                 v-if="activeFilterCount"
@@ -519,7 +517,7 @@ watchEffect(() => {
               </span>
             </div>
             <p v-else class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Open draw. Every legal card is in play.
+              No filters applied.
             </p>
           </div>
         </div>
@@ -580,7 +578,6 @@ watchEffect(() => {
           <HeroStage
             v-else
             :hero-card-name="heroTitle"
-            :hero-subtitle="heroSubtitle"
             :hero-cards="heroCards"
             :hero-scryfall-url="heroScryfallUrl"
             :hero-edhrec-url="heroEdhrecUrl"
@@ -640,17 +637,11 @@ watchEffect(() => {
           <div class="min-w-0 flex-1">
             <p class="m3-label">EDHREC</p>
             <h2 id="inspiration-title" class="text-xl font-bold">Deck inspiration</h2>
-            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Themes and popularity arrive after the reveal.
-            </p>
           </div>
         </div>
 
         <div v-if="!hasResults" class="mt-5 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-4">
           <p class="text-sm font-semibold">Nothing drawn yet</p>
-          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Randomize a commander to open its deckbuilding context.
-          </p>
         </div>
 
         <div
@@ -658,19 +649,29 @@ watchEffect(() => {
           class="mt-5 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-4"
         >
           <p class="text-sm font-semibold">Waiting for the reveal</p>
-          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Inspiration stays hidden until the cards turn over.
-          </p>
         </div>
 
         <div
-          v-else-if="isChoiceMode"
-          class="mt-5 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-4"
+          v-else-if="isChoiceMode && choices.length"
+          class="mt-5 space-y-4"
         >
-          <p class="text-sm font-semibold">Compare your options first</p>
-          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Each choice includes direct Scryfall and EDHREC links.
-          </p>
+          <section
+            v-for="(choice, choiceIndex) in choices"
+            :key="`${choice.id}-inspiration`"
+            class="rounded-2xl bg-[var(--md-sys-color-surface-container-lowest)] p-4"
+            :aria-label="`Option ${choiceIndex + 1}: ${choice.cards.map((card) => card.name).join(' + ')}`"
+          >
+            <h3 class="m3-label mb-4">
+              Option {{ choiceIndex + 1 }}
+            </h3>
+            <ResultDetailsSection
+              :cards="choice.cards"
+              :group="choice.cards"
+              :show-links="display.showLinks"
+              :show-metadata="display.showTags"
+              :pair-link-url="getPairLinkUrl(choice.cards)"
+            />
+          </section>
         </div>
 
         <div v-else class="mt-5">

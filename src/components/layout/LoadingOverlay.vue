@@ -25,12 +25,7 @@ defineProps<{ isLoading: boolean }>();
           class="motion-spin-slow h-12 w-12 rounded-[45%_55%_52%_48%] border-[5px] border-[var(--md-sys-color-primary-container)] border-t-[var(--md-sys-color-primary)]"
           aria-hidden="true"
         ></div>
-        <div>
-          <p class="text-base font-bold">Shuffling cards...</p>
-          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Asking Scryfall for a fresh pull
-          </p>
-        </div>
+        <p class="text-base font-bold">Shuffling cards...</p>
       </div>
     </div>
   </Transition>

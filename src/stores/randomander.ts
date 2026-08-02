@@ -7,6 +7,7 @@ import {
   getPartnerVariant,
   getPartnerWithName,
   getTypeLine,
+  isBackgroundCard,
   type PartnerKind,
   type ScryfallCard,
 } from '../lib/scryfall'
@@ -100,17 +101,17 @@ export const modes = [
   {
     id: 'commander',
     label: 'Commander',
-    description: 'One commander-legal legend.',
+    description: 'One legal commander.',
   },
   {
     id: 'partner',
     label: 'Partner pair',
-    description: 'Two cards that can partner together.',
+    description: 'A legal partner pair.',
   },
   {
     id: 'spark',
     label: '3-card spark',
-    description: 'Three random Commander-legal cards.',
+    description: 'Three Commander-legal cards.',
   },
 ] as const
 
@@ -237,7 +238,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const tagController = ref<AbortController | null>(null)
   const tagLookup = ref<Record<string, EdhrecTag[]>>({})
   const tagRequestId = ref(0)
-  const metaCache = new Map<string, EdhrecMeta>()
+  const metaCache = reactive(new Map<string, EdhrecMeta>())
   const isOptionsOpen = computed(() => activePanel.value === 'filters')
 
   const cacheOptions = computed<CacheOptions | undefined>(() => {
@@ -260,7 +261,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     primaryCard.value ? getPartnerKind(primaryCard.value) : null
   )
   const canRandomizePartner = computed(
-    () => mode.value === 'commander' && primaryPartnerKind.value !== null
+    () =>
+      mode.value === 'commander' &&
+      (isBackgroundCard(primaryCard.value) || primaryPartnerKind.value !== null)
   )
 
   const isChoiceMode = computed(
@@ -400,6 +403,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
 
   const getPartnerButtonLabel = (card: ScryfallCard | null) => {
+    if (isBackgroundCard(card)) return 'Find commander'
     const partnerKind = card ? getPartnerKind(card) : null
     switch (partnerKind) {
       case 'partner_with': {
@@ -488,9 +492,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   const usesCommanderLink = (card: ScryfallCard) => {
     if (mode.value === 'spark') return false
-    const typeLine = getTypeLine(card).toLowerCase()
-    if (typeLine.includes('background')) return false
-    return true
+    return !isBackgroundCard(card)
   }
 
   const shouldShowTags = (card: ScryfallCard) =>
@@ -667,6 +669,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   const passesDeckLimit = async (card: ScryfallCard, signal: AbortSignal) => {
     if (!options.limitByDecks) return true
+    if (isBackgroundCard(card)) return true
     if (!Number.isFinite(options.maxDecks) || options.maxDecks <= 0) return true
     if (options.useRankCutoff) return true
     if (mode.value === 'spark') return true
@@ -765,6 +768,22 @@ export const useRandomanderStore = defineStore('randomander', () => {
       asyncFilter: passesDeckLimit,
     })
   }
+
+  const fetchCommanderForBackground = async (
+    background: ScryfallCard,
+    signal: AbortSignal,
+    maxColors: number | null
+  ) =>
+    fetchCardMatchingFilters(signal, chooseBackgroundCommanderQuery.value, {
+      applyColorFilter: false,
+      extraFilter: (card) =>
+        card.id !== background.id &&
+        getPartnerKind(card) === 'choose_background' &&
+        isWithinMaxColors([card, background], maxColors) &&
+        isWithinSelectedColors([card, background]),
+      asyncFilter: passesDeckLimit,
+      useRankedRandom: options.useRankCutoff,
+    })
 
   const fetchPartnerPair = async (signal: AbortSignal) => {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -1000,17 +1019,30 @@ export const useRandomanderStore = defineStore('randomander', () => {
     controller.value = current
     isLoading.value = true
     try {
-      const partner = await fetchPartnerForCard(
-        primary,
-        current.signal,
-        colorCountNumber.value
-      )
-      if (!partner) {
-        throw new Error("This commander doesn't have a compatible partner.")
+      const primaryIsBackground = isBackgroundCard(primary)
+      const companion = primaryIsBackground
+        ? await fetchCommanderForBackground(
+            primary,
+            current.signal,
+            colorCountNumber.value
+          )
+        : await fetchPartnerForCard(
+            primary,
+            current.signal,
+            colorCountNumber.value
+          )
+      if (!companion) {
+        throw new Error(
+          primaryIsBackground
+            ? "This Background doesn't have a compatible commander."
+            : "This commander doesn't have a compatible partner."
+        )
       }
       choices.value[index] = {
         ...choice,
-        cards: [primary, partner],
+        cards: primaryIsBackground
+          ? [companion, primary]
+          : [primary, companion],
       }
       addHistory(buildRecord([], choices.value))
     } catch (error) {
@@ -1028,24 +1060,17 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   const randomizeCommanderForBackground = async () => {
     const background = primaryCard.value
-    if (!background || !getTypeLine(background).toLowerCase().includes('background')) {
-      return
-    }
+    if (!isBackgroundCard(background)) return
     errorMessage.value = ''
     const current = new AbortController()
     controller.value?.abort()
     controller.value = current
     isLoading.value = true
     try {
-      const commander = await fetchCardMatchingFilters(
+      const commander = await fetchCommanderForBackground(
+        background,
         current.signal,
-        chooseBackgroundCommanderQuery.value,
-        {
-          applyColorFilter: true,
-          extraFilter: matchesSelectedColors,
-          asyncFilter: passesDeckLimit,
-          useRankedRandom: options.useRankCutoff,
-        }
+        colorCountNumber.value
       )
       cards.value = [commander, background]
       choices.value = []

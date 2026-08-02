@@ -107,6 +107,7 @@ const pairTags = computed(() =>
         <p
           v-if="!store.hasTagEntry(combinedPair[0]!, group)"
           class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+          role="status"
         >
           Loading EDHREC themes...
         </p>
@@ -114,7 +115,7 @@ const pairTags = computed(() =>
           v-else-if="pairTags.length === 0"
           class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
         >
-          No themes available yet.
+          No themes available.
         </p>
         <div v-else class="mt-2 flex flex-wrap gap-2">
           <a
@@ -186,6 +187,7 @@ const pairTags = computed(() =>
         <p
           v-if="!store.hasTagEntry(card, group)"
           class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+          role="status"
         >
           Loading EDHREC themes...
         </p>
@@ -193,7 +195,7 @@ const pairTags = computed(() =>
           v-else-if="store.getTagsForCard(card, group).length === 0"
           class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
         >
-          No themes available yet.
+          No themes available.
         </p>
         <div v-else class="mt-2 flex flex-wrap gap-2">
           <a

@@ -37,56 +37,45 @@ const { display, theme, cacheSettings, history, performance } =
 const themeOptions: Array<{
   value: ThemeMode;
   label: string;
-  description: string;
   icon: typeof ComputerDesktopIcon;
 }> = [
   {
     value: "system",
     label: "System",
-    description: "Match your device theme.",
     icon: ComputerDesktopIcon,
   },
   {
     value: "light",
     label: "Light",
-    description: "Always light mode.",
     icon: SunIcon,
   },
   {
     value: "dark",
     label: "Dark",
-    description: "Always dark mode.",
     icon: MoonIcon,
   },
 ];
 
-const activeThemeDescription = computed(
-  () =>
-    themeOptions.find((option) => option.value === theme.value)?.description ??
-    "Match your device theme.",
-);
-
 const displayToggles = computed(() => [
   {
     key: "enablePrestigeReveal" as const,
-    label: "Prestige reveal animation",
-    description:
-      "Turn this off to skip future card-back reveals until you re-enable it here.",
+    label: "Card reveal animation",
+    description: "Skip card-back reveals when off.",
   },
   {
     key: "showLinks" as const,
     label: "External links",
-    description: "Show Scryfall and EDHREC links around active results.",
+    description: "Show Scryfall and EDHREC links.",
   },
   {
     key: "showTags" as const,
     label: "EDHREC metadata",
-    description: "Show deck counts and tag chips on active results.",
+    description: "Show EDHREC deck counts and themes.",
   },
   {
     key: "showAmbient" as const,
-    label: "Card-art atmosphere",
-    description: "Strengthen the revealed card art tint behind the result stage.",
+    label: "Card-art backdrop",
+    description: "Tint the backdrop with card art.",
   },
 ]);
 
@@ -112,25 +101,12 @@ const performanceProfiles = [
   {
     value: "standard" as const,
     label: "Standard",
-    description: "Keep the full motion, artwork, and surface treatments.",
   },
   {
     value: "low-power" as const,
     label: "Low power",
-    description: "Cut motion and simplify heavier visual effects.",
   },
 ];
-
-const activePerformanceDescription = computed(() => {
-  if (performancePreset.value === "custom") {
-    return "Choose individual controls below for a custom setup.";
-  }
-  return (
-    performanceProfiles.find(
-      (profile) => profile.value === performancePreset.value,
-    )?.description ?? "Keep the full motion, artwork, and surface treatments."
-  );
-});
 
 const performanceToggles = computed(() => [
   {
@@ -141,12 +117,12 @@ const performanceToggles = computed(() => [
   {
     key: "simplifyBackdrop" as const,
     label: "Simplify backdrop",
-    description: "Use a flatter, lower-cost card-art treatment behind results.",
+    description: "Use a simpler card-art backdrop.",
   },
   {
     key: "reduceTransparency" as const,
     label: "Reduce transparency",
-    description: "Disable expensive blur and translucent surface effects.",
+    description: "Disable blur and translucent surfaces.",
   },
 ]);
 
@@ -192,12 +168,6 @@ const closeSettings = () => {
         >
           Settings
         </h2>
-        <p
-          class="mt-1 max-w-2xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-        >
-          Tune how Randomander looks, reveals cards, and stores network data on
-          this device.
-        </p>
       </div>
 
       <button
@@ -230,11 +200,6 @@ const closeSettings = () => {
             >
               Theme
             </h3>
-            <p
-              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-            >
-              Choose a comfortable color appearance for this device.
-            </p>
           </div>
         </div>
 
@@ -251,12 +216,6 @@ const closeSettings = () => {
             <span>{{ option.label }}</span>
           </button>
         </div>
-        <p
-          class="mt-3 text-sm text-[var(--md-sys-color-on-surface-variant)]"
-          aria-live="polite"
-        >
-          {{ activeThemeDescription }}
-        </p>
       </section>
 
       <section
@@ -277,11 +236,6 @@ const closeSettings = () => {
             >
               Display controls
             </h3>
-            <p
-              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-            >
-              Decide what appears with each result.
-            </p>
           </div>
         </div>
 
@@ -349,11 +303,6 @@ const closeSettings = () => {
                 }}
               </span>
             </div>
-            <p
-              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-            >
-              Balance expressive motion with battery and device needs.
-            </p>
           </div>
         </div>
 
@@ -370,11 +319,6 @@ const closeSettings = () => {
               {{ option.label }}
             </button>
           </div>
-          <p
-            class="mt-3 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-          >
-            {{ activePerformanceDescription }}
-          </p>
 
           <div class="mt-4">
             <label
@@ -424,11 +368,6 @@ const closeSettings = () => {
             >
               Cache
             </h3>
-            <p
-              class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-            >
-              Reuse Scryfall and EDHREC responses to make repeat visits faster.
-            </p>
           </div>
         </div>
 
@@ -446,7 +385,7 @@ const closeSettings = () => {
                 id="cache-enabled-description"
                 class="mt-1 block text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
               >
-                Reuse card details and EDHREC data.
+                Cache eligible card and EDHREC data.
               </span>
             </span>
             <input
@@ -502,7 +441,7 @@ const closeSettings = () => {
             <p
               class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
             >
-              Remove cached responses stored locally. Your settings stay intact.
+              Remove cached responses. Settings are not affected.
             </p>
           </div>
           <button
@@ -536,11 +475,7 @@ const closeSettings = () => {
           <p
             class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
           >
-            History entries:
-            <strong class="font-semibold text-[var(--md-sys-color-on-surface)]">
-              {{ history.length }}
-            </strong>
-            · Stored locally on this device.
+            {{ history.length }} pull{{ history.length === 1 ? "" : "s" }} stored on this device.
           </p>
         </div>
         <button

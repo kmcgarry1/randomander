@@ -69,6 +69,11 @@ export const getTypeLine = (card: ScryfallCard) => {
   )
 }
 
+export const isBackgroundCard = (
+  card: ScryfallCard | null | undefined
+): card is ScryfallCard =>
+  Boolean(card && /\bbackground\b/i.test(getTypeLine(card)))
+
 export const formatColorIdentity = (colors?: string[]) => {
   if (!colors || colors.length === 0) {
     return 'Colorless'
