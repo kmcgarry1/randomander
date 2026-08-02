@@ -98,6 +98,10 @@ const filterChips = computed(() => {
 });
 
 const activeFilterCount = computed(() => filterChips.value.length);
+const activeModeLabel = computed(
+  () => modes.find((option) => option.id === mode.value)?.label ?? "Commander",
+);
+const drawControlsOpen = ref(false);
 const detailsOpen = ref(false);
 const isWideViewport = ref(false);
 const systemReducedMotion = ref(true);
@@ -295,6 +299,10 @@ const updateMode = (value: Mode) => {
   mode.value = value;
 };
 
+const toggleDrawControls = () => {
+  drawControlsOpen.value = !drawControlsOpen.value;
+};
+
 const handleRandomize = () => {
   if (revealInProgress.value) finishReveal();
   store.randomize();
@@ -432,55 +440,88 @@ watchEffect(() => {
     </header>
 
     <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(22rem,1fr)_22rem] xl:gap-5">
-      <aside class="m3-card m3-card--filled min-w-0 overflow-hidden p-4 lg:sticky lg:top-8 lg:p-5">
-        <div>
-          <p class="m3-label">DRAW MODE</p>
-          <h2 class="mt-1 text-xl font-bold">What should we find?</h2>
-        </div>
-
-        <div class="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-1" role="group" aria-label="Draw mode">
+      <aside class="m3-card m3-card--filled min-w-0 overflow-hidden p-3 lg:sticky lg:top-8 lg:p-5">
+        <div class="flex min-h-11 items-center justify-between gap-3 lg:block">
+          <div class="min-w-0">
+            <p class="m3-label">DRAW MODE</p>
+            <div class="mt-1 flex min-w-0 items-center gap-2">
+              <h2 class="min-w-0 truncate text-lg font-bold lg:text-xl">
+                <span class="lg:hidden">{{ activeModeLabel }}</span>
+                <span class="hidden lg:inline">What should we find?</span>
+              </h2>
+              <span
+                v-if="activeFilterCount"
+                class="shrink-0 rounded-full bg-[var(--md-sys-color-secondary-container)] px-2 py-0.5 text-xs font-semibold text-[var(--md-sys-color-on-secondary-container)] lg:hidden"
+              >
+                {{ activeFilterCount }} filter{{ activeFilterCount === 1 ? "" : "s" }}
+              </span>
+            </div>
+          </div>
           <button
-            v-for="option in modes"
-            :key="option.id"
             type="button"
-            class="min-h-16 min-w-0 rounded-2xl border px-1.5 py-3 text-left transition-all lg:px-4"
-            :class="
-              mode === option.id
-                ? 'rounded-[1.5rem_1.5rem_1.5rem_0.65rem] border-transparent bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
-                : 'border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
-            "
-            :aria-pressed="mode === option.id"
-            :disabled="revealInProgress"
-            @click="updateMode(option.id)"
+            class="m3-button m3-button--text min-h-11 shrink-0 px-3 py-2 lg:hidden"
+            :aria-expanded="drawControlsOpen"
+            aria-controls="draw-controls-panel"
+            :aria-label="drawControlsOpen ? 'Hide draw controls' : 'Show draw controls'"
+            @click="toggleDrawControls"
           >
-            <span class="block break-words text-center text-[0.7rem] font-bold leading-4 sm:text-xs lg:text-left lg:text-sm">
-              {{ option.label }}
-            </span>
-            <span class="mt-1 hidden text-xs leading-4 opacity-80 lg:block">
-              {{ option.description }}
-            </span>
+            {{ drawControlsOpen ? "Hide" : "Show" }}
+            <component
+              :is="drawControlsOpen ? ChevronUpIcon : ChevronDownIcon"
+              class="h-5 w-5"
+              aria-hidden="true"
+            />
           </button>
         </div>
 
-        <div class="mt-5 border-t border-[var(--md-sys-color-outline-variant)] pt-4">
-          <div class="flex items-center justify-between gap-3">
-            <p class="m3-label">ACTIVE FILTERS</p>
+        <div
+          id="draw-controls-panel"
+          :class="drawControlsOpen ? 'block' : 'hidden lg:block'"
+        >
+          <div class="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-1" role="group" aria-label="Draw mode">
             <button
+              v-for="option in modes"
+              :key="option.id"
               type="button"
-              class="m3-button m3-button--text min-h-8 px-2 py-1 text-xs"
-              @click="store.openOptions()"
+              class="min-h-16 min-w-0 rounded-2xl border px-1.5 py-3 text-left transition-all lg:px-4"
+              :class="
+                mode === option.id
+                  ? 'rounded-[1.5rem_1.5rem_1.5rem_0.65rem] border-transparent bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                  : 'border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
+              "
+              :aria-pressed="mode === option.id"
+              :disabled="revealInProgress"
+              @click="updateMode(option.id)"
             >
-              Edit
+              <span class="block break-words text-center text-[0.7rem] font-bold leading-4 sm:text-xs lg:text-left lg:text-sm">
+                {{ option.label }}
+              </span>
+              <span class="mt-1 hidden text-xs leading-4 opacity-80 lg:block">
+                {{ option.description }}
+              </span>
             </button>
           </div>
-          <div v-if="filterChips.length" class="mt-3 flex flex-wrap gap-2">
-            <span v-for="chip in filterChips" :key="chip" class="m3-chip">
-              {{ chip }}
-            </span>
+
+          <div class="mt-5 border-t border-[var(--md-sys-color-outline-variant)] pt-4">
+            <div class="flex items-center justify-between gap-3">
+              <p class="m3-label">ACTIVE FILTERS</p>
+              <button
+                type="button"
+                class="m3-button m3-button--text min-h-8 px-2 py-1 text-xs"
+                @click="store.openOptions()"
+              >
+                Edit
+              </button>
+            </div>
+            <div v-if="filterChips.length" class="mt-3 flex flex-wrap gap-2">
+              <span v-for="chip in filterChips" :key="chip" class="m3-chip">
+                {{ chip }}
+              </span>
+            </div>
+            <p v-else class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
+              Open draw. Every legal card is in play.
+            </p>
           </div>
-          <p v-else class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Open draw. Every legal card is in play.
-          </p>
         </div>
 
         <button
