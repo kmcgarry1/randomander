@@ -33,6 +33,7 @@ There is no account or project backend. Preferences, history, and saved pulls st
 | Choice mode | Compare two commanders or two partner-pair options in one draw. |
 | Card filters | Focus on selected colors, mode-aware color-count limits, less-common commanders, or ranked results outside EDHREC's top 10%. |
 | Pairing rules | Supports Partner, Partner with, Friends forever, Choose a Background, Background cards, and Doctor's companion. |
+| Double-faced cards | Adds an accessible front/back control to transforming and modal double-faced results. |
 | Deck inspiration | Shows card or pair profiles, color identities, a compact marketplace price, available deck counts, links, and up to four EDHREC themes after reveal. |
 | Personal library | Keeps up to 40 recent pulls and 40 saved pulls in local browser storage. |
 | Display controls | Offers system/light/dark themes, a Cardmarket/TCGplayer/Cardhoarder price selector, optional card reveals and ambient art, and reduced-motion/low-power controls. |

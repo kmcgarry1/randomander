@@ -213,7 +213,7 @@ Follow-up pairing replaces only `choices[index]` and then records the full updat
 
 Reveal state belongs to `DrawView` because it is view timing, not persisted domain state.
 
-The active result key combines result card IDs with the newest History ID. A new key resets the reveal, even if a repeated Scryfall result happens to contain the same card IDs.
+The active result key combines result card IDs with the newest History ID. A new key resets the reveal, even if a repeated Scryfall result happens to contain the same card IDs. The selected face of a turnable card is local `PrestigeCard` presentation state: it resets when the card changes or is concealed and is not written to History or Saved.
 
 The reveal lifecycle is:
 
@@ -320,9 +320,9 @@ The main result components are:
 
 - `HeroStage` for normal card/pair/Spark results;
 - `ChoiceOptionsSection` for two independent options;
-- `PrestigeCard` for card art and reveal state;
+- `PrestigeCard` for card art, reveal state, and independent double-faced-card turning;
 - `DrawBackdrop` for optional ambient artwork;
-- `ResultDetailsSection` for card/pair profile, links, counts, and themes.
+- `ResultDetailsSection` for card/pair profile, links, counts, and themes;
 - `CardPriceBadge` for a compact per-card estimate and optional marketplace link.
 
 Avoid introducing a second metadata presentation path. Improvements to deck details should usually happen in `ResultDetailsSection`, with grouping decisions left to `DrawView`.

@@ -3,6 +3,7 @@ import {
   getCardPrice,
   getCardSlug,
   getPartnerVariant,
+  getTurnableCardFaces,
   isBackgroundCard,
 } from "../../lib/scryfall";
 import type { ScryfallCard } from "../../lib/scryfall";
@@ -126,6 +127,67 @@ describe('scryfall helper utilities', () => {
         getCardPrice(createCard({ prices: { tix: 'not-a-price' } }), 'cardhoarder')
       ).toBeNull()
       expect(getCardPrice(createCard({ prices: { usd: '0' } }), 'tcgplayer')).toBeNull()
+    })
+  })
+
+  describe('getTurnableCardFaces', () => {
+    const faces = [
+      {
+        name: 'Valki, God of Lies',
+        image_uris: { normal: 'https://cards.scryfall.io/valki.jpg' },
+      },
+      {
+        name: 'Tibalt, Cosmic Impostor',
+        image_uris: { normal: 'https://cards.scryfall.io/tibalt.jpg' },
+      },
+    ]
+
+    it.each([
+      'transform',
+      'modal_dfc',
+      'double_faced_token',
+      'reversible_card',
+    ])(
+      'returns both display faces for the %s layout',
+      (layout) => {
+        expect(
+          getTurnableCardFaces(
+            createCard({
+              name: 'Valki, God of Lies // Tibalt, Cosmic Impostor',
+              layout,
+              card_faces: faces,
+            })
+          )
+        ).toEqual([
+          {
+            index: 0,
+            name: 'Valki, God of Lies',
+            imageUrl: 'https://cards.scryfall.io/valki.jpg',
+          },
+          {
+            index: 1,
+            name: 'Tibalt, Cosmic Impostor',
+            imageUrl: 'https://cards.scryfall.io/tibalt.jpg',
+          },
+        ])
+      }
+    )
+
+    it('does not make split cards or incomplete face data turnable', () => {
+      expect(
+        getTurnableCardFaces(
+          createCard({ layout: 'split', card_faces: faces })
+        )
+      ).toEqual([])
+      expect(
+        getTurnableCardFaces(
+          createCard({
+            layout: 'modal_dfc',
+            card_faces: [faces[0]!, { name: 'Missing reverse image' }],
+          })
+        )
+      ).toEqual([])
+      expect(getTurnableCardFaces(createCard())).toEqual([])
     })
   })
 

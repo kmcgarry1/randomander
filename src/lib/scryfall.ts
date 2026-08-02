@@ -1,26 +1,28 @@
+export type ScryfallImageUris = {
+  normal?: string
+  art_crop?: string
+}
+
+export type ScryfallCardFace = {
+  type_line?: string
+  oracle_text?: string
+  image_uris?: ScryfallImageUris
+  name?: string
+}
+
 export type ScryfallCard = {
   id: string
   name: string
   scryfall_uri: string
+  layout?: string
   set?: string
   collector_number?: string
   type_line?: string
   oracle_text?: string
   keywords?: string[]
   color_identity?: string[]
-  image_uris?: {
-    normal?: string
-    art_crop?: string
-  }
-  card_faces?: Array<{
-    type_line?: string
-    oracle_text?: string
-    image_uris?: {
-      normal?: string
-      art_crop?: string
-    }
-    name?: string
-  }>
+  image_uris?: ScryfallImageUris
+  card_faces?: ScryfallCardFace[]
   all_parts?: Array<{
     id: string
     name: string
@@ -128,8 +130,45 @@ const COLOR_NAMES: Record<string, string> = {
   G: 'Green',
 }
 
+const TURNABLE_CARD_LAYOUTS = new Set([
+  'transform',
+  'modal_dfc',
+  'double_faced_token',
+  'reversible_card',
+])
+
+export type TurnableCardFace = {
+  index: number
+  name: string
+  imageUrl: string
+}
+
+export const getTurnableCardFaces = (
+  card: ScryfallCard
+): TurnableCardFace[] => {
+  if (!card.layout || !TURNABLE_CARD_LAYOUTS.has(card.layout)) return []
+  if (card.card_faces?.length !== 2) return []
+
+  const faces: TurnableCardFace[] = []
+  for (const [index, face] of card.card_faces.entries()) {
+    const imageUrl = face.image_uris?.normal?.trim()
+    if (!imageUrl) return []
+    const fallbackName = card.name.split(/\s*\/\/\s*/)[index]?.trim()
+    faces.push({
+      index,
+      name: face.name?.trim() || fallbackName || `Face ${index + 1}`,
+      imageUrl,
+    })
+  }
+
+  return new Set(faces.map((face) => face.imageUrl)).size === 2 ? faces : []
+}
+
 export const getCardImageUrl = (card: ScryfallCard) =>
-  card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? ''
+  getTurnableCardFaces(card)[0]?.imageUrl ??
+  card.image_uris?.normal ??
+  card.card_faces?.[0]?.image_uris?.normal ??
+  ''
 
 export const getCardArtUrl = (card: ScryfallCard) =>
   card.image_uris?.art_crop ??

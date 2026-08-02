@@ -145,6 +145,8 @@ Use Scryfall search syntax to reduce the candidate pool, but retain client-side 
 
 Marketplace prices use the nullable `prices` and `purchase_uris` fields already present on Scryfall card payloads. Keep provider mapping in the pure Scryfall helper, never fetch or scrape a marketplace from the browser, label foil/etched fallbacks, and test missing values without coercing them to zero. Historical records contain price snapshots rather than live quotes.
 
+Double-faced-card presentation uses `layout` plus two usable `card_faces[].image_uris.normal` values. Do not infer a turnable card from `//` or `card_faces.length`: split and Adventure layouts have logical faces but one printed image. Keep the selected face as local component state rather than persisting it with a pull.
+
 ### EDHREC
 
 Treat post-reveal deck inspiration as optional: parser and display-loader changes should cover every supported schema fixture and degrade to `null`/empty themes rather than invalidating an otherwise successful Scryfall result.
@@ -221,6 +223,7 @@ When draw logic or Deck inspiration changes, cover the relevant rows:
 | Spark | Three cards with best-effort duplicate avoidance; no choice/popularity metadata path. |
 | Reveal enabled | Metadata begins only after visible result. |
 | Reveal skipped/reduced | Result and metadata become available without decorative delay. |
+| Transforming/modal DFC | Front is shown first; each result card can turn independently after reveal. |
 | Metadata disabled | No post-reveal EDHREC metadata request or theme UI. |
 
 ## Accessibility review

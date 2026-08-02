@@ -113,6 +113,8 @@ Card images and mana symbols are hosted by Scryfall domains rather than bundled 
 
 Inspect the Network panel for blocked requests to Scryfall image/symbol hosts. Randomander should still show accessible card names even when artwork fails.
 
+For a transforming or modal double-faced card, the **Back face** control appears only after the reveal and only when Scryfall supplies separate images for both faces. If the front loads but the reverse does not, check the failed image request in the same panel. Split and Adventure cards intentionally keep their combined image and have no turn control.
+
 ## Deck inspiration issues
 
 ### Themes never appear

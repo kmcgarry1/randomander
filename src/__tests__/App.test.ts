@@ -627,6 +627,100 @@ describe('Randomander', () => {
     )
   })
 
+  it('turns double-faced cards independently in choice mode', async () => {
+    const doubleFacedCard = (
+      id: string,
+      frontName: string,
+      backName: string
+    ) =>
+      createCard({
+        id,
+        name: `${frontName} // ${backName}`,
+        layout: 'modal_dfc',
+        image_uris: undefined,
+        card_faces: [
+          {
+            name: frontName,
+            image_uris: {
+              normal: `https://cards.scryfall.io/normal/${id}-front.jpg`,
+            },
+          },
+          {
+            name: backName,
+            image_uris: {
+              normal: `https://cards.scryfall.io/normal/${id}-back.jpg`,
+            },
+          },
+        ],
+      })
+    const fetchMock = createFetchMock(
+      doubleFacedCard(
+        'valki',
+        'Valki, God of Lies',
+        'Tibalt, Cosmic Impostor'
+      ),
+      doubleFacedCard(
+        'esika',
+        'Esika, God of the Tree',
+        'The Prismatic Bridge'
+      )
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    const dialog = await openFiltersDialog(user)
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: /show two commander options/i })
+    )
+    await user.click(within(dialog).getByRole('button', { name: /done/i }))
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    const choicesHeading = await screen.findByRole('heading', {
+      name: /compare commanders/i,
+    })
+    const choicesSection = choicesHeading.closest('section')!
+    const optionOne = within(choicesSection).getByText(/^option 1$/i).closest('article')!
+    const optionTwo = within(choicesSection).getByText(/^option 2$/i).closest('article')!
+
+    expect(
+      within(optionOne).getByRole('img', {
+        name: 'Valki, God of Lies (front face)',
+      })
+    ).toHaveAttribute(
+      'src',
+      'https://cards.scryfall.io/normal/valki-front.jpg'
+    )
+    expect(
+      within(optionTwo).getByRole('img', {
+        name: 'Esika, God of the Tree (front face)',
+      })
+    ).toBeInTheDocument()
+
+    await user.click(
+      within(optionOne).getByRole('button', {
+        name: 'Show Tibalt, Cosmic Impostor (back face)',
+      })
+    )
+
+    expect(
+      within(optionOne).getByRole('img', {
+        name: 'Tibalt, Cosmic Impostor (back face)',
+      })
+    ).toHaveAttribute(
+      'src',
+      'https://cards.scryfall.io/normal/valki-back.jpg'
+    )
+    expect(
+      within(optionTwo).getByRole('img', {
+        name: 'Esika, God of the Tree (front face)',
+      })
+    ).toHaveAttribute(
+      'src',
+      'https://cards.scryfall.io/normal/esika-front.jpg'
+    )
+  })
+
   it('finds a commander for a Background choice without changing the other option', async () => {
     const fetchMock = createFetchMock(
       createCard({

@@ -133,6 +133,8 @@ During the reveal:
 
 After a non-choice reveal, **Keep pull** saves the current result. Once saved, it changes to **Pull kept**. A commander with a supported pairing mechanic also shows the appropriate pairing action.
 
+Transforming and modal double-faced cards show a **Back face** control after the reveal. Use it to view the reverse image; the same control then becomes **Front face**. Each card in a pair or choice keeps its own temporary orientation, and a new result starts on the front. Split and Adventure cards use their single combined card image and do not show this control.
+
 External Scryfall, EDHREC, and marketplace links open in a new tab when External links are enabled in Settings. Price text remains visible without a link when that setting is off.
 
 ## Deck inspiration
