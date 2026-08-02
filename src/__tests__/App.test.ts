@@ -27,20 +27,13 @@ const mockEdhrecResponse = () =>
   ({
     ok: true,
     json: async () => ({
-      num_decks: 500,
+      container: {
+        json_dict: {
+          card: { num_decks: 500 },
+        },
+      },
       panels: {
-        links: [
-          {
-            header: 'Tags',
-            items: [
-              {
-                href: '/tags/infect/atraxa-praetors-voice',
-                value: 'Infect',
-              },
-            ],
-          },
-        ],
-        taglinks: [{ slug: 'infect', count: 1000 }],
+        taglinks: [{ slug: 'infect', value: 'Infect', count: 1000 }],
       },
     }),
   } as Response)
@@ -119,6 +112,42 @@ describe('Randomander', () => {
     expect(randomize).not.toHaveClass('sm:static')
   })
 
+  it('keeps mobile draw controls compact until the user expands them', async () => {
+    renderApp()
+    const user = userEvent.setup()
+    const panel = document.querySelector('#draw-controls-panel')
+    const showControls = screen.getByRole('button', {
+      name: /show draw controls/i,
+    })
+
+    expect(panel).not.toBeNull()
+    expect(panel).toHaveClass('hidden', 'lg:block')
+    expect(showControls).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      within(showControls.parentElement!).getByText('Commander')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^randomize$/i })).toBeInTheDocument()
+
+    await user.click(showControls)
+
+    const hideControls = screen.getByRole('button', {
+      name: /hide draw controls/i,
+    })
+    expect(hideControls).toHaveAttribute('aria-expanded', 'true')
+    expect(panel).toHaveClass('block')
+    expect(panel).not.toHaveClass('hidden')
+    expect(
+      screen.getByRole('button', { name: /^commander\b/i }),
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(hideControls)
+
+    expect(panel).toHaveClass('hidden', 'lg:block')
+    expect(
+      screen.getByRole('button', { name: /show draw controls/i }),
+    ).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('fetches a commander, shows external links, and renders visible EDHREC metadata', async () => {
     const fetchMock = createFetchMock(createCard({ name: 'Atraxa, Praetors Voice' }))
     vi.stubGlobal('fetch', fetchMock)
@@ -150,6 +179,7 @@ describe('Randomander', () => {
     ).toBe(true)
     await user.click(screen.getByRole('button', { name: /show details/i }))
     expect(await screen.findByText(/500 decks/i)).toBeInTheDocument()
+    expect(screen.getByText('DECK THEMES')).toBeInTheDocument()
     expect(await screen.findByText('Infect')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Infect' })).toHaveAttribute(
       'href',
@@ -439,6 +469,11 @@ describe('Randomander', () => {
     await user.click(within(dialog).getByRole('button', { name: /done/i }))
 
     expect(screen.getAllByText('Exact colors').length).toBeGreaterThan(0)
+    expect(
+      within(
+        screen.getByRole('button', { name: /show draw controls/i }).parentElement!
+      ).getByText('1 filter')
+    ).toBeInTheDocument()
   })
 
   it('applies the low-power preset to the shell and backdrop', async () => {
