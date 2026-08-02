@@ -149,7 +149,16 @@ describe('Randomander', () => {
   })
 
   it('fetches a commander, shows external links, and renders visible EDHREC metadata', async () => {
-    const fetchMock = createFetchMock(createCard({ name: 'Atraxa, Praetors Voice' }))
+    const fetchMock = createFetchMock(
+      createCard({
+        name: 'Atraxa, Praetors Voice',
+        prices: { eur: '1.25', usd: '2.50' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/example',
+          tcgplayer: 'https://www.tcgplayer.com/product/example',
+        },
+      })
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderApp()
@@ -178,6 +187,24 @@ describe('Randomander', () => {
         )
     ).toBe(true)
     await user.click(screen.getByRole('button', { name: /show details/i }))
+    const inspiration = screen.getByRole('complementary', {
+      name: /deck inspiration/i,
+    })
+    expect(
+      within(inspiration).getByRole('link', {
+        name: /cardmarket price for atraxa.*€1\.25/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/example'
+    )
+    expect(within(inspiration).queryByText('$2.50')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        return url.includes('cardmarket.com')
+      })
+    ).toBe(false)
     expect(await screen.findByText(/500 decks/i)).toBeInTheDocument()
     expect(screen.getByText('DECK THEMES')).toBeInTheDocument()
     expect(await screen.findByText('Infect')).toBeInTheDocument()
@@ -197,6 +224,10 @@ describe('Randomander', () => {
         type_line: 'Legendary Creature - Cat Soldier',
         oracle_text: 'Partner',
         keywords: ['Partner'],
+        prices: { eur: '0.35' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/prava',
+        },
       }),
       createCard({
         id: 'card-2',
@@ -206,6 +237,10 @@ describe('Randomander', () => {
         type_line: 'Legendary Creature - Siren Pirate',
         oracle_text: 'Partner',
         keywords: ['Partner'],
+        prices: { eur: '0.80' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/malcolm',
+        },
       })
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -229,6 +264,22 @@ describe('Randomander', () => {
     await user.click(screen.getByRole('button', { name: /show details/i }))
 
     expect(screen.getAllByText(/500 decks/i)).toHaveLength(1)
+    expect(
+      screen.getByRole('link', {
+        name: /cardmarket price for prava.*€0\.35/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/prava'
+    )
+    expect(
+      screen.getByRole('link', {
+        name: /cardmarket price for malcolm.*€0\.80/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/malcolm'
+    )
     expect(
       screen
         .getAllByRole('link')
@@ -284,6 +335,76 @@ describe('Randomander', () => {
     )
     expect(requestedUrls.filter((url) => url.includes('api.scryfall.com'))).toHaveLength(2)
     expect(requestedUrls.some((url) => url.includes('json.edhrec.com'))).toBe(true)
+  })
+
+  it('finds a commander after drawing a Background first', async () => {
+    const fetchMock = createFetchMock(
+      createCard({
+        id: 'background-card',
+        name: 'Agent of the Iron Throne',
+        scryfall_uri: 'https://scryfall.com/card/abc/agent-of-the-iron-throne',
+        color_identity: ['B'],
+        type_line: 'Legendary Enchantment — Background',
+        oracle_text:
+          'Commander creatures you own have "Whenever this creature attacks, defending player loses 1 life and you gain 1 life."',
+      }),
+      createCard({
+        id: 'commander-card',
+        name: 'Burakos, Party Leader',
+        scryfall_uri: 'https://scryfall.com/card/abc/burakos-party-leader',
+        color_identity: ['B'],
+        type_line: 'Legendary Creature — Orc',
+        oracle_text:
+          'Choose a Background (You can have a Background as a second commander.)',
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Agent of the Iron Throne' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: 'Agent of the Iron Throne' })
+    ).toBeInTheDocument()
+    const findCommander = screen.getByRole('button', { name: /find commander/i })
+    expect(
+      screen.getByRole('link', { name: /open background on edhrec/i })
+    ).toHaveAttribute(
+      'href',
+      'https://edhrec.com/cards/agent-of-the-iron-throne'
+    )
+    expect(
+      screen.queryByRole('button', { name: /randomize background/i })
+    ).not.toBeInTheDocument()
+
+    await user.click(findCommander)
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /burakos, party leader \+ agent of the iron throne/i,
+      })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: 'Burakos, Party Leader' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: 'Agent of the Iron Throne' })
+    ).toBeInTheDocument()
+
+    const requestedScryfallUrls = fetchMock.mock.calls
+      .map(([input]) => (typeof input === 'string' ? input : input.toString()))
+      .filter((url) => url.includes('api.scryfall.com'))
+    expect(requestedScryfallUrls).toHaveLength(2)
+
+    const reverseCommanderQuery = new URL(requestedScryfallUrls[1]!).searchParams.get(
+      'q'
+    )
+    expect(reverseCommanderQuery).toContain('is:commander legal:commander')
+    expect(reverseCommanderQuery).toContain('o:"choose a background"')
   })
 
   it('draws three cards in 3-card spark mode', async () => {
@@ -376,7 +497,7 @@ describe('Randomander', () => {
     })
   })
 
-  it('renders both options in two-choice mode', async () => {
+  it('renders deck inspiration for both options in distinct sections', async () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn((query: string) => ({
@@ -391,8 +512,26 @@ describe('Randomander', () => {
       }))
     )
     const fetchMock = createFetchMock(
-      createCard({ id: 'card-1', name: 'Tymna the Weaver' }),
-      createCard({ id: 'card-2', name: 'Kraum, Ludevic\'s Opus' })
+      createCard({
+        id: 'card-1',
+        name: 'Tymna the Weaver',
+        type_line: 'Legendary Creature - Human Cleric',
+        color_identity: ['W', 'B'],
+        prices: { eur: '3.10' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/tymna',
+        },
+      }),
+      createCard({
+        id: 'card-2',
+        name: 'Kraum, Ludevic\'s Opus',
+        type_line: 'Legendary Creature - Zombie Horror',
+        color_identity: ['U', 'R'],
+        prices: { eur: '4.20' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/kraum',
+        },
+      })
     )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -408,11 +547,346 @@ describe('Randomander', () => {
     expect(await screen.findByText(/option 1/i)).toBeInTheDocument()
     expect(screen.getByText(/option 2/i)).toBeInTheDocument()
     expect(screen.queryByText('Tymna the Weaver')).not.toBeInTheDocument()
+    expectNoEdhrecMetadataFetch(fetchMock)
+
     await user.click(screen.getByRole('button', { name: /skip reveal/i }))
+
     expect(screen.getAllByText('Tymna the Weaver').length).toBeGreaterThan(0)
     expect(screen.getAllByText("Kraum, Ludevic's Opus").length).toBeGreaterThan(0)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    await vi.waitFor(() => {
+      const requestedEdhrecUrls = fetchMock.mock.calls
+        .map(([input]) => (typeof input === 'string' ? input : input.toString()))
+        .filter((url) => url.includes('json.edhrec.com'))
+
+      expect(requestedEdhrecUrls).toHaveLength(2)
+      expect(requestedEdhrecUrls).toEqual(
+        expect.arrayContaining([
+          'https://json.edhrec.com/pages/commanders/tymna-the-weaver.json',
+          'https://json.edhrec.com/pages/commanders/kraum-ludevics-opus.json',
+        ])
+      )
+    })
+
+    const inspiration = screen.getByRole('complementary', {
+      name: /deck inspiration/i,
+    })
+    const optionRegions = within(inspiration).getAllByRole('region', {
+      name: /option [12]/i,
+    })
+    expect(optionRegions).toHaveLength(2)
+
+    const optionOne = within(inspiration).getByRole('region', {
+      name: /option 1/i,
+    })
+    expect(
+      within(optionOne).getByRole('heading', { name: 'Tymna the Weaver' })
+    ).toBeInTheDocument()
+    expect(
+      within(optionOne).getByText('Legendary Creature - Human Cleric')
+    ).toBeInTheDocument()
+    expect(within(optionOne).getByText(/500 decks/i)).toBeInTheDocument()
+    expect(
+      within(optionOne).getByRole('link', {
+        name: /cardmarket price for tymna.*€3\.10/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/tymna'
+    )
+    expect(within(optionOne).queryByText('€4.20')).not.toBeInTheDocument()
+    expect(within(optionOne).getByText('DECK THEMES')).toBeInTheDocument()
+    expect(within(optionOne).getByRole('link', { name: 'Infect' })).toHaveAttribute(
+      'href',
+      'https://edhrec.com/commanders/tymna-the-weaver/infect'
+    )
+
+    const optionTwo = within(inspiration).getByRole('region', {
+      name: /option 2/i,
+    })
+    expect(
+      within(optionTwo).getByRole('heading', { name: "Kraum, Ludevic's Opus" })
+    ).toBeInTheDocument()
+    expect(
+      within(optionTwo).getByText('Legendary Creature - Zombie Horror')
+    ).toBeInTheDocument()
+    expect(within(optionTwo).getByText(/500 decks/i)).toBeInTheDocument()
+    expect(
+      within(optionTwo).getByRole('link', {
+        name: /cardmarket price for kraum.*€4\.20/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/kraum'
+    )
+    expect(within(optionTwo).queryByText('€3.10')).not.toBeInTheDocument()
+    expect(within(optionTwo).getByText('DECK THEMES')).toBeInTheDocument()
+    expect(within(optionTwo).getByRole('link', { name: 'Infect' })).toHaveAttribute(
+      'href',
+      'https://edhrec.com/commanders/kraum-ludevics-opus/infect'
+    )
+  })
+
+  it('turns double-faced cards independently in choice mode', async () => {
+    const doubleFacedCard = (
+      id: string,
+      frontName: string,
+      backName: string
+    ) =>
+      createCard({
+        id,
+        name: `${frontName} // ${backName}`,
+        layout: 'modal_dfc',
+        image_uris: undefined,
+        card_faces: [
+          {
+            name: frontName,
+            image_uris: {
+              normal: `https://cards.scryfall.io/normal/${id}-front.jpg`,
+            },
+          },
+          {
+            name: backName,
+            image_uris: {
+              normal: `https://cards.scryfall.io/normal/${id}-back.jpg`,
+            },
+          },
+        ],
+      })
+    const fetchMock = createFetchMock(
+      doubleFacedCard(
+        'valki',
+        'Valki, God of Lies',
+        'Tibalt, Cosmic Impostor'
+      ),
+      doubleFacedCard(
+        'esika',
+        'Esika, God of the Tree',
+        'The Prismatic Bridge'
+      )
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    const dialog = await openFiltersDialog(user)
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: /show two commander options/i })
+    )
+    await user.click(within(dialog).getByRole('button', { name: /done/i }))
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    const choicesHeading = await screen.findByRole('heading', {
+      name: /compare commanders/i,
+    })
+    const choicesSection = choicesHeading.closest('section')!
+    const optionOne = within(choicesSection).getByText(/^option 1$/i).closest('article')!
+    const optionTwo = within(choicesSection).getByText(/^option 2$/i).closest('article')!
+
+    expect(
+      within(optionOne).getByRole('img', {
+        name: 'Valki, God of Lies (front face)',
+      })
+    ).toHaveAttribute(
+      'src',
+      'https://cards.scryfall.io/normal/valki-front.jpg'
+    )
+    expect(
+      within(optionTwo).getByRole('img', {
+        name: 'Esika, God of the Tree (front face)',
+      })
+    ).toBeInTheDocument()
+
+    await user.click(
+      within(optionOne).getByRole('button', {
+        name: 'Show Tibalt, Cosmic Impostor (back face)',
+      })
+    )
+
+    expect(
+      within(optionOne).getByRole('img', {
+        name: 'Tibalt, Cosmic Impostor (back face)',
+      })
+    ).toHaveAttribute(
+      'src',
+      'https://cards.scryfall.io/normal/valki-back.jpg'
+    )
+    expect(
+      within(optionTwo).getByRole('img', {
+        name: 'Esika, God of the Tree (front face)',
+      })
+    ).toHaveAttribute(
+      'src',
+      'https://cards.scryfall.io/normal/esika-front.jpg'
+    )
+  })
+
+  it('finds a commander for a Background choice without changing the other option', async () => {
+    const fetchMock = createFetchMock(
+      createCard({
+        id: 'background-option',
+        name: 'Agent of the Iron Throne',
+        color_identity: ['B'],
+        type_line: 'Legendary Enchantment — Background',
+      }),
+      createCard({
+        id: 'other-option',
+        name: 'Muldrotha, the Gravetide',
+        color_identity: ['U', 'B', 'G'],
+        type_line: 'Legendary Creature — Elemental Avatar',
+      }),
+      createCard({
+        id: 'background-commander',
+        name: 'Burakos, Party Leader',
+        color_identity: ['B'],
+        type_line: 'Legendary Creature — Orc',
+        oracle_text: 'Choose a Background',
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    const dialog = await openFiltersDialog(user)
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: /show two commander options/i })
+    )
+    await user.click(within(dialog).getByRole('button', { name: /done/i }))
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    const choicesHeading = await screen.findByRole('heading', {
+      name: /compare commanders/i,
+    })
+    const choicesSection = choicesHeading.closest('section')!
+    const optionOne = within(choicesSection).getByText(/^option 1$/i).closest('article')!
+    const optionTwo = within(choicesSection).getByText(/^option 2$/i).closest('article')!
+
+    expect(
+      within(optionOne).getByRole('heading', { name: 'Agent of the Iron Throne' })
+    ).toBeInTheDocument()
+    const findCommander = within(optionOne).getByRole('button', {
+      name: /find commander/i,
+    })
+    expect(
+      within(optionTwo).getByRole('heading', { name: 'Muldrotha, the Gravetide' })
+    ).toBeInTheDocument()
+
+    await user.click(findCommander)
+
+    expect(
+      await within(optionOne).findByRole('heading', {
+        name: 'Burakos, Party Leader + Agent of the Iron Throne',
+      })
+    ).toBeInTheDocument()
+    expect(
+      within(optionOne)
+        .getAllByRole('listitem')
+        .map((item) => within(item).getByRole('img').getAttribute('alt'))
+    ).toEqual(['Burakos, Party Leader', 'Agent of the Iron Throne'])
+    expect(
+      within(optionTwo).getByRole('heading', { name: 'Muldrotha, the Gravetide' })
+    ).toBeInTheDocument()
+
+    const requestedScryfallUrls = fetchMock.mock.calls
+      .map(([input]) => (typeof input === 'string' ? input : input.toString()))
+      .filter((url) => url.includes('api.scryfall.com'))
+    expect(requestedScryfallUrls).toHaveLength(3)
+  })
+
+  it('renders pair-specific deck inspiration for both partner choices', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+    )
+    const partnerCard = (id: string, name: string, colorIdentity: string[]) =>
+      createCard({
+        id,
+        name,
+        color_identity: colorIdentity,
+        type_line: 'Legendary Creature',
+        oracle_text: 'Partner',
+        keywords: ['Partner'],
+      })
+    const fetchMock = createFetchMock(
+      partnerCard('card-1', 'Prava of the Steel Legion', ['W']),
+      partnerCard('card-2', 'Malcolm, Keen-Eyed Navigator', ['U']),
+      partnerCard('card-3', 'Tymna the Weaver', ['W', 'B']),
+      partnerCard('card-4', "Kraum, Ludevic's Opus", ['U', 'R'])
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    const dialog = await openFiltersDialog(user)
+    await user.click(within(dialog).getByRole('button', { name: /partner pair/i }))
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: /show two partner options/i })
+    )
+    await user.click(within(dialog).getByRole('button', { name: /done/i }))
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+
+    expect(await screen.findByText(/option 1/i)).toBeInTheDocument()
+    expect(screen.getByText(/option 2/i)).toBeInTheDocument()
     expectNoEdhrecMetadataFetch(fetchMock)
+
+    await user.click(screen.getByRole('button', { name: /skip reveal/i }))
+
+    const firstPairName =
+      'Prava of the Steel Legion + Malcolm, Keen-Eyed Navigator'
+    const secondPairName = "Tymna the Weaver + Kraum, Ludevic's Opus"
+    const firstPairSlug =
+      'malcolm-keen-eyed-navigator-prava-of-the-steel-legion'
+    const secondPairSlug = 'kraum-ludevics-opus-tymna-the-weaver'
+
+    await vi.waitFor(() => {
+      const requestedEdhrecUrls = fetchMock.mock.calls
+        .map(([input]) => (typeof input === 'string' ? input : input.toString()))
+        .filter((url) => url.includes('json.edhrec.com'))
+
+      expect(requestedEdhrecUrls).toHaveLength(2)
+      expect(requestedEdhrecUrls).toEqual(
+        expect.arrayContaining([
+          `https://json.edhrec.com/pages/commanders/${firstPairSlug}.json`,
+          `https://json.edhrec.com/pages/commanders/${secondPairSlug}.json`,
+        ])
+      )
+    })
+
+    const inspiration = screen.getByRole('complementary', {
+      name: /deck inspiration/i,
+    })
+    const optionRegions = within(inspiration).getAllByRole('region', {
+      name: /option [12]/i,
+    })
+    expect(optionRegions).toHaveLength(2)
+
+    const pairExpectations = [
+      { region: optionRegions[0]!, name: firstPairName, slug: firstPairSlug },
+      { region: optionRegions[1]!, name: secondPairName, slug: secondPairSlug },
+    ]
+
+    pairExpectations.forEach(({ region, name, slug }) => {
+      expect(within(region).getByRole('heading', { name })).toBeInTheDocument()
+      expect(within(region).getByText(/500 decks/i)).toBeInTheDocument()
+      expect(within(region).getByText('DECK THEMES')).toBeInTheDocument()
+      expect(within(region).getByRole('link', { name: /edhrec pair/i })).toHaveAttribute(
+        'href',
+        `https://edhrec.com/commanders/${slug}`
+      )
+      expect(within(region).getByRole('link', { name: 'Infect' })).toHaveAttribute(
+        'href',
+        `https://edhrec.com/commanders/${slug}/infect`
+      )
+    })
   })
 
   it('shows inline error messaging when a draw fails', async () => {
@@ -502,14 +976,154 @@ describe('Randomander', () => {
     )
   })
 
-  it('persists the choice to skip future prestige reveals', async () => {
+  it('defaults price data to Cardmarket and persists another marketplace', async () => {
+    localStorage.setItem(
+      'randomander:state:v2',
+      JSON.stringify({ display: { showLinks: true } })
+    )
+    const firstRender = renderApp()
+    const user = userEvent.setup()
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+    const providerSelect = within(settingsDialog).getByRole('combobox', {
+      name: /marketplace/i,
+    })
+
+    expect(providerSelect).toHaveValue('cardmarket')
+    expect(
+      within(providerSelect)
+        .getAllByRole('option')
+        .map((option) => ({
+          label: option.textContent?.trim(),
+          value: option.getAttribute('value'),
+        }))
+    ).toEqual([
+      { label: 'Cardmarket (EUR)', value: 'cardmarket' },
+      { label: 'TCGplayer (USD)', value: 'tcgplayer' },
+      { label: 'Cardhoarder (tix)', value: 'cardhoarder' },
+    ])
+    await user.selectOptions(providerSelect, 'tcgplayer')
+
+    await vi.waitFor(() => {
+      const persisted = JSON.parse(
+        localStorage.getItem('randomander:state:v2') ?? '{}'
+      ) as { display?: { priceProvider?: string } }
+      expect(persisted.display?.priceProvider).toBe('tcgplayer')
+    })
+
+    firstRender.unmount()
+    renderApp()
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const reopenedDialog = await screen.findByRole('dialog', { name: /settings/i })
+
+    expect(
+      within(reopenedDialog).getByRole('combobox', { name: /marketplace/i })
+    ).toHaveValue('tcgplayer')
+  })
+
+  it('repairs an invalid persisted marketplace to Cardmarket', async () => {
+    localStorage.setItem(
+      'randomander:state:v2',
+      JSON.stringify({ display: { priceProvider: 'retired-marketplace' } })
+    )
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+
+    expect(
+      within(settingsDialog).getByRole('combobox', { name: /marketplace/i })
+    ).toHaveValue('cardmarket')
+    await vi.waitFor(() => {
+      const persisted = JSON.parse(
+        localStorage.getItem('randomander:state:v2') ?? '{}'
+      ) as { display?: { priceProvider?: string } }
+      expect(persisted.display?.priceProvider).toBe('cardmarket')
+    })
+  })
+
+  it('switches visible price data to the selected marketplace', async () => {
+    const fetchMock = createFetchMock(
+      createCard({
+        name: 'Atraxa, Praetors Voice',
+        prices: { eur: '1.25', usd: '2.50' },
+        purchase_uris: {
+          cardmarket: 'https://www.cardmarket.com/en/Magic/Products/example',
+          tcgplayer: 'https://www.tcgplayer.com/product/example',
+        },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+    await screen.findAllByText('Atraxa, Praetors Voice')
+    await user.click(screen.getByRole('button', { name: /show details/i }))
+
+    const inspiration = screen.getByRole('complementary', {
+      name: /deck inspiration/i,
+    })
+    expect(
+      within(inspiration).getByRole('link', {
+        name: /cardmarket price for atraxa.*€1\.25/i,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.cardmarket.com/en/Magic/Products/example'
+    )
+
+    const scryfallRequestsBeforeSwitch = fetchMock.mock.calls.filter(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      return url.includes('api.scryfall.com')
+    }).length
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
+    await user.selectOptions(
+      within(settingsDialog).getByRole('combobox', { name: /marketplace/i }),
+      'tcgplayer'
+    )
+    await user.click(within(settingsDialog).getByRole('button', { name: /^close$/i }))
+
+    expect(
+      within(inspiration).getByRole('link', {
+        name: /tcgplayer price for atraxa.*\$2\.50/i,
+      })
+    ).toHaveAttribute('href', 'https://www.tcgplayer.com/product/example')
+    expect(within(inspiration).queryByText('€1.25')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.filter(([input]) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        return url.includes('api.scryfall.com')
+      })
+    ).toHaveLength(scryfallRequestsBeforeSwitch)
+
+    await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
+    const reopenedSettings = await screen.findByRole('dialog', { name: /settings/i })
+    await user.click(
+      within(reopenedSettings).getByRole('checkbox', { name: /external links/i })
+    )
+    await user.click(
+      within(reopenedSettings).getByRole('button', { name: /^close$/i })
+    )
+
+    expect(
+      within(inspiration).queryByRole('link', { name: /tcgplayer price/i })
+    ).not.toBeInTheDocument()
+    expect(within(inspiration).getByText('$2.50')).toBeInTheDocument()
+  })
+
+  it('persists the choice to skip future card reveals', async () => {
     const firstRender = renderApp()
     const user = userEvent.setup()
 
     await user.click(screen.getAllByRole('button', { name: /^settings$/i })[0]!)
     const settingsDialog = await screen.findByRole('dialog', { name: /settings/i })
     const revealToggle = within(settingsDialog).getByRole('checkbox', {
-      name: /prestige reveal animation/i,
+      name: /card reveal animation/i,
     })
 
     expect(revealToggle).toBeChecked()
@@ -529,7 +1143,7 @@ describe('Randomander', () => {
 
     expect(
       within(reopenedDialog).getByRole('checkbox', {
-        name: /prestige reveal animation/i,
+        name: /card reveal animation/i,
       })
     ).not.toBeChecked()
   })

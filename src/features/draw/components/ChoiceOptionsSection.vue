@@ -2,7 +2,12 @@
 import { computed, type PropType } from "vue";
 import { ArrowTopRightOnSquareIcon, SparklesIcon } from "@heroicons/vue/24/outline";
 import type { ScryfallCard } from "../../../lib/scryfall";
-import { getEdhrecCommanderUrl, getTypeLine } from "../../../lib/scryfall";
+import {
+  getEdhrecCardUrl,
+  getEdhrecCommanderUrl,
+  getTypeLine,
+  isBackgroundCard,
+} from "../../../lib/scryfall";
 import type { CommanderChoice } from "../../../stores/randomander";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
 import PrestigeCard from "./PrestigeCard.vue";
@@ -47,6 +52,11 @@ const getChoiceTitle = (choice: CommanderChoice) =>
   choice.cards.length === 2
     ? choice.cards.map((card) => card.name).join(" + ")
     : choice.cards[0]?.name ?? "Commander option";
+
+const getEdhrecUrl = (card: ScryfallCard) =>
+  isBackgroundCard(card)
+    ? getEdhrecCardUrl(card)
+    : getEdhrecCommanderUrl(card);
 </script>
 
 <template>
@@ -58,15 +68,8 @@ const getChoiceTitle = (choice: CommanderChoice) =>
         tabindex="-1"
         class="mt-1 text-2xl font-bold sm:text-3xl"
       >
-        {{ revealComplete ? sectionLabel : "Two paths are taking shape" }}
+        {{ revealComplete ? sectionLabel : "Preparing two options" }}
       </h2>
-      <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-        {{
-          revealComplete
-            ? "Compare the cards, then follow the idea that gives you somewhere new to build."
-            : "Both options share one reveal budget, however many cards they contain."
-        }}
-      </p>
     </header>
 
     <div class="mt-5 grid gap-4 lg:grid-cols-2">
@@ -78,9 +81,6 @@ const getChoiceTitle = (choice: CommanderChoice) =>
         <div class="flex min-h-11 items-start justify-between gap-3">
           <div>
             <p class="m3-label">Option {{ choiceIndex + 1 }}</p>
-            <p class="mt-1 text-xs text-[var(--md-sys-color-on-surface-variant)]">
-              {{ choice.cards.length }} card{{ choice.cards.length === 1 ? "" : "s" }}
-            </p>
           </div>
           <button
             v-if="
@@ -150,7 +150,7 @@ const getChoiceTitle = (choice: CommanderChoice) =>
                 <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
               </a>
               <a
-                :href="getEdhrecCommanderUrl(card)"
+                :href="getEdhrecUrl(card)"
                 target="_blank"
                 rel="noreferrer"
                 class="m3-button m3-button--text min-h-9 px-2.5 py-1.5 text-xs"

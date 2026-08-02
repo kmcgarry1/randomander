@@ -4,15 +4,8 @@ import { useRandomanderStore } from "../../../stores/randomander";
 import {
   getCardImageUrl,
   getPartnerKind,
-  getTypeLine,
-  type ScryfallCard,
+  isBackgroundCard,
 } from "../../../lib/scryfall";
-
-const isBackgroundCard = (card: ScryfallCard | null) => {
-  if (!card) return false;
-  const typeLine = getTypeLine(card).toLowerCase();
-  return typeLine.includes("background");
-};
 
 export function useHeroSummary() {
   const store = useRandomanderStore();
@@ -40,7 +33,7 @@ export function useHeroSummary() {
   const heroHasCompanionSlot = computed(
     () =>
       mode.value === "commander" &&
-      heroPartnerKind.value !== null &&
+      (heroIsBackground.value || heroPartnerKind.value !== null) &&
       heroGroup.value.length === 1 &&
       !isChoiceMode.value,
   );
@@ -61,12 +54,6 @@ export function useHeroSummary() {
       return "Find commander";
     }
     return partnerButtonLabel.value;
-  });
-
-  const heroSubtitle = computed(() => {
-    if (cards.value.length > 1) return `${cards.value.length} cards ready to build from`;
-    if (heroCard.value) return "A fresh commander to build around";
-    return "Tap Randomize to draw";
   });
 
   const heroBackgroundStyle = computed<Record<string, string>>(() => {
@@ -92,7 +79,6 @@ export function useHeroSummary() {
     heroHasCompanionSlot,
     heroPartnerLinkUrl,
     heroCompanionButtonLabel,
-    heroSubtitle,
     heroBackgroundStyle,
     heroHeadline,
     heroIsBackground,

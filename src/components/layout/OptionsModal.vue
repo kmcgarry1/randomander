@@ -29,12 +29,12 @@ const colorComparisonOptions: Array<{
   {
     label: "Up to",
     value: "up-to",
-    description: "Allow anything within the selected color ceiling.",
+    description: "Allow up to the selected color count.",
   },
   {
     label: "Exactly",
     value: "exactly",
-    description: "Only return cards that hit the exact color count.",
+    description: "Require the selected color count.",
   },
 ];
 
@@ -123,9 +123,6 @@ useModalFocus(dialogRef, close);
           <h2 id="options-title" class="font-heading text-2xl leading-tight sm:text-3xl">
             Randomizer options
           </h2>
-          <p class="mt-1 max-w-2xl text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Shape the next draw without losing the surprise.
-          </p>
         </div>
         <button
           type="button"
@@ -139,12 +136,7 @@ useModalFocus(dialogRef, close);
 
       <div class="overflow-y-auto overscroll-contain px-4 pb-6 sm:px-8">
         <section class="m3-card m3-card--filled p-4 sm:p-5">
-          <div>
-            <h3 class="text-base font-semibold">Mode</h3>
-            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Choose the kind of inspiration you want to reveal.
-            </p>
-          </div>
+          <h3 class="text-base font-semibold">Mode</h3>
           <div class="mt-4 grid gap-2 md:grid-cols-3">
             <button
               v-for="item in modes"
@@ -192,9 +184,6 @@ useModalFocus(dialogRef, close);
             <div class="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 class="text-base font-semibold">Color focus</h3>
-                <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-                  Select colors to narrow the card pool.
-                </p>
               </div>
               <p
                 class="rounded-full bg-[var(--md-sys-color-secondary-container)] px-3 py-1.5 text-xs font-semibold text-[var(--md-sys-color-on-secondary-container)]"
@@ -232,9 +221,6 @@ useModalFocus(dialogRef, close);
 
           <section class="m3-card p-4 sm:p-5">
             <h3 class="text-base font-semibold">Comparison</h3>
-            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Decide how strictly the color count applies.
-            </p>
             <div class="m3-segmented mt-4" role="group" aria-label="Color comparison">
               <button
                 v-for="comparison in colorComparisonOptions"
@@ -267,9 +253,6 @@ useModalFocus(dialogRef, close);
 
         <section class="m3-card mt-4 p-4 sm:p-5">
           <h3 class="text-base font-semibold">{{ store.colorLabel }}</h3>
-          <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-            Set the number of colors allowed in each result.
-          </p>
           <div class="mt-4 flex flex-wrap gap-2">
             <button
               v-for="option in colorOptions"
@@ -292,9 +275,6 @@ useModalFocus(dialogRef, close);
         <div class="mt-4 grid gap-4 lg:grid-cols-3">
           <section class="m3-card m3-card--filled p-4 sm:p-5">
             <h3 class="text-base font-semibold">Deck popularity</h3>
-            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Filter familiar commanders using EDHREC activity.
-            </p>
             <div class="mt-4 space-y-4">
               <label class="flex min-h-12 items-center justify-between gap-4">
                 <span class="text-sm">Limit by EDHREC decks</span>
@@ -306,7 +286,7 @@ useModalFocus(dialogRef, close);
                 />
               </label>
               <label class="block" for="max-edhrec-decks">
-                <span class="m3-label">Maximum deck count</span>
+                <span class="m3-label">Deck count below</span>
                 <span class="mt-1 flex items-center gap-3">
                   <input
                     id="max-edhrec-decks"
@@ -322,7 +302,7 @@ useModalFocus(dialogRef, close);
                     "
                   />
                   <span class="text-xs text-[var(--md-sys-color-on-surface-variant)]">
-                    Decks or fewer
+                    decks
                   </span>
                 </span>
               </label>
@@ -340,9 +320,6 @@ useModalFocus(dialogRef, close);
 
           <section class="m3-card p-4 sm:p-5">
             <h3 class="text-base font-semibold">Choice mode</h3>
-            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Reveal an alternative when one card is not enough.
-            </p>
             <label class="mt-4 flex min-h-12 items-center justify-between gap-4">
               <span class="text-sm">{{ store.choiceLabel }}</span>
               <input
@@ -352,16 +329,16 @@ useModalFocus(dialogRef, close);
                 :disabled="mode === 'spark'"
               />
             </label>
-            <p class="mt-2 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
-              Spark draws always return a trio of cards.
+            <p
+              v-if="mode === 'spark'"
+              class="mt-2 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            >
+              Spark mode always draws three cards.
             </p>
           </section>
 
           <section class="m3-card p-4 sm:p-5">
             <h3 class="text-base font-semibold">Spark extras</h3>
-            <p class="mt-1 text-sm text-[var(--md-sys-color-on-surface-variant)]">
-              Fine-tune the three-card prompt pool.
-            </p>
             <label class="mt-4 flex min-h-12 items-center justify-between gap-4">
               <span class="text-sm">Exclude Game Changers</span>
               <input
@@ -371,9 +348,6 @@ useModalFocus(dialogRef, close);
                 :disabled="mode !== 'spark'"
               />
             </label>
-            <p class="mt-2 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
-              Applies only to 3-card spark mode.
-            </p>
           </section>
         </div>
       </div>

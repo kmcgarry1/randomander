@@ -104,11 +104,6 @@ const handleClear = () => {
         >
           History
         </h2>
-        <p
-          class="mt-1 max-w-xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-        >
-          Revisit recent pulls stored locally on this device.
-        </p>
         <div class="m3-chip mt-3 w-fit" aria-label="History entry count">
           <ClockIcon class="h-4 w-4" aria-hidden="true" />
           <span>{{ history.length }} pull{{ history.length === 1 ? "" : "s" }}</span>
@@ -157,7 +152,7 @@ const handleClear = () => {
       <p
         class="mt-2 max-w-sm text-sm leading-6 text-[var(--md-sys-color-on-surface-variant)]"
       >
-        Start randomizing to build a history of commanders and sparks.
+        Draw a commander or spark to start your history.
       </p>
     </section>
 
@@ -204,18 +199,16 @@ const handleClear = () => {
               />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="m3-label text-[var(--md-sys-color-primary)]">
-                {{ record.choices?.length ? `Option ${index + 1}` : "Pull" }}
+              <p
+                v-if="record.choices?.length"
+                class="m3-label text-[var(--md-sys-color-primary)]"
+              >
+                Option {{ index + 1 }}
               </p>
               <p
                 class="mt-1 line-clamp-2 text-sm font-medium leading-5 text-[var(--md-sys-color-on-surface)]"
               >
                 {{ getGroupLabel(group) }}
-              </p>
-              <p
-                class="mt-1 text-xs text-[var(--md-sys-color-on-surface-variant)]"
-              >
-                {{ group.length }} card{{ group.length === 1 ? "" : "s" }}
               </p>
             </div>
           </div>

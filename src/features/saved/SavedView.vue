@@ -100,11 +100,6 @@ const handleClose = () => {
         >
           Saved pulls
         </h2>
-        <p
-          class="mt-1 max-w-xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
-        >
-          Keep promising commanders and sparks close at hand.
-        </p>
         <div class="m3-chip mt-3 w-fit" aria-label="Saved pull count">
           <BookmarkIcon class="h-4 w-4" aria-hidden="true" />
           <span>{{ saved.length }} saved</span>
@@ -153,7 +148,7 @@ const handleClose = () => {
       <p
         class="mt-2 max-w-sm text-sm leading-6 text-[var(--md-sys-color-on-surface-variant)]"
       >
-        Save pulls from the draw screen to collect favorites.
+        Save a draw to find it here.
       </p>
     </section>
 
@@ -200,18 +195,16 @@ const handleClose = () => {
               />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="m3-label text-[var(--md-sys-color-primary)]">
-                {{ record.choices?.length ? `Option ${index + 1}` : "Pull" }}
+              <p
+                v-if="record.choices?.length"
+                class="m3-label text-[var(--md-sys-color-primary)]"
+              >
+                Option {{ index + 1 }}
               </p>
               <p
                 class="mt-1 line-clamp-2 text-sm font-medium leading-5 text-[var(--md-sys-color-on-surface)]"
               >
                 {{ getGroupLabel(group) }}
-              </p>
-              <p
-                class="mt-1 text-xs text-[var(--md-sys-color-on-surface-variant)]"
-              >
-                {{ group.length }} card{{ group.length === 1 ? "" : "s" }}
               </p>
             </div>
           </div>

@@ -127,12 +127,7 @@ const closePanel = () => store.closePanel();
           class="grid h-9 w-9 place-items-center rounded-[0.8rem_0.8rem_0.8rem_0.3rem] bg-[var(--md-sys-color-primary)] text-sm font-extrabold text-[var(--md-sys-color-on-primary)]"
           aria-hidden="true"
         >R</span>
-        <span>
-          <span class="block text-base font-bold leading-tight">Randomander</span>
-          <span class="block text-xs text-[var(--md-sys-color-on-surface-variant)]">
-            Commander discovery
-          </span>
-        </span>
+        <span class="block text-base font-bold leading-tight">Randomander</span>
       </button>
       <button
         type="button"
@@ -192,13 +187,6 @@ const closePanel = () => store.closePanel();
           {{ destination.label }}
         </button>
       </nav>
-
-      <p
-        class="m3-label -rotate-90 whitespace-nowrap pb-2 text-[0.62rem]"
-        aria-hidden="true"
-      >
-        Built for Commander
-      </p>
     </aside>
 
     <main class="min-h-screen pb-44 sm:ml-24 sm:pb-0">
