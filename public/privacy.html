@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Randomander privacy notice</title>
+    <style>
+      :root { font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.6; color-scheme: light dark; }
+      body { margin: 0; }
+      main { width: min(46rem, calc(100% - 2rem)); margin: 0 auto; padding: 2rem 0 4rem; }
+      h1, h2 { line-height: 1.2; }
+      a { color: inherit; }
+      .updated { opacity: 0.75; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Randomander privacy notice</h1>
+      <p class="updated">Effective 3 August 2026</p>
+
+      <h2>Who controls the app</h2>
+      <p>
+        Randomander is maintained by the owner of the
+        <a href="https://github.com/kmcgarry1/randomander">Randomander GitHub repository</a>.
+        Use the repository support or security process to make a privacy request.
+      </p>
+
+      <h2>Data stored in your browser</h2>
+      <p>
+        Randomander stores settings, recent History, Saved pulls, and a disposable response cache in
+        Web Storage on this device. This data is not synced to a Randomander account or application
+        server. It remains until you clear it, the app evicts bounded cache/history data, or the browser
+        removes site storage. History, Saved, and cache controls are available in the app.
+      </p>
+
+      <h2>External requests</h2>
+      <p>
+        New draws request card data and images from Scryfall. Optional deck counts and themes request
+        data from EDHREC. Opening price or inspiration links sends you to the selected external service,
+        which applies its own privacy policy. Requests can disclose ordinary network information such as
+        IP address, browser headers, requested card or metadata URL, and request time to those services.
+      </p>
+
+      <h2>Analytics</h2>
+      <p>
+        Production analytics are disabled by default. A deployment can explicitly enable Vercel Web
+        Analytics with the <code>VITE_ENABLE_ANALYTICS=true</code> build setting. When enabled, Vercel
+        describes the service as cookieless and anonymized and may process page/referrer, approximate
+        location, browser/OS, device, and timing information. Randomander does not intentionally send
+        card History, Saved pulls, or filter values as analytics events. Randomander does not initialize
+        analytics when the browser sends Do Not Track or Global Privacy Control.
+      </p>
+
+      <h2>Fonts, cookies, retention, and choices</h2>
+      <p>
+        Randomander uses system fonts and does not request Google Fonts. The app does not set its own
+        cookies. Local browser data follows the retention described above. Analytics retention, when
+        enabled, is controlled in the deployment's Vercel account. You can block optional analytics with
+        browser controls or use a deployment where it is disabled.
+      </p>
+
+      <h2>Changes</h2>
+      <p>
+        Material changes will update the effective date and release notes. This notice is a technical
+        description and must be reviewed by the project owner for the jurisdictions where 1.0 is offered.
+      </p>
+    </main>
+  </body>
+</html>

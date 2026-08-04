@@ -1,18 +1,23 @@
-import type { ScryfallCard } from '../lib/scryfall'
-import { getCachedValue } from '../lib/cache'
+import { decodeScryfallCard, type ScryfallCard } from '../lib/scryfall'
+import { getCachedValue, setCachedValue } from '../lib/cache'
 import { fetchJson, HttpError, type CacheOptions } from './http'
+import {
+  RuntimeDataError,
+  finiteNumber,
+  isRecord,
+} from '../lib/runtimeValidation'
 
 const PAGE_SIZE = 175
 const REQUEST_INTERVAL_MS = 150
 const RATE_LIMIT_COOLDOWN_MS = 60_000
-const NETWORK_COOLDOWN_MS = 60_000
 const SCRYFALL_ACCEPT = 'application/json;q=0.9,*/*;q=0.8'
 
-type ScryfallFailureKind = 'rate-limit' | 'network' | 'request'
+type ScryfallFailureKind = 'data' | 'rate-limit' | 'network' | 'request'
 
 export class ScryfallRequestError extends Error {
   readonly kind: ScryfallFailureKind
   readonly cause: unknown
+  readonly recoverable = true
 
   constructor(message: string, kind: ScryfallFailureKind, cause?: unknown) {
     super(message)
@@ -123,24 +128,84 @@ const scheduleScryfallRequest = <T>(
   return rejectWhenAborted(scheduled, signal)
 }
 
+const decodeCardResponse = (value: unknown, path = 'card') => {
+  if (isRecord(value) && value.object === 'error') {
+    throw new RuntimeDataError(
+      'scryfall',
+      path,
+      typeof value.details === 'string' ? value.details : 'returned an error object'
+    )
+  }
+  return decodeScryfallCard(value, { source: 'scryfall', path })
+}
+
+type SearchPage = { data: ScryfallCard[]; total_cards?: number }
+
+const decodeSearchPage = (value: unknown): SearchPage => {
+  if (!isRecord(value)) {
+    throw new RuntimeDataError('scryfall', 'search', 'expected an object')
+  }
+  if (!Array.isArray(value.data)) {
+    throw new RuntimeDataError('scryfall', 'search.data', 'expected an array')
+  }
+  let totalCards: number | undefined
+  if (value.total_cards !== undefined) {
+    const decodedTotal = finiteNumber(value.total_cards)
+    if (
+      decodedTotal === null ||
+      decodedTotal < 0 ||
+      !Number.isInteger(decodedTotal)
+    ) {
+      throw new RuntimeDataError(
+        'scryfall',
+        'search.total_cards',
+        'expected a non-negative integer'
+      )
+    }
+    totalCards = decodedTotal
+  }
+  return {
+    total_cards: totalCards,
+    data: value.data.map((card, index) =>
+      decodeCardResponse(card, `search.data[${index}]`)
+    ),
+  }
+}
+
 const fetchScryfallJson = async <T>(
   url: string,
+  decode: (value: unknown) => T,
   options: { signal?: AbortSignal; cache?: CacheOptions } = {}
 ) => {
   throwIfAborted(options.signal)
+  const cacheKey = options.cache?.key ?? url
   if (options.cache?.enabled) {
-    const cached = getCachedValue<T>(options.cache.key ?? url)
+    const cached = getCachedValue(cacheKey, decode)
     if (cached !== null) return cached
   }
 
   return scheduleScryfallRequest(async () => {
     try {
-      return await fetchJson<T>(url, {
-        ...options,
+      const raw = await fetchJson<unknown>(url, {
+        signal: options.signal,
         headers: { Accept: SCRYFALL_ACCEPT },
       })
+      const decoded = decode(raw)
+      if (options.cache?.enabled) {
+        setCachedValue(
+          cacheKey,
+          decoded,
+          options.cache.ttlMs,
+          options.cache.maxEntries
+        )
+      }
+      return decoded
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw error
+
+      if (error instanceof RuntimeDataError) {
+        throw new ScryfallRequestError(error.message, 'data', error)
+      }
 
       if (error instanceof HttpError && error.status === 429) {
         const wrapped = new ScryfallRequestError(
@@ -156,13 +221,11 @@ const fetchScryfallJson = async <T>(
       }
 
       if (error instanceof TypeError) {
-        const wrapped = new ScryfallRequestError(
-          'Scryfall could not be reached. It may be rate-limiting this connection; wait before trying again and check your connection.',
+        throw new ScryfallRequestError(
+          'Scryfall could not be reached. Check your connection and try again.',
           'network',
           error
         )
-        startCooldown(wrapped, NETWORK_COOLDOWN_MS)
-        throw wrapped
       }
 
       throw new ScryfallRequestError(
@@ -179,11 +242,7 @@ export const fetchRandomCard = async (
   signal?: AbortSignal
 ): Promise<ScryfallCard> => {
   const url = `https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`
-  const data = await fetchScryfallJson<ScryfallCard>(url, { signal })
-  if ((data as { object?: string }).object === 'error') {
-    throw new Error((data as { details?: string }).details ?? 'Scryfall returned an error.')
-  }
-  return data
+  return fetchScryfallJson(url, decodeCardResponse, { signal })
 }
 
 export const fetchCardByExactName = async (
@@ -192,18 +251,13 @@ export const fetchCardByExactName = async (
   cache?: CacheOptions
 ): Promise<ScryfallCard> => {
   const url = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`
-  const data = await fetchScryfallJson<ScryfallCard>(url, { signal, cache })
-  if ((data as { object?: string }).object === 'error') {
-    throw new Error((data as { details?: string }).details ?? 'Scryfall returned an error.')
-  }
-  return data
+  return fetchScryfallJson(url, decodeCardResponse, { signal, cache })
 }
 
 const fetchSearchPage = async (
   url: string,
   signal?: AbortSignal
-): Promise<{ data: ScryfallCard[]; total_cards?: number }> =>
-  fetchScryfallJson(url, { signal })
+): Promise<SearchPage> => fetchScryfallJson(url, decodeSearchPage, { signal })
 
 export const fetchRankedRandomCard = async (
   query: string,
@@ -216,35 +270,18 @@ export const fetchRankedRandomCard = async (
     throw new Error('No cards available for this filter.')
   }
 
-  const totalPages = Math.max(1, Math.ceil(totalCards / PAGE_SIZE))
   const skipCount = Math.floor(totalCards * 0.1)
-  let startPage = Math.floor(skipCount / PAGE_SIZE) + 1
-  let startIndex = skipCount % PAGE_SIZE
-  if (startPage > totalPages) {
-    startPage = totalPages
-    startIndex = 0
-  }
-
-  const randomPage =
-    totalPages === startPage
-      ? startPage
-      : startPage + Math.floor(Math.random() * (totalPages - startPage + 1))
+  const eligibleCount = totalCards - skipCount
+  const globalIndex = skipCount + Math.floor(Math.random() * eligibleCount)
+  const randomPage = Math.floor(globalIndex / PAGE_SIZE) + 1
+  const pageIndex = globalIndex % PAGE_SIZE
 
   const pageData =
     randomPage === 1
       ? firstData
       : await fetchSearchPage(`${baseUrl}&page=${randomPage}`, signal)
 
-  let lowerBound = randomPage === startPage ? startIndex : 0
-  if (lowerBound >= pageData.data.length) {
-    lowerBound = 0
-  }
-
-  const index =
-    lowerBound +
-    Math.floor(Math.random() * Math.max(1, pageData.data.length - lowerBound))
-
-  const card = pageData.data[index]
+  const card = pageData.data[pageIndex]
   if (!card) {
     throw new Error('No card found at the selected index.')
   }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  decodeScryfallCard,
   getCardPrice,
   getCardSlug,
+  getCardThumbnailUrl,
   getPartnerVariant,
   getTurnableCardFaces,
   isBackgroundCard,
@@ -16,6 +18,64 @@ const createCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
 });
 
 describe('scryfall helper utilities', () => {
+  describe('getCardThumbnailUrl', () => {
+    it('prefers Scryfall small images and falls back to the display image', () => {
+      expect(
+        getCardThumbnailUrl(
+          createCard({
+            image_uris: {
+              small: 'https://cards.scryfall.io/small/card.jpg',
+              normal: 'https://cards.scryfall.io/normal/card.jpg',
+            },
+          })
+        )
+      ).toBe('https://cards.scryfall.io/small/card.jpg')
+
+      expect(
+        getCardThumbnailUrl(
+          createCard({
+            layout: 'modal_dfc',
+            card_faces: [
+              {
+                image_uris: {
+                  small: 'https://cards.scryfall.io/small/front.jpg',
+                  normal: 'https://cards.scryfall.io/normal/front.jpg',
+                },
+              },
+            ],
+          })
+        )
+      ).toBe('https://cards.scryfall.io/small/front.jpg')
+
+      expect(
+        getCardThumbnailUrl(
+          createCard({
+            image_uris: {
+              normal: 'https://cards.scryfall.io/normal/fallback.jpg',
+            },
+          })
+        )
+      ).toBe('https://cards.scryfall.io/normal/fallback.jpg')
+    })
+
+    it('retains small image fields while decoding Scryfall responses', () => {
+      const card = decodeScryfallCard({
+        id: 'decoded-card',
+        name: 'Decoded Card',
+        scryfall_uri: 'https://scryfall.com/card/test/decoded-card',
+        color_identity: [],
+        image_uris: {
+          small: 'https://cards.scryfall.io/small/decoded-card.jpg',
+          normal: 'https://cards.scryfall.io/normal/decoded-card.jpg',
+        },
+      })
+
+      expect(card.image_uris?.small).toBe(
+        'https://cards.scryfall.io/small/decoded-card.jpg'
+      )
+    })
+  })
+
   describe('getCardSlug', () => {
     it('creates a slug from the canonical portion of a double-faced card name', () => {
       const card = createCard({

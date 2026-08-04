@@ -35,7 +35,7 @@ There is no account or project backend. Preferences, history, and saved pulls st
 | Pairing rules | Supports Partner, Partner with, Friends forever, Choose a Background, Background cards, and Doctor's companion. |
 | Double-faced cards | Adds an accessible front/back control to transforming and modal double-faced results. |
 | Deck inspiration | Shows card or pair profiles, color identities, a compact marketplace price, available deck counts, links, and up to four EDHREC themes after reveal. |
-| Personal library | Keeps up to 40 recent pulls and 40 saved pulls in local browser storage. |
+| Personal library | Stores up to 40 recent pulls and 40 saved pulls in local browser storage. |
 | Display controls | Offers system/light/dark themes, a Cardmarket/TCGplayer/Cardhoarder price selector, optional card reveals and ambient art, and reduced-motion/low-power controls. |
 | Responsive UI | Uses a compact, collapsible draw-mode card and fixed primary action/navigation on small screens. |
 
@@ -51,8 +51,8 @@ Randomander uses Scryfall's live card data and legality/search syntax. Results a
 
 ### Prerequisites
 
-- Node.js `^20.19.0` or `>=22.12.0` and npm, as required by the installed Vite toolchain. GitHub Actions currently verifies the project with Node.js 20.
-- A modern browser with JavaScript and local storage enabled.
+- Node.js `^22.12.0` or `^24.0.0` and npm. GitHub Actions verifies both supported LTS lines; `.nvmrc` selects Node.js 24 for local development.
+- Chrome/Edge 112+, Firefox 112+, or Safari/iOS Safari 16.4+, with JavaScript enabled. Browser storage is optional for drawing but required for durable settings, History, and Saved pulls.
 - Network access to install packages and load live card data.
 
 No API keys or environment variables are required.
@@ -62,11 +62,13 @@ No API keys or environment variables are required.
 ```bash
 git clone https://github.com/kmcgarry1/randomander.git
 cd randomander
-npm install
+npm ci
 npm run dev
 ```
 
 Vite prints the local URL, normally `http://localhost:5173`. Open it in a browser and press **Randomize**.
+
+The production bundle targets ES2020. CI exercises Playwright's current Chromium, Firefox, and WebKit engines on desktop, Chromium and WebKit phone emulation, and exact 320/375/390 CSS-pixel evidence at normal and 200% root text size; the release checklist adds physical iOS Safari and Android Chrome checks because automation does not prove device-specific behavior.
 
 ### Production build
 
@@ -75,7 +77,7 @@ npm run build
 npm run preview
 ```
 
-The compiled static site is written to `dist/`. The repository does not currently prescribe a hosting provider or deployment configuration.
+The compiled static site is written to `dist/`. The canonical production deployment is <https://randomander.vercel.app/>; `vercel.json` and the [deployment guide](docs/deployment.md) define hosting, headers, preview promotion, smoke checks, and rollback.
 
 ## Using Randomander
 
@@ -85,7 +87,7 @@ A normal session follows five steps:
 2. Open **Filters** to set color, popularity, choice, or Spark-specific constraints.
 3. Press **Randomize** and wait for the live Scryfall result.
 4. Complete or skip the reveal, then inspect the result and deck-inspiration details.
-5. Keep a non-choice pull directly, save a choice pull from History, or randomize again.
+5. Save a non-choice pull directly, save a choice pull from History, or randomize again.
 
 On mobile, use **Show** and **Hide** on the Draw mode card to reclaim vertical space. The Randomize action and primary navigation remain within easy reach near the bottom of the viewport.
 
@@ -119,14 +121,19 @@ For a complete walkthrough, see the [User guide](docs/user-guide.md).
 
 | Command | Purpose |
 | --- | --- |
-| `npm install` | Install dependencies and configure the Husky hooks. |
+| `npm ci` | Install the exact locked dependencies and configure the Husky hooks. |
+| `npm install` | Intentionally update dependency declarations or the lockfile. |
 | `npm run dev` | Start the Vite development server. |
 | `npm run test` | Run the Vitest suite once in jsdom. |
 | `npm run test:watch` | Re-run relevant tests while files change. |
-| `npm run build` | Type-check with `vue-tsc`, then create the Vite production bundle. |
+| `npm run typecheck:test` | Type-check unit tests, E2E specs, fixtures, and test configuration. |
+| `npm run test:coverage` | Run the risk-scoped Vitest coverage gate and create `coverage/`. |
+| `npm run test:e2e` | Run the mocked release suite across the desktop and phone browser matrix. |
+| `npm run test:e2e:headed` | Run the same Playwright suite with visible browser windows. |
+| `npm run build` | Type-check, create the Vite production bundle, and enforce gzip asset budgets. |
 | `npm run preview` | Serve the latest production bundle locally. |
 
-There is currently no separate lint or formatting script. TypeScript compilation, the test suite, and a production build are the repository's automated quality gates.
+There is currently no separate lint or formatting script. Test-source and production TypeScript compilation, risk-based coverage, mocked real-browser E2E, and a production build are automated quality gates.
 
 ### Technology
 
@@ -134,7 +141,8 @@ There is currently no separate lint or formatting script. TypeScript compilation
 - Pinia for application, result, and persisted UI state
 - Vite for development and production builds
 - Tailwind CSS 4 plus a small shared Material 3-inspired token/component layer
-- Vitest, jsdom, and Testing Library for automated behavior tests
+- Vitest, jsdom, and Testing Library for unit and integration behavior tests
+- Playwright and axe-core for mocked real-browser journeys and accessibility scans
 - Heroicons for interface icons
 - Vercel Analytics for deployed usage analytics
 
@@ -144,10 +152,13 @@ Before opening a pull request, run:
 
 ```bash
 npm run test
+npm run typecheck:test
+npm run test:coverage
+npm run test:e2e
 npm run build
 ```
 
-The pre-push hook runs the build. CI repeats tests and the build for pull requests targeting `main`. See [Troubleshooting](docs/troubleshooting.md) if local tests fail under a newer experimental Node.js local-storage implementation.
+The pre-push hook runs the build. CI repeats tests, test-source type-checking, coverage, E2E, and the build on the supported Node/browser matrix for pull requests targeting `main`. See [Testing and release evidence](docs/testing.md) for the browser matrix, mock-only contract, coverage policy, and artifacts.
 
 ## Project structure
 
@@ -155,6 +166,7 @@ The pre-push hook runs the build. CI repeats tests and the build for pull reques
 randomander/
 ├── .github/workflows/       # GitHub Actions checks
 ├── docs/                    # User, architecture, and support documentation
+├── e2e/                     # Mocked real-browser release journeys and fixtures
 ├── public/                  # Static brand assets
 ├── src/
 │   ├── app/                 # Responsive shell, navigation, and panels
@@ -163,7 +175,7 @@ randomander/
 │   ├── features/
 │   │   ├── draw/            # Draw orchestration, reveal, choices, and details
 │   │   ├── history/         # Recent-pull panel
-│   │   ├── saved/           # Kept-pull panel
+│   │   ├── saved/           # Saved-pull panel
 │   │   └── settings/        # Appearance, prices, performance, and cache controls
 │   ├── lib/                 # Card helpers, storage, and persistent cache
 │   ├── services/            # Scryfall, EDHREC, and HTTP adapters
@@ -185,23 +197,33 @@ Randomander has no repository-owned API server and does not require a login. It 
 | --- | --- |
 | [Scryfall](https://scryfall.com/docs/api) | Random/search/exact card data, legality, images, mana-symbol assets, marketplace price estimates, and purchase links. |
 | [EDHREC](https://edhrec.com/) | Optional commander/pair deck counts, themes, and outbound inspiration links. |
-| Google Fonts | The Google Sans Flex web font loaded by the stylesheet. |
-| Vercel Analytics | Analytics initialized by the client application. |
+| [Vercel Analytics](https://vercel.com/docs/analytics/privacy-policy) | Optional production page analytics, disabled unless the deploy explicitly sets `VITE_ENABLE_ANALYTICS=true`. |
+
+The UI uses system fonts and does not make a third-party font request. See the in-app [privacy notice](public/privacy.html) for retention, service, and user-choice details.
 
 Browser storage is split into two keys:
 
 - `randomander:state:v2` stores mode, options, display/performance/cache settings (including the price marketplace), theme, history, and saved pulls.
 - `randomander:cache:v1` stores eligible HTTP responses subject to the configured TTL and entry limit.
 
-The default response-cache settings are 24 hours and 120 entries. Random Scryfall draws are live requests; persistent caching primarily benefits EDHREC metadata and exact-name card lookups. Clearing the network cache does not clear settings, history, or saved pulls.
+The default response-cache settings are 24 hours and 120 entries, with a 1.5 MB serialized byte ceiling. EDHREC responses are reduced to the metadata the UI consumes before caching. Random Scryfall draws are live requests; persistent caching primarily benefits EDHREC metadata and exact-name card lookups. Clearing the network cache does not clear settings, history, or saved pulls.
 
 Do not describe the app as offline-first: previously stored state remains available without a network, but new random draws require Scryfall and uncached metadata requires EDHREC.
 
 ## Documentation
 
+- [1.0 release-readiness review](docs/release-1.0-readiness-review.md) — cross-functional sign-off, release gates, and paste-ready GitHub issue backlog
 - [User guide](docs/user-guide.md) — modes, filters, pair mechanics, choices, history, saved pulls, and settings
 - [Architecture](docs/architecture.md) — runtime topology, state, draw pipelines, integrations, persistence, and testing boundaries
+- [Testing and release evidence](docs/testing.md) — commands, browser matrix, mock-only contracts, coverage floors, and CI artifacts
 - [Troubleshooting](docs/troubleshooting.md) — local setup, browser storage, upstream service, test, and build issues
+- [Deployment and rollback](docs/deployment.md) — canonical environments, headers, promotion smoke, and recovery
+- [Operations runbook](docs/operations-runbook.md) — synthetic monitoring, upstream triage, privacy-safe incidents, and rollback triggers
+- [Release evidence](docs/release-evidence.md) — hosted controls, deployment state, and commands/artifacts required for sign-off
+- [Legal and service review](docs/legal-service-review.md) — sourced Scryfall, EDHREC, fan-content, privacy, and licensing decisions
+- [Security policy](SECURITY.md) — supported versions and private vulnerability reporting
+- [Support policy](SUPPORT.md) — issue routing, support boundaries, and safe diagnostic information
+- [Privacy notice](public/privacy.html) — local data, optional analytics, external requests, and retention
 - [Contributing](CONTRIBUTING.md) — workflow, conventions, verification, accessibility, and pull-request expectations
 - [Vision and goals](VISION.md) — product intent and current direction
 - [Collaboration guide](COLLABORATION.md) — repository-specific coordination notes
@@ -212,7 +234,7 @@ Do not describe the app as offline-first: previously stored state remains availa
 
 Issues and focused pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), include tests for behavior changes, and verify both a narrow mobile viewport and a desktop layout for UI work.
 
-When reporting a bug, include the mode, active filters, browser/OS, exact reproduction steps, and any visible error. Avoid posting the contents of local storage if a saved pull contains information you do not want to share.
+Use the [structured issue forms](https://github.com/kmcgarry1/randomander/issues/new/choose) for bugs, accessibility barriers, feature requests, and documentation problems. When reporting a bug, include the mode, active filters, browser/OS, exact reproduction steps, and any visible error. Avoid posting the contents of local storage if a saved pull contains information you do not want to share. Suspected vulnerabilities belong in the [private reporting flow](https://github.com/kmcgarry1/randomander/security/advisories/new), never a public issue.
 
 ## Project status and boundaries
 

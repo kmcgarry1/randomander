@@ -91,7 +91,11 @@ const resetFilters = () => {
   store.resetOptions();
 };
 
-useModalFocus(dialogRef, close);
+useModalFocus(dialogRef, close, {
+  initialTarget: () => dialogRef.value,
+  restoreTarget: () =>
+    document.querySelector<HTMLElement>('[data-options-invoker="true"]'),
+});
 </script>
 
 <template>
@@ -242,11 +246,7 @@ useModalFocus(dialogRef, close);
               </button>
             </div>
             <p class="mt-3 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
-              {{
-                colorComparisonOptions.find(
-                  (item) => item.value === options.colorCountMode,
-                )?.description
-              }}
+              {{ store.colorComparisonDescription }}
             </p>
           </section>
         </div>
@@ -270,6 +270,13 @@ useModalFocus(dialogRef, close);
               {{ store.getColorOptionLabel(option) }}
             </button>
           </div>
+          <p
+            v-if="store.colorFilterProblem"
+            role="alert"
+            class="mt-4 rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] px-3 py-2 text-sm text-[var(--md-sys-color-on-error-container)]"
+          >
+            {{ store.colorFilterProblem }}
+          </p>
         </section>
 
         <div class="mt-4 grid gap-4 lg:grid-cols-3">

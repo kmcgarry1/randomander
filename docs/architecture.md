@@ -321,7 +321,7 @@ The main result components are:
 - `HeroStage` for normal card/pair/Spark results;
 - `ChoiceOptionsSection` for two independent options;
 - `PrestigeCard` for card art, reveal state, and independent double-faced-card turning;
-- `DrawBackdrop` for optional ambient artwork;
+- `DrawBackdrop` for the optional decorative ambient treatment;
 - `ResultDetailsSection` for card/pair profile, links, counts, and themes;
 - `CardPriceBadge` for a compact per-card estimate and optional marketplace link.
 
@@ -355,7 +355,9 @@ Vitest runs in jsdom with global test functions and Testing Library's jest-dom m
 | `src/__tests__/lib/scryfall.test.ts` | Card helpers, slugs, Background detection, and partner parsing. |
 | `src/__tests__/components/` | Focused loading/reveal component behavior. |
 
-The production build runs `vue-tsc -b` before Vite. The application TypeScript configuration excludes test files, so passing `npm run build` does not replace running Vitest.
+Playwright runs deterministic release journeys in Chromium, Firefox, and WebKit desktop projects plus Chromium and WebKit phone emulation. Its catch-all network fixture mocks every external dependency; browser tests must not call live Scryfall or EDHREC. Axe scans cover the initial draw surface and options modal. See [Testing and release evidence](testing.md) for the matrix and artifact contract.
+
+The production build runs `vue-tsc -b` before Vite. The application TypeScript configuration excludes test files, so passing `npm run build` does not replace running Vitest or `npm run typecheck:test`. Risk-focused coverage is enforced over store orchestration, services, persistence, and cache/card-domain helpers.
 
 For changes to draw logic, prefer a pure-helper test for classification/slug rules plus an app or store-level behavior test for the complete workflow. For service policy, mock `fetch`, use fake timers where pacing is involved, and keep tests independent of live upstream APIs.
 
@@ -398,7 +400,7 @@ For changes to draw logic, prefer a pure-helper test for classification/slug rul
 - Scryfall and EDHREC schemas/availability are external dependencies.
 - Response-cache pruning happens on writes, and expiration cleanup happens on reads.
 - Clearing persistent cache does not clear already memoized metadata until reload.
-- There is no lint, formatter, coverage, or deployment command in `package.json`.
+- There is no standalone lint or formatter command. Coverage, test-source type-checking, browser E2E, security, and deployment-smoke commands are defined in `package.json`.
 - A few scaffold or earlier-iteration components may exist without runtime imports; do not treat them as part of the canonical component tree.
 
 When architecture and implementation disagree, the implementation and tests describe current behavior. Update this document in the same pull request once the new behavior is deliberate and verified.

@@ -25,7 +25,7 @@ Randomander does not use URL routes. Closing a support panel returns to the same
 3. Press **Randomize**.
 4. Let the reveal finish, press **Skip reveal**, or press <kbd>Escape</kbd> during the reveal.
 5. Review the cards and Deck inspiration.
-6. Keep a single result directly, or save any recorded draw from History.
+6. Save a single result directly, or save any recorded draw from History.
 
 Randomize is disabled while a request is active. Internally, a newly initiated draw workflow aborts older request work, and filtered searches cap candidate attempts rather than running indefinitely.
 
@@ -131,7 +131,7 @@ During the reveal:
 - Draw-card mode buttons and pairing actions wait until the reveal is complete; Filters can still be opened;
 - post-reveal metadata requests are deferred so the reveal surface appears first.
 
-After a non-choice reveal, **Keep pull** saves the current result. Once saved, it changes to **Pull kept**. A commander with a supported pairing mechanic also shows the appropriate pairing action.
+After a non-choice reveal, **Save pull** saves the current result. Once saved, it changes to **Pull saved**. A commander with a supported pairing mechanic also shows the appropriate pairing action.
 
 Transforming and modal double-faced cards show a **Back face** control after the reveal. Use it to view the reverse image; the same control then becomes **Front face**. Each card in a pair or choice keeps its own temporary orientation, and a new result starts on the front. Split and Adventure cards use their single combined card image and do not show this control.
 
@@ -172,7 +172,7 @@ History is capped at 40 records. Once full, a new record removes the oldest one.
 
 ## Saved pulls
 
-Saved holds result records you want to keep beyond the rolling History list. From Saved you can:
+Saved holds result records you save beyond the rolling History list. From Saved you can:
 
 - load a pull;
 - remove one saved record;
@@ -194,12 +194,12 @@ Equivalent results are deduplicated using their mode and card/group identity. Sa
 | Card reveal animation | Enables the staged card-back reveal. Turn it off for immediate results. |
 | External links | Shows or hides Scryfall, EDHREC, and marketplace actions; price text remains. |
 | EDHREC metadata | Enables deck counts and themes after reveal. |
-| Card-art backdrop | Uses result artwork to tint the result surface. |
+| Ambient backdrop | Adds a decorative color glow behind results without using card art. |
 
 ### Performance
 
 - **Standard** clears Reduce motion, Simplify backdrop, and Reduce transparency without changing separate display preferences.
-- **Low power** enables those three reductions together and turns off Card-art backdrop.
+- **Low power** enables those three reductions together and turns off Ambient backdrop.
 - Changing one of those controls directly creates a **Custom** profile.
 
 The app also respects the operating system's `prefers-reduced-motion` setting for reveal behavior.
@@ -224,6 +224,7 @@ Caching primarily helps repeat EDHREC metadata and exact-name card lookups. It d
 
 ## Keyboard and accessibility behavior
 
+- Randomander exposes one page-level heading, **Find a deck worth building.**, at every viewport size; modal surfaces use their own labelled section headings.
 - Interactive controls use native buttons, links, inputs, and pressed/expanded state where applicable.
 - Filters and support panels trap focus while open and restore focus to the previous control when closed.
 - <kbd>Escape</kbd> closes the active modal/panel, or skips an active reveal.

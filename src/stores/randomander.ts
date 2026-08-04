@@ -1,14 +1,15 @@
 import { defineStore } from 'pinia'
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, shallowRef, watch } from 'vue'
 import {
   formatColorIdentity,
   getCardSlug,
+  getEdhrecPairIdentifier,
   getPartnerKind,
   getPartnerVariant,
   getPartnerWithName,
   getTypeLine,
   isBackgroundCard,
-  isPriceProvider,
+  isLegalPartnerPair,
   type PartnerKind,
   type PriceProvider,
   type ScryfallCard,
@@ -19,16 +20,71 @@ import {
   fetchRankedRandomCard,
   isScryfallRequestError,
 } from '../services/scryfall'
-import { fetchCommanderMeta, type EdhrecTag, type EdhrecMeta } from '../services/edhrec'
-import { readStorage, writeStorage } from '../lib/storage'
-import { clearCache } from '../lib/cache'
-import type { CacheOptions } from '../services/http'
+import type { EdhrecTag, EdhrecMeta } from '../services/edhrec'
+import {
+  readStorageResult,
+  removeStorage,
+  writeStorage,
+  type StorageFailureKind,
+} from '../lib/storage'
+import { clearCache, removeCache } from '../lib/cache'
+import {
+  compileColorFilter,
+  formatColorCountLabel,
+  type CompiledColorFilter,
+} from '../lib/colorFilter'
+import { RuntimeDataError } from '../lib/runtimeValidation'
+import {
+  HttpError,
+  RequestTimeoutError,
+  type CacheOptions,
+} from '../services/http'
+import {
+  createDrawWorkflowContext,
+  DRAW_WORKFLOW_DEADLINE_MS,
+  DrawWorkflowNoMatchError,
+  DrawWorkflowTimeoutError,
+  type DrawWorkflowContext,
+  type DrawWorkflowStopReason,
+} from './drawWorkflow'
+import {
+  decodePersistedState,
+  DEFAULT_CACHE,
+  DEFAULT_DISPLAY,
+  DEFAULT_OPTIONS,
+  DEFAULT_PERFORMANCE,
+  PERSISTED_COLLECTION_LIMIT,
+  PERSISTED_STATE_VERSION,
+  type PersistedStateV2,
+} from './randomanderPersistence'
+
+export {
+  DRAW_WORKFLOW_CALL_BUDGET,
+  DRAW_WORKFLOW_DEADLINE_MS,
+} from './drawWorkflow'
 
 export type Mode = 'commander' | 'spark' | 'partner'
 export type ViewKey = 'draw'
 export type LegacyViewKey = ViewKey | 'settings' | 'history' | 'saved'
 export type ActivePanelKey = 'filters' | 'history' | 'saved' | 'settings'
 export type ThemeMode = 'light' | 'dark' | 'system'
+
+// EDHREC's public terms prohibit automated agents. Keep the adapter available
+// to contract tests, but make public builds link-only unless written permission
+// and a separately reviewed release decision change this boundary.
+export const AUTOMATED_EDHREC_METADATA_ENABLED = import.meta.env.MODE === 'test'
+
+export type MetadataLoadStatus =
+  | 'idle'
+  | 'loading'
+  | 'success-data'
+  | 'success-empty'
+  | 'error'
+
+export type MetadataLoadState = Readonly<{
+  status: MetadataLoadStatus
+  error: string
+}>
 
 export type CommanderChoice = {
   id: string
@@ -83,22 +139,53 @@ export type PullRecord = {
   choices?: CommanderChoice[]
 }
 
-type PersistedState = {
-  view: LegacyViewKey
-  mode: Mode
-  options: OptionsState
-  display: DisplaySettings
-  cache: CacheSettings
-  performance: PerformanceSettings
-  theme: ThemeMode
-  history: PullRecord[]
-  saved: PullRecord[]
-}
+export type SaveRecordOptions = Readonly<{
+  replaceOldest?: boolean
+}>
 
 const STORAGE_KEY = 'randomander:state:v2'
-const MAX_HISTORY = 40
-const MAX_SAVED = 40
-const MAX_ATTEMPTS = 24
+export const MAX_HISTORY = PERSISTED_COLLECTION_LIMIT
+export const MAX_SAVED = PERSISTED_COLLECTION_LIMIT
+
+type RequestOptions = Readonly<
+  Omit<OptionsState, 'selectedColors'> & {
+    selectedColors: readonly string[]
+  }
+>
+
+type ResultProvenance = Readonly<{
+  mode: Mode
+  options: RequestOptions
+}>
+
+type DrawRequestConfig = ResultProvenance &
+  Readonly<{
+    signature: string
+    drawCount: number
+    isChoiceMode: boolean
+    colorFilter: CompiledColorFilter
+    pairColorFilter: CompiledColorFilter
+    cacheOptions?: Readonly<CacheOptions>
+    queries: Readonly<{
+      background: string
+      chooseBackgroundCommander: string
+      commander: string
+      doctors: string
+      friendsForever: string
+      genericPartner: string
+      partnerPool: string
+      spark: string
+    }>
+  }>
+
+type ActiveDrawWorkflow = DrawWorkflowContext<DrawRequestConfig>
+
+class CandidateMismatchError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CandidateMismatchError'
+  }
+}
 
 export const modes = [
   {
@@ -132,7 +219,6 @@ export const colorOptions = [
   { value: '5', label: 'Five colors' },
 ] as const
 
-const COLOR_SYMBOLS = ['W', 'U', 'B', 'R', 'G'] as const
 export const COLOR_CHOICES = [
   {
     symbol: 'C',
@@ -161,40 +247,8 @@ export const COLOR_CHOICES = [
 ] as const
 
 const defaultOptions: OptionsState = {
-  colorCount: 'any',
+  ...DEFAULT_OPTIONS,
   selectedColors: [],
-  limitByDecks: false,
-  maxDecks: 1000,
-  twoChoices: false,
-  excludeGameChangers: false,
-  useRankCutoff: false,
-  colorCountMode: 'up-to',
-}
-
-const defaultDisplay: DisplaySettings = {
-  showHeader: false,
-  showStatus: false,
-  showChips: false,
-  showCardTitles: true,
-  showColorIdentity: true,
-  showLinks: true,
-  showTags: true,
-  usePairTags: true,
-  showAmbient: false,
-  enablePrestigeReveal: true,
-  priceProvider: 'cardmarket',
-}
-
-const defaultCache: CacheSettings = {
-  enabled: true,
-  ttlHours: 24,
-  maxEntries: 120,
-}
-
-const defaultPerformance: PerformanceSettings = {
-  reduceMotion: false,
-  simplifyBackdrop: false,
-  reduceTransparency: false,
 }
 
 const createId = () =>
@@ -202,50 +256,88 @@ const createId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`
 
+// Pull records cross the JSON persistence boundary, so clone them through the
+// same representation. This also unwraps Vue proxies and prevents current,
+// History, and Saved state from sharing nested card or choice references.
+const snapshotRecord = (record: PullRecord): PullRecord =>
+  JSON.parse(JSON.stringify(record)) as PullRecord
+
+const persistenceFailureMessage = (kind: StorageFailureKind) => {
+  if (kind === 'quota') {
+    return 'Browser storage is full, so these changes are only available in this tab.'
+  }
+  if (kind === 'security' || kind === 'unavailable') {
+    return 'Browser storage is blocked, so these changes are only available in this tab.'
+  }
+  if (kind === 'invalid-data') {
+    return 'Saved browser data could not be read. Defaults are in use until storage is repaired.'
+  }
+  return 'Randomander could not save these changes to browser storage.'
+}
+
 export const useRandomanderStore = defineStore('randomander', () => {
-  const persisted = readStorage<Partial<PersistedState>>(STORAGE_KEY, {})
-  const persistedView = persisted.view ?? 'draw'
+  const persistedReadResult = readStorageResult<unknown>(STORAGE_KEY, null)
+  const persistedDecodeResult = decodePersistedState(persistedReadResult.value)
+  const persisted = persistedDecodeResult.value
+  const persistedView = persisted.view
   const initialPanel =
     persistedView === 'history' || persistedView === 'saved' ? persistedView : null
 
   const view = ref<ViewKey>('draw')
   const activePanel = ref<ActivePanelKey | null>(initialPanel)
-  const mode = ref<Mode>(persisted.mode ?? 'commander')
+  const mode = ref<Mode>(persisted.mode)
   const options = reactive<OptionsState>({
-    ...defaultOptions,
-    ...(persisted.options ?? {}),
+    ...persisted.options,
+    limitByDecks: AUTOMATED_EDHREC_METADATA_ENABLED
+      ? persisted.options.limitByDecks
+      : false,
+    selectedColors: [...persisted.options.selectedColors],
   })
   const display = reactive<DisplaySettings>({
-    ...defaultDisplay,
-    ...(persisted.display ?? {}),
+    ...persisted.display,
+    showTags: AUTOMATED_EDHREC_METADATA_ENABLED
+      ? persisted.display.showTags
+      : false,
   })
-  if (!isPriceProvider(display.priceProvider)) {
-    display.priceProvider = defaultDisplay.priceProvider
-  }
-  const cacheSettings = reactive<CacheSettings>({
-    ...defaultCache,
-    ...(persisted.cache ?? {}),
-  })
-  const performance = reactive<PerformanceSettings>({
-    ...defaultPerformance,
-    ...(persisted.performance ?? {}),
-  })
-  const theme = ref<ThemeMode>(persisted.theme ?? 'system')
-  const history = ref<PullRecord[]>(persisted.history ?? [])
-  const saved = ref<PullRecord[]>(persisted.saved ?? [])
+  const cacheSettings = reactive<CacheSettings>({ ...persisted.cache })
+  const performance = reactive<PerformanceSettings>({ ...persisted.performance })
+  const theme = ref<ThemeMode>(persisted.theme)
+  const history = ref<PullRecord[]>(persisted.history)
+  const saved = ref<PullRecord[]>(persisted.saved)
 
   const cards = ref<ScryfallCard[]>([])
   const choices = ref<CommanderChoice[]>([])
   const sparkPalette = ref<string[] | null>(null)
   const isLoading = ref(false)
   const errorMessage = ref('')
+  const initialPersistenceFailure: StorageFailureKind | null =
+    !persistedReadResult.ok
+      ? persistedReadResult.kind
+      : !persistedDecodeResult.ok
+        ? 'invalid-data'
+        : null
+  const persistenceError = ref(
+    initialPersistenceFailure
+      ? persistenceFailureMessage(initialPersistenceFailure)
+      : ''
+  )
+  const shouldPersistDecodedState =
+    persistedReadResult.ok &&
+    persistedDecodeResult.ok &&
+    (persistedDecodeResult.migrated || persistedDecodeResult.repaired)
+  const persistenceNotice = ref('')
   const metadataSurfaceVisible = ref(false)
+  const resultProvenance = shallowRef<ResultProvenance | null>(null)
 
-  const controller = ref<AbortController | null>(null)
+  let activeWorkflow: ActiveDrawWorkflow | null = null
+  let suppressQueryInvalidation = false
+  let suppressPersistenceWatch = false
   const tagController = ref<AbortController | null>(null)
   const tagLookup = ref<Record<string, EdhrecTag[]>>({})
+  const metadataStateLookup = ref<Record<string, MetadataLoadState>>({})
   const tagRequestId = ref(0)
   const metaCache = reactive(new Map<string, EdhrecMeta>())
+  let pendingDurabilityAction: (() => boolean) | null = null
   const isOptionsOpen = computed(() => activePanel.value === 'filters')
 
   const cacheOptions = computed<CacheOptions | undefined>(() => {
@@ -280,46 +372,30 @@ export const useRandomanderStore = defineStore('randomander', () => {
     isChoiceMode.value ? choices.value.length > 0 : cards.value.length > 0
   )
 
-  const colorCountNumber = computed(() =>
-    options.colorCount === 'any' ? null : Number(options.colorCount)
+  const compiledColorFilter = computed(() =>
+    compileColorFilter({
+      mode: mode.value,
+      colorCount: options.colorCount,
+      colorCountMode: options.colorCountMode,
+      selectedColors: options.selectedColors,
+    })
   )
-
-  const formatColorCountLabel = (
-    value: ColorCount,
-    comparison: 'up-to' | 'exactly'
-  ) => {
-    if (value === 'any') return 'any colors'
-    if (value === '0') return 'Colorless only'
-    const count = Number(value)
-    const prefix = comparison === 'exactly' ? 'Exactly' : 'Up to'
-    const plural = count === 1 ? 'color' : 'colors'
-    return `${prefix} ${count} ${plural}`
-  }
+  const colorCountNumber = computed(() => compiledColorFilter.value.count)
   const selectedColorSet = computed(
-    () => new Set(options.selectedColors.map((color) => color.toUpperCase()))
+    () => new Set(compiledColorFilter.value.selectedColors)
   )
-  const allowedColors = computed(() =>
-    options.selectedColors.length > 0
-      ? options.selectedColors
-          .map((color) => color.toUpperCase())
-          .filter((color) => color !== 'C')
-      : [...COLOR_SYMBOLS]
+  const allowedColors = computed(() => [
+    ...compiledColorFilter.value.allowedColors,
+  ])
+  const colorFilterLabel = computed(
+    () => compiledColorFilter.value.ui.summary
   )
-
-  const colorFilterLabel = computed(() => {
-    const selection =
-      options.selectedColors.length > 0
-        ? `within ${formatColorIdentity(options.selectedColors)}`
-        : ''
-    if (options.colorCount === 'any') {
-      return selection ? `any colors ${selection}` : 'any colors'
-    }
-    const base = formatColorCountLabel(
-      options.colorCount,
-      options.colorCountMode
-    )
-    return selection ? `${base} ${selection}` : base
-  })
+  const colorFilterProblem = computed(
+    () => compiledColorFilter.value.problem?.message ?? ''
+  )
+  const colorComparisonDescription = computed(
+    () => compiledColorFilter.value.ui.comparisonDescription
+  )
 
   const sparkPaletteLabel = computed(() =>
     sparkPalette.value ? formatColorIdentity(sparkPalette.value) : ''
@@ -367,9 +443,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     return chips
   })
 
-  const colorLabel = computed(() =>
-    mode.value === 'commander' ? 'Color identity' : 'Max color identity'
-  )
+  const colorLabel = computed(() => compiledColorFilter.value.ui.fieldLabel)
 
   const choiceLabel = computed(() =>
     mode.value === 'partner'
@@ -443,31 +517,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const joinQuery = (...parts: Array<string | null | undefined>) =>
     parts.filter(Boolean).join(' ').trim()
 
-  const colorIdentityQuery = computed(() => {
-    if (options.selectedColors.length === 0) return ''
-    const normalized = options.selectedColors.map((color) => color.toUpperCase())
-    const hasColorless = normalized.includes('C')
-    const palette = normalized.filter((color) => color !== 'C')
-    const colorString = palette.join('').toLowerCase()
-
-    // If only colorless is selected, just return colorless identity.
-    if (!colorString && hasColorless) {
-      return 'ci:c'
-    }
-
-    // Build base query depending on "exactly" vs "up to" color-count mode.
-    const baseQuery =
-      options.colorCountMode === 'exactly'
-        ? `ci=${colorString}`
-        : `ci<=${colorString}`
-
-    // If colorless is also selected alongside other colors, include it explicitly.
-    if (hasColorless) {
-      return `(${baseQuery} or ci:c)`
-    }
-
-    return baseQuery
-  })
+  const colorIdentityQuery = computed(() =>
+    compiledColorFilter.value.getScryfallClause()
+  )
 
   const commanderQuery = computed(() =>
     joinQuery('is:commander legal:commander', colorIdentityQuery.value)
@@ -488,14 +540,97 @@ export const useRandomanderStore = defineStore('randomander', () => {
     joinQuery('is:commander legal:commander keyword:"friends forever"', colorIdentityQuery.value)
   )
   const doctorsQuery = computed(() =>
-    joinQuery('is:commander legal:commander type:doctor', colorIdentityQuery.value)
+    joinQuery(
+      'is:commander legal:commander type:"Time Lord" type:doctor',
+      colorIdentityQuery.value
+    )
   )
   const backgroundQuery = computed(() =>
     joinQuery('type:background legal:commander', colorIdentityQuery.value)
   )
-  const chooseBackgroundCommanderQuery = computed(() =>
-    joinQuery('is:commander legal:commander o:"choose a background"', colorIdentityQuery.value)
-  )
+  const snapshotOptions = (): RequestOptions =>
+    Object.freeze({
+      ...options,
+      limitByDecks: AUTOMATED_EDHREC_METADATA_ENABLED
+        ? options.limitByDecks
+        : false,
+      selectedColors: Object.freeze([...options.selectedColors]),
+    })
+
+  const cloneRequestOptions = (requestOptions: RequestOptions): OptionsState => ({
+    ...requestOptions,
+    selectedColors: [...requestOptions.selectedColors],
+  })
+
+  const getRequestSignature = (
+    requestMode: Mode,
+    requestOptions: RequestOptions
+  ) =>
+    JSON.stringify([
+      requestMode,
+      requestOptions.colorCount,
+      requestOptions.colorCountMode,
+      requestOptions.excludeGameChangers,
+      requestOptions.selectedColors,
+      requestOptions.limitByDecks,
+      requestOptions.maxDecks,
+      requestOptions.twoChoices,
+      requestOptions.useRankCutoff,
+    ])
+
+  const getCurrentRequestSignature = () =>
+    getRequestSignature(mode.value, snapshotOptions())
+
+  const captureRequestConfig = (): DrawRequestConfig => {
+    const requestMode = mode.value
+    const requestOptions = snapshotOptions()
+    const colorFilter = compileColorFilter({
+      mode: requestMode,
+      colorCount: requestOptions.colorCount,
+      colorCountMode: requestOptions.colorCountMode,
+      selectedColors: requestOptions.selectedColors,
+    })
+    const pairColorFilter = compileColorFilter({
+      mode: 'partner',
+      colorCount: requestOptions.colorCount,
+      colorCountMode: requestOptions.colorCountMode,
+      selectedColors: requestOptions.selectedColors,
+    })
+    const requestCacheOptions = cacheOptions.value
+      ? Object.freeze({ ...cacheOptions.value })
+      : undefined
+    return Object.freeze({
+      mode: requestMode,
+      options: requestOptions,
+      signature: getRequestSignature(requestMode, requestOptions),
+      drawCount: requestMode === 'spark' ? 3 : requestMode === 'partner' ? 2 : 1,
+      isChoiceMode: requestOptions.twoChoices && requestMode !== 'spark',
+      colorFilter,
+      pairColorFilter,
+      cacheOptions: requestCacheOptions,
+      queries: Object.freeze({
+        background: 'type:background legal:commander',
+        chooseBackgroundCommander:
+          'is:commander legal:commander o:"choose a background"',
+        commander: 'is:commander legal:commander',
+        doctors: 'is:commander legal:commander type:"Time Lord" type:doctor',
+        friendsForever:
+          'is:commander legal:commander keyword:"friends forever"',
+        genericPartner: 'is:commander legal:commander keyword:partner',
+        partnerPool:
+          'is:commander legal:commander (keyword:partner or keyword:"partner with" or keyword:"friends forever" or keyword:"choose a background" or keyword:"doctor\'s companion")',
+        spark: joinQuery(
+          'legal:commander',
+          requestOptions.excludeGameChangers ? '-is:game-changer' : ''
+        ),
+      }),
+    })
+  }
+
+  const provenanceFromConfig = (
+    config: DrawRequestConfig
+  ): ResultProvenance =>
+    Object.freeze({ mode: config.mode, options: config.options })
 
   const usesCommanderLink = (card: ScryfallCard) => {
     if (mode.value === 'spark') return false
@@ -503,7 +638,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const shouldShowTags = (card: ScryfallCard) =>
-    display.showTags && usesCommanderLink(card)
+    AUTOMATED_EDHREC_METADATA_ENABLED &&
+    display.showTags &&
+    usesCommanderLink(card)
 
   const getGroupsForState = (
     cardsToCheck: ScryfallCard[],
@@ -543,7 +680,11 @@ export const useRandomanderStore = defineStore('randomander', () => {
   )
 
   const currentResultFingerprint = computed(() =>
-    getFingerprintForGroups(mode.value, cards.value, choices.value)
+    getFingerprintForGroups(
+      resultProvenance.value?.mode ?? mode.value,
+      cards.value,
+      choices.value
+    )
   )
 
   const isCurrentSaved = computed(() => {
@@ -558,11 +699,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   const isPairGroup = (group: ScryfallCard[]) => group.length === 2
   const getPairSlug = (group: ScryfallCard[]) =>
-    group
-      .slice()
-      .sort((a, b) => getCardSlug(a).localeCompare(getCardSlug(b)))
-      .map((card) => getCardSlug(card))
-      .join('-')
+    getEdhrecPairIdentifier(group)
 
   const getPartnerSlugForGroup = (group: ScryfallCard[]) => getPairSlug(group)
 
@@ -577,17 +714,31 @@ export const useRandomanderStore = defineStore('randomander', () => {
     shouldShowTags(card)
 
   const getTagsForCard = (card: ScryfallCard, group: ScryfallCard[]) =>
-    tagLookup.value[getTagKeyForCard(card, group)] ?? []
+    getTagKeyForCard(card, group)
+      ? tagLookup.value[getTagKeyForCard(card, group)!] ?? []
+      : []
 
-  const hasTagEntry = (card: ScryfallCard, group: ScryfallCard[]) =>
-    Object.prototype.hasOwnProperty.call(
-      tagLookup.value,
-      getTagKeyForCard(card, group)
-    )
+  const hasTagEntry = (card: ScryfallCard, group: ScryfallCard[]) => {
+    const status = getMetadataStateForCard(card, group).status
+    return status === 'success-data' || status === 'success-empty'
+  }
+
+  const getMetadataStateForCard = (
+    card: ScryfallCard,
+    group: ScryfallCard[]
+  ): MetadataLoadState => {
+    const key = getTagKeyForCard(card, group)
+    return key
+      ? metadataStateLookup.value[key] ?? { status: 'idle', error: '' }
+      : {
+          status: 'error',
+          error: 'Metadata is unavailable because this card has no safe identifier.',
+        }
+  }
 
   const getDeckCountForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
     const key = getTagKeyForCard(card, group)
-    return metaCache.get(key)?.deckCount ?? null
+    return key ? metaCache.get(key)?.deckCount ?? null : null
   }
 
   const getTagUrlForCard = (
@@ -596,423 +747,662 @@ export const useRandomanderStore = defineStore('randomander', () => {
     tag: EdhrecTag
   ) => {
     if (!tag.slug || !usesCommanderLink(card)) return tag.href
-    return `https://edhrec.com/commanders/${getTagKeyForCard(card, group)}/${tag.slug}`
+    const key = getTagKeyForCard(card, group)
+    return key
+      ? `https://edhrec.com/commanders/${key}/${tag.slug}`
+      : tag.href
   }
 
-  const matchesColorCount = (card: ScryfallCard) => {
-    const expected = colorCountNumber.value
-    if (expected === null) return true
-    const actual = card.color_identity?.length ?? 0
-    if (options.colorCountMode === 'exactly' || expected === 0) {
-      return actual === expected
+  const requireLegalPartnerPair = (
+    first: ScryfallCard,
+    second: ScryfallCard
+  ): [ScryfallCard, ScryfallCard] => {
+    if (!isLegalPartnerPair(first, second)) {
+      throw new Error('Scryfall returned an incompatible commander pair.')
     }
-    return actual <= expected
+    return [first, second]
   }
 
-  const matchesSelectedColors = (card: ScryfallCard) => {
-    if (options.selectedColors.length === 0) return true
-    const colors = card.color_identity ?? []
-    if (colorCountNumber.value === 0) {
-      return colors.length === 0
-    }
-    const allowsColorless = selectedColorSet.value.has('C')
-    if (colors.length === 0) return allowsColorless
-    if (selectedColorSet.value.size === 1 && allowsColorless) return false
-    return colors.every((color) => selectedColorSet.value.has(color))
-  }
-
-  const getCombinedColors = (cardsToCheck: ScryfallCard[]) => {
-    const combined = new Set<string>()
-    cardsToCheck.forEach((card) => {
-      ;(card.color_identity ?? []).forEach((color) => combined.add(color))
-    })
-    return Array.from(combined)
-  }
-
-  const isWithinMaxColors = (
-    cardsToCheck: ScryfallCard[],
-    maxColors: number | null
+  const cancelWorkflow = (
+    workflow: ActiveDrawWorkflow,
+    reason: DrawWorkflowStopReason
   ) => {
-    if (maxColors === null) return true
-    return getCombinedColors(cardsToCheck).length <= maxColors
-  }
-
-  const isWithinSelectedColors = (cardsToCheck: ScryfallCard[]) => {
-    if (options.selectedColors.length === 0) return true
-    const combined = getCombinedColors(cardsToCheck)
-    if (colorCountNumber.value === 0) {
-      return combined.length === 0
+    workflow.cancel(reason)
+    workflow.finish()
+    if (activeWorkflow === workflow) {
+      activeWorkflow = null
+      isLoading.value = false
     }
-    const allowsColorless = selectedColorSet.value.has('C')
-    if (combined.length === 0) return allowsColorless
-    if (selectedColorSet.value.size === 1 && allowsColorless) return false
-    return combined.every((color) => selectedColorSet.value.has(color))
   }
 
-  const pickRandomPalette = (maxColors: number, pool: string[]) => {
-    const available = [...pool]
-    const cappedMax = Math.max(0, Math.min(maxColors, available.length))
-    const target = cappedMax === 0 ? 0 : Math.floor(Math.random() * (cappedMax + 1))
-    const picked: string[] = []
-    for (let i = 0; i < target; i += 1) {
-      const index = Math.floor(Math.random() * available.length)
-      picked.push(available.splice(index, 1)[0]!)
+  const beginWorkflow = () => {
+    if (activeWorkflow) cancelWorkflow(activeWorkflow, 'superseded')
+    const config = captureRequestConfig()
+    errorMessage.value = ''
+    if (config.colorFilter.problem) {
+      errorMessage.value = config.colorFilter.problem.message
+      isLoading.value = false
+      return null
     }
-    return picked
+    const workflow = createDrawWorkflowContext(
+      createId(),
+      config
+    )
+    activeWorkflow = workflow
+    isLoading.value = true
+    return workflow
   }
 
-  const isCardWithinPalette = (card: ScryfallCard, palette: string[]) => {
-    const colors = card.color_identity ?? []
-    return colors.every((color) => palette.includes(color))
+  const assertCurrentWorkflow = (workflow: ActiveDrawWorkflow) => {
+    if (
+      activeWorkflow !== workflow ||
+      workflow.signal.aborted ||
+      workflow.config.signature !== getCurrentRequestSignature()
+    ) {
+      if (!workflow.signal.aborted) workflow.cancel('configuration')
+      throw new DOMException('The draw workflow was cancelled.', 'AbortError')
+    }
   }
 
-  const getEdhrecMeta = async (slug: string, signal: AbortSignal) => {
+  const finishWorkflow = (workflow: ActiveDrawWorkflow) => {
+    workflow.finish()
+    if (activeWorkflow === workflow) {
+      activeWorkflow = null
+      isLoading.value = false
+    }
+  }
+
+  const getWorkflowErrorMessage = (
+    error: unknown,
+    workflow: ActiveDrawWorkflow,
+    fallback: string
+  ) => {
+    if (
+      error instanceof DrawWorkflowTimeoutError ||
+      workflow.stopReason === 'timeout'
+    ) {
+      return new DrawWorkflowTimeoutError(DRAW_WORKFLOW_DEADLINE_MS).message
+    }
+    if (
+      error instanceof DrawWorkflowNoMatchError ||
+      workflow.stopReason === 'budget'
+    ) {
+      return error instanceof DrawWorkflowNoMatchError
+        ? error.message
+        : new DrawWorkflowNoMatchError(workflow.callBudget).message
+    }
+    if (workflow.stopReason === 'user') return 'Draw cancelled.'
+    if (
+      workflow.stopReason === 'configuration' ||
+      workflow.stopReason === 'superseded'
+    ) {
+      return null
+    }
+    if (error instanceof RequestTimeoutError) {
+      return `An upstream request timed out. ${error.message}`
+    }
+    if (isScryfallRequestError(error)) {
+      return `Scryfall upstream failure: ${error.message}`
+    }
+    if (error instanceof HttpError) {
+      return `EDHREC upstream failure: ${error.message}`
+    }
+    if (error instanceof RuntimeDataError) {
+      const service = error.source === 'edhrec' ? 'EDHREC' : 'Upstream'
+      return `${service} data is unavailable: ${error.message}`
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      return 'Draw cancelled.'
+    }
+    return error instanceof Error ? error.message : fallback
+  }
+
+  const handleWorkflowError = (
+    error: unknown,
+    workflow: ActiveDrawWorkflow,
+    fallback: string
+  ) => {
+    if (activeWorkflow !== workflow) return
+    const message = getWorkflowErrorMessage(error, workflow, fallback)
+    if (message !== null) errorMessage.value = message
+  }
+
+  const cancelActiveRequest = () => {
+    if (!activeWorkflow) return false
+    const workflow = activeWorkflow
+    cancelWorkflow(workflow, 'user')
+    errorMessage.value = 'Draw cancelled.'
+    return true
+  }
+
+  const invalidateResultsForConfiguration = () => {
+    if (activeWorkflow) cancelWorkflow(activeWorkflow, 'configuration')
+    cards.value = []
+    choices.value = []
+    sparkPalette.value = null
+    resultProvenance.value = null
+    errorMessage.value = ''
+  }
+
+  const getEdhrecMeta = async (
+    slug: string,
+    signal: AbortSignal,
+    workflow?: ActiveDrawWorkflow
+  ) => {
+    if (!slug) {
+      throw new RuntimeDataError(
+        'edhrec',
+        'identifier',
+        'this card has no EDHREC-compatible identifier'
+      )
+    }
     const cached = metaCache.get(slug)
     if (cached) return cached
-    const meta = await fetchCommanderMeta(slug, signal, cacheOptions.value)
+    workflow?.consumeCalls()
+    if (!AUTOMATED_EDHREC_METADATA_ENABLED) {
+      throw new Error('Automated EDHREC metadata is disabled in this build.')
+    }
+    const { fetchCommanderMeta } = await import('../services/edhrec')
+    const meta = await fetchCommanderMeta(
+      slug,
+      signal,
+      workflow?.config.cacheOptions ?? cacheOptions.value
+    )
     metaCache.set(slug, meta)
     return meta
   }
 
-  const passesDeckLimit = async (card: ScryfallCard, signal: AbortSignal) => {
-    if (!options.limitByDecks) return true
+  const passesDeckLimit = async (
+    card: ScryfallCard,
+    workflow: ActiveDrawWorkflow
+  ) => {
+    const config = workflow.config
+    if (!AUTOMATED_EDHREC_METADATA_ENABLED || !config.options.limitByDecks) {
+      return true
+    }
     if (isBackgroundCard(card)) return true
-    if (!Number.isFinite(options.maxDecks) || options.maxDecks <= 0) return true
-    if (options.useRankCutoff) return true
-    if (mode.value === 'spark') return true
-    const meta = await getEdhrecMeta(getCardSlug(card), signal)
+    if (
+      !Number.isFinite(config.options.maxDecks) ||
+      config.options.maxDecks <= 0
+    ) {
+      return true
+    }
+    if (config.options.useRankCutoff) return true
+    if (config.mode === 'spark') return true
+    const meta = await getEdhrecMeta(getCardSlug(card), workflow.signal, workflow)
     if (meta.deckCount === null) {
       throw new Error('EDHREC deck counts are unavailable for this commander.')
     }
-    return meta.deckCount < options.maxDecks
+    return meta.deckCount < config.options.maxDecks
   }
 
   const fetchCardMatchingFilters = async (
-    signal: AbortSignal,
+    workflow: ActiveDrawWorkflow,
     query: string,
     optionsOverrides?: {
-      applyColorFilter?: boolean
+      colorFilter?: CompiledColorFilter
+      palette?: readonly string[] | null
       extraFilter?: (card: ScryfallCard) => boolean
-      errorLabel?: string
-      asyncFilter?: (card: ScryfallCard, signal: AbortSignal) => Promise<boolean>
+      asyncFilter?: (
+        card: ScryfallCard,
+        workflow: ActiveDrawWorkflow
+      ) => Promise<boolean>
       useRankedRandom?: boolean
     }
   ) => {
-    const applyColorFilter = optionsOverrides?.applyColorFilter ?? true
+    const config = workflow.config
+    const colorFilter = optionsOverrides?.colorFilter ?? config.colorFilter
+    const palette = optionsOverrides?.palette
     const extraFilter = optionsOverrides?.extraFilter ?? (() => true)
-    const errorLabel = optionsOverrides?.errorLabel ?? colorFilterLabel.value
     const asyncFilter = optionsOverrides?.asyncFilter ?? (async () => true)
     const useRankedRandom = optionsOverrides?.useRankedRandom ?? false
+    const constrainedQuery = joinQuery(
+      query,
+      colorFilter.getScryfallClause(palette)
+    )
 
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    while (true) {
+      workflow.consumeCalls(useRankedRandom ? 2 : 1)
       const card = useRankedRandom
-        ? await fetchRankedRandomCard(query, signal)
-        : await fetchRandomCard(query, signal)
-      const asyncOk = await asyncFilter(card, signal)
-      if (asyncOk && (!applyColorFilter || matchesColorCount(card)) && extraFilter(card)) {
+        ? await fetchRankedRandomCard(constrainedQuery, workflow.signal)
+        : await fetchRandomCard(constrainedQuery, workflow.signal)
+      if (
+        !colorFilter.matchesCandidate(card, palette) ||
+        !extraFilter(card)
+      ) {
+        continue
+      }
+      if (await asyncFilter(card, workflow)) {
         return card
       }
     }
-    throw new Error(`No cards matched ${errorLabel}. Try another option.`)
   }
 
   const fetchPartnerForCard = async (
     primary: ScryfallCard,
-    signal: AbortSignal,
-    maxColors: number | null
+    workflow: ActiveDrawWorkflow
   ) => {
+    const config = workflow.config
+    const pairColorFilter = config.pairColorFilter
     const partnerKind = getPartnerKind(primary)
     if (!partnerKind) return null
     const variant = getPartnerVariant(primary)
     if (partnerKind === 'partner_with') {
       const partnerName = getPartnerWithName(primary)
       if (!partnerName) {
-        throw new Error('Unable to find a named partner for this commander.')
+        throw new CandidateMismatchError(
+          'Unable to find a named partner for this commander.'
+        )
       }
-      const partner = await fetchCardByExactName(partnerName, signal, cacheOptions.value)
-      await passesDeckLimit(partner, signal)
-      if (!isWithinMaxColors([primary, partner], maxColors) || !isWithinSelectedColors([primary, partner])) {
-        throw new Error(`That partner pair exceeds ${colorFilterLabel.value} in total colors.`)
+      workflow.consumeCalls()
+      const partner = await fetchCardByExactName(
+        partnerName,
+        workflow.signal,
+        config.cacheOptions
+      )
+      if (!(await passesDeckLimit(partner, workflow))) {
+        throw new CandidateMismatchError(
+          'That named partner does not meet the active deck limit.'
+        )
+      }
+      if (!isLegalPartnerPair(primary, partner)) {
+        throw new CandidateMismatchError(
+          'That card is not the named partner for this commander.'
+        )
+      }
+      if (
+        !pairColorFilter.matchesResult([primary, partner])
+      ) {
+        throw new CandidateMismatchError(
+          `That partner pair does not match ${pairColorFilter.ui.summary}.`
+        )
       }
       return partner
     }
     if (partnerKind === 'choose_background') {
-      return fetchCardMatchingFilters(signal, backgroundQuery.value, {
-        applyColorFilter: false,
+      return fetchCardMatchingFilters(workflow, config.queries.background, {
+        colorFilter: pairColorFilter,
         extraFilter: (card) =>
-          isWithinMaxColors([primary, card], maxColors) &&
-          isWithinSelectedColors([primary, card]),
+          isLegalPartnerPair(primary, card) &&
+          pairColorFilter.matchesResult([primary, card]),
       })
     }
     if (partnerKind === 'friends_forever') {
-      return fetchCardMatchingFilters(signal, friendsForeverQuery.value, {
-        applyColorFilter: false,
+      return fetchCardMatchingFilters(workflow, config.queries.friendsForever, {
+        colorFilter: pairColorFilter,
         extraFilter: (card) =>
-          card.id !== primary.id &&
-          isWithinMaxColors([primary, card], maxColors) &&
-          isWithinSelectedColors([primary, card]),
+          isLegalPartnerPair(primary, card) &&
+          pairColorFilter.matchesResult([primary, card]),
         asyncFilter: passesDeckLimit,
       })
     }
     if (partnerKind === 'doctors_companion') {
-      return fetchCardMatchingFilters(signal, doctorsQuery.value, {
-        applyColorFilter: false,
+      return fetchCardMatchingFilters(workflow, config.queries.doctors, {
+        colorFilter: pairColorFilter,
         extraFilter: (card) =>
-          card.id !== primary.id &&
-          isWithinMaxColors([primary, card], maxColors) &&
-          isWithinSelectedColors([primary, card]),
+          isLegalPartnerPair(primary, card) &&
+          pairColorFilter.matchesResult([primary, card]),
         asyncFilter: passesDeckLimit,
       })
     }
-    return fetchCardMatchingFilters(signal, genericPartnerQuery.value, {
-      applyColorFilter: false,
+    return fetchCardMatchingFilters(workflow, config.queries.genericPartner, {
+      colorFilter: pairColorFilter,
       extraFilter: (card) =>
-        card.id !== primary.id &&
+        isLegalPartnerPair(primary, card) &&
         getPartnerKind(card) === 'partner' &&
         getPartnerVariant(card) === variant &&
-        isWithinMaxColors([primary, card], maxColors) &&
-        isWithinSelectedColors([primary, card]),
+        pairColorFilter.matchesResult([primary, card]),
       asyncFilter: passesDeckLimit,
     })
   }
 
   const fetchCommanderForBackground = async (
     background: ScryfallCard,
-    signal: AbortSignal,
-    maxColors: number | null
+    workflow: ActiveDrawWorkflow
   ) =>
-    fetchCardMatchingFilters(signal, chooseBackgroundCommanderQuery.value, {
-      applyColorFilter: false,
-      extraFilter: (card) =>
-        card.id !== background.id &&
-        getPartnerKind(card) === 'choose_background' &&
-        isWithinMaxColors([card, background], maxColors) &&
-        isWithinSelectedColors([card, background]),
-      asyncFilter: passesDeckLimit,
-      useRankedRandom: options.useRankCutoff,
-    })
-
-  const fetchPartnerPair = async (signal: AbortSignal) => {
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-      const primary = await fetchCardMatchingFilters(signal, partnerPoolQuery.value, {
-        extraFilter: (card) => getPartnerKind(card) !== null,
-        applyColorFilter: false,
+    fetchCardMatchingFilters(
+      workflow,
+      workflow.config.queries.chooseBackgroundCommander,
+      {
+        colorFilter: workflow.config.pairColorFilter,
+        extraFilter: (card) =>
+          isLegalPartnerPair(card, background) &&
+          getPartnerKind(card) === 'choose_background' &&
+          workflow.config.pairColorFilter.matchesResult([card, background]),
         asyncFilter: passesDeckLimit,
-        useRankedRandom: options.useRankCutoff,
+        useRankedRandom: workflow.config.options.useRankCutoff,
+      }
+    )
+
+  const fetchPartnerPair = async (workflow: ActiveDrawWorkflow) => {
+    const config = workflow.config
+    while (true) {
+      const primary = await fetchCardMatchingFilters(workflow, config.queries.partnerPool, {
+        extraFilter: (card) => getPartnerKind(card) !== null,
+        colorFilter: config.pairColorFilter,
+        asyncFilter: passesDeckLimit,
+        useRankedRandom: config.options.useRankCutoff,
       })
       try {
-        const partner = await fetchPartnerForCard(primary, signal, colorCountNumber.value)
+        const partner = await fetchPartnerForCard(primary, workflow)
         if (
           partner &&
-          isWithinMaxColors([primary, partner], colorCountNumber.value) &&
-          isWithinSelectedColors([primary, partner])
+          isLegalPartnerPair(primary, partner) &&
+          config.pairColorFilter.matchesResult([primary, partner])
         ) {
-          return [primary, partner]
+          return requireLegalPartnerPair(primary, partner)
         }
       } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw error
-        }
-        if (isScryfallRequestError(error)) {
-          throw error
-        }
+        if (error instanceof CandidateMismatchError) continue
+        throw error
       }
     }
-    throw new Error(
-      `Unable to find a compatible partner pair within ${colorFilterLabel.value}.`
-    )
   }
 
-  const buildRecord = (cardsToRecord: ScryfallCard[], choiceRecords?: CommanderChoice[]) => ({
-    id: createId(),
-    createdAt: new Date().toISOString(),
-    mode: mode.value,
-    options: { ...options },
-    cards: cardsToRecord,
-    choices: choiceRecords,
-  })
+  const buildRecord = (
+    cardsToRecord: ScryfallCard[],
+    choiceRecords: CommanderChoice[] | undefined,
+    provenance: ResultProvenance
+  ): PullRecord =>
+    snapshotRecord({
+      id: createId(),
+      createdAt: new Date().toISOString(),
+      mode: provenance.mode,
+      options: cloneRequestOptions(provenance.options),
+      cards: cardsToRecord,
+      choices: choiceRecords,
+    })
+
+  const createPersistedPayload = (): PersistedStateV2 => {
+    const persistedPanel =
+      activePanel.value === 'history' || activePanel.value === 'saved'
+        ? activePanel.value
+        : null
+    return {
+      version: PERSISTED_STATE_VERSION,
+      view: persistedPanel ?? view.value,
+      mode: mode.value,
+      options: {
+        ...options,
+        limitByDecks: AUTOMATED_EDHREC_METADATA_ENABLED
+          ? options.limitByDecks
+          : false,
+      },
+      display: {
+        ...display,
+        showTags: AUTOMATED_EDHREC_METADATA_ENABLED
+          ? display.showTags
+          : false,
+      },
+      cache: { ...cacheSettings },
+      performance: { ...performance },
+      theme: theme.value,
+      history: history.value,
+      saved: saved.value,
+    }
+  }
+
+  const persistCurrentState = () => {
+    let result = writeStorage(STORAGE_KEY, createPersistedPayload())
+    if (!result.ok && result.kind === 'quota') {
+      clearCache()
+      result = writeStorage(STORAGE_KEY, createPersistedPayload())
+    }
+    if (result.ok) {
+      if (persistenceError.value) {
+        persistenceNotice.value = 'Changes are saved to this browser again.'
+      }
+      persistenceError.value = ''
+      return true
+    }
+    persistenceNotice.value = ''
+    persistenceError.value = persistenceFailureMessage(result.kind)
+    return false
+  }
+
+  const retryPersistence = () =>
+    pendingDurabilityAction
+      ? pendingDurabilityAction()
+      : persistCurrentState()
+  const dismissPersistenceNotice = () => {
+    persistenceNotice.value = ''
+  }
 
   const addHistory = (record: PullRecord) => {
-    history.value = [record, ...history.value].slice(0, MAX_HISTORY)
+    history.value = [snapshotRecord(record), ...history.value].slice(0, MAX_HISTORY)
   }
 
-  const saveRecord = (record: PullRecord) => {
-    const fingerprint = getRecordFingerprint(record)
-    if (!fingerprint) return
+  const saveRecord = (
+    record: PullRecord,
+    saveOptions: SaveRecordOptions = {}
+  ) => {
+    const snapshot = snapshotRecord(record)
+    const fingerprint = getRecordFingerprint(snapshot)
+    if (!fingerprint) return false
     const exists = saved.value.some(
       (item) => getRecordFingerprint(item) === fingerprint
     )
-    if (exists) return
-    saved.value = [record, ...saved.value].slice(0, MAX_SAVED)
+    if (exists) return false
+    if (saved.value.length >= MAX_SAVED && !saveOptions.replaceOldest) {
+      return false
+    }
+    const previousSaved = saved.value
+    saved.value = saveOptions.replaceOldest
+      ? [snapshot, ...saved.value].slice(0, MAX_SAVED)
+      : [snapshot, ...saved.value]
+    if (!persistCurrentState()) {
+      saved.value = previousSaved
+      return false
+    }
+    return true
   }
 
-  const saveCurrent = () => {
-    if (!hasResults.value || isCurrentSaved.value) return
-    const record = buildRecord(cards.value, choices.value)
-    saveRecord(record)
+  const saveCurrent = (saveOptions: SaveRecordOptions = {}) => {
+    if (!hasResults.value || isCurrentSaved.value) return false
+    const provenance =
+      resultProvenance.value ?? provenanceFromConfig(captureRequestConfig())
+    const record = buildRecord(cards.value, choices.value, provenance)
+    return saveRecord(record, saveOptions)
   }
 
   const loadRecord = (record: PullRecord) => {
-    mode.value = record.mode
-    Object.assign(options, record.options)
-    cards.value = record.cards ?? []
-    choices.value = record.choices ?? []
+    const snapshot = snapshotRecord(record)
+    if (activeWorkflow) cancelWorkflow(activeWorkflow, 'superseded')
+    suppressQueryInvalidation = true
+    try {
+      mode.value = snapshot.mode
+      Object.assign(options, {
+        ...snapshot.options,
+        limitByDecks: AUTOMATED_EDHREC_METADATA_ENABLED
+          ? snapshot.options.limitByDecks
+          : false,
+      })
+      cards.value = snapshot.cards ?? []
+      choices.value = snapshot.choices ?? []
+      sparkPalette.value = null
+      resultProvenance.value = Object.freeze({
+        mode: snapshot.mode,
+        options: Object.freeze({
+          ...snapshot.options,
+          selectedColors: Object.freeze([
+            ...snapshot.options.selectedColors,
+          ]),
+        }),
+      })
+      errorMessage.value = ''
+      isLoading.value = false
+    } finally {
+      suppressQueryInvalidation = false
+    }
     view.value = 'draw'
     activePanel.value = null
   }
 
   const removeSaved = (id: string) => {
-    saved.value = saved.value.filter((record) => record.id !== id)
+    const nextSaved = saved.value.filter((record) => record.id !== id)
+    if (nextSaved.length === saved.value.length) return false
+    const previousSaved = saved.value
+    saved.value = nextSaved
+    if (!persistCurrentState()) {
+      saved.value = previousSaved
+      return false
+    }
+    return true
   }
 
   const clearHistory = () => {
+    if (history.value.length === 0) return false
+    const previousHistory = history.value
     history.value = []
+    if (!persistCurrentState()) {
+      history.value = previousHistory
+      return false
+    }
+    return true
   }
 
   const clearSaved = () => {
+    if (saved.value.length === 0) return false
+    const previousSaved = saved.value
     saved.value = []
+    if (!persistCurrentState()) {
+      saved.value = previousSaved
+      return false
+    }
+    return true
   }
 
   const resetOptions = () => {
     Object.assign(options, defaultOptions)
   }
 
+  const commitWorkflowResult = (
+    workflow: ActiveDrawWorkflow,
+    result: {
+      cards: ScryfallCard[]
+      choices?: CommanderChoice[]
+      sparkPalette?: string[] | null
+    }
+  ) => {
+    assertCurrentWorkflow(workflow)
+    const provenance = provenanceFromConfig(workflow.config)
+    resultProvenance.value = provenance
+    cards.value = result.choices ? [] : result.cards
+    choices.value = result.choices ?? []
+    sparkPalette.value = result.sparkPalette ?? null
+    addHistory(buildRecord(result.cards, result.choices, provenance))
+  }
+
   const randomize = async () => {
-    errorMessage.value = ''
-    const current = new AbortController()
-    controller.value?.abort()
-    controller.value = current
-    isLoading.value = true
+    const workflow = beginWorkflow()
+    if (!workflow) return
+    const config = workflow.config
     const nextCards: ScryfallCard[] = []
     try {
-      if (isChoiceMode.value) {
+      if (config.isChoiceMode) {
         const nextChoices: CommanderChoice[] = []
         const seenIds = new Set<string>()
         for (let i = 0; i < 2; i += 1) {
-          if (mode.value === 'partner') {
-            let pair = await fetchPartnerPair(current.signal)
-            let guard = 0
-            while (pair.some((card) => seenIds.has(card.id)) && guard < 6) {
-              pair = await fetchPartnerPair(current.signal)
-              guard += 1
-            }
+          if (config.mode === 'partner') {
+            let pair: [ScryfallCard, ScryfallCard]
+            do {
+              pair = await fetchPartnerPair(workflow)
+            } while (pair.some((card) => seenIds.has(card.id)))
             pair.forEach((card) => seenIds.add(card.id))
             nextChoices.push({ id: createId(), cards: pair })
           } else {
-            let card = await fetchCardMatchingFilters(current.signal, commanderQuery.value, {
-              applyColorFilter: true,
-              extraFilter: matchesSelectedColors,
-              asyncFilter: passesDeckLimit,
-              useRankedRandom: options.useRankCutoff,
-            })
-            let guard = 0
-            while (seenIds.has(card.id) && guard < 6) {
-              card = await fetchCardMatchingFilters(current.signal, commanderQuery.value, {
-                applyColorFilter: true,
-                extraFilter: matchesSelectedColors,
-                asyncFilter: passesDeckLimit,
-                useRankedRandom: options.useRankCutoff,
-              })
-              guard += 1
-            }
+            let card: ScryfallCard
+            do {
+              card = await fetchCardMatchingFilters(
+                workflow,
+                config.queries.commander,
+                {
+                  asyncFilter: passesDeckLimit,
+                  useRankedRandom: config.options.useRankCutoff,
+                }
+              )
+            } while (seenIds.has(card.id))
             seenIds.add(card.id)
             nextChoices.push({ id: createId(), cards: [card] })
           }
         }
-        choices.value = nextChoices
-        cards.value = []
-        addHistory(buildRecord([], nextChoices))
-      } else if (mode.value === 'partner') {
-        const pair = await fetchPartnerPair(current.signal)
+        commitWorkflowResult(workflow, { cards: [], choices: nextChoices })
+      } else if (config.mode === 'partner') {
+        const pair = await fetchPartnerPair(workflow)
         nextCards.push(...pair)
-        cards.value = nextCards
-        choices.value = []
-        addHistory(buildRecord(nextCards))
-      } else {
-        const query = mode.value === 'commander' ? commanderQuery.value : sparkQuery.value
-        const seenIds = new Set<string>()
-        let sparkFilter: ((card: ScryfallCard) => boolean) | null = null
-        let errorLabelOverride: string | undefined
-        if (mode.value === 'spark' && colorCountNumber.value !== null) {
-          const palette = pickRandomPalette(colorCountNumber.value, allowedColors.value)
-          sparkPalette.value = palette
-          sparkFilter = (card) =>
-            isCardWithinPalette(card, palette) && matchesSelectedColors(card)
-          errorLabelOverride = `the ${formatColorIdentity(palette)} palette`
-        } else {
-          sparkPalette.value = null
-        }
-
-        for (let i = 0; i < drawCount.value; i += 1) {
-          let card = await fetchCardMatchingFilters(current.signal, query, {
-            applyColorFilter: mode.value === 'commander',
-            extraFilter: sparkFilter ?? matchesSelectedColors,
-            errorLabel: errorLabelOverride,
-            asyncFilter: mode.value === 'commander' ? passesDeckLimit : undefined,
-            useRankedRandom: mode.value === 'commander' && options.useRankCutoff,
-          })
-          let guard = 0
-          while (seenIds.has(card.id) && guard < 6) {
-            card = await fetchCardMatchingFilters(current.signal, query, {
-              applyColorFilter: mode.value === 'commander',
-              extraFilter: sparkFilter ?? matchesSelectedColors,
-              errorLabel: errorLabelOverride,
-              asyncFilter: mode.value === 'commander' ? passesDeckLimit : undefined,
-              useRankedRandom: mode.value === 'commander' && options.useRankCutoff,
-            })
-            guard += 1
+        commitWorkflowResult(workflow, { cards: nextCards })
+      } else if (config.mode === 'commander') {
+        const card = await fetchCardMatchingFilters(
+          workflow,
+          config.queries.commander,
+          {
+            asyncFilter: passesDeckLimit,
+            useRankedRandom: config.options.useRankCutoff,
           }
-          seenIds.add(card.id)
-          nextCards.push(card)
-        }
-        cards.value = nextCards
-        choices.value = []
-        addHistory(buildRecord(nextCards))
+        )
+        nextCards.push(card)
+        commitWorkflowResult(workflow, { cards: nextCards })
+      } else {
+        const nextSparkPalette = config.colorFilter.pickSparkPalette()
+        const seenIds = new Set<string>()
+        do {
+          nextCards.length = 0
+          seenIds.clear()
+          for (let i = 0; i < config.drawCount; i += 1) {
+            let card: ScryfallCard
+            do {
+              card = await fetchCardMatchingFilters(
+                workflow,
+                config.queries.spark,
+                {
+                  palette: nextSparkPalette,
+                }
+              )
+            } while (seenIds.has(card.id))
+            seenIds.add(card.id)
+            nextCards.push(card)
+          }
+        } while (
+          !config.colorFilter.matchesResult(nextCards, nextSparkPalette)
+        )
+        commitWorkflowResult(workflow, {
+          cards: nextCards,
+          sparkPalette: nextSparkPalette ? [...nextSparkPalette] : null,
+        })
       }
       await nextTick()
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return
-      }
-      errorMessage.value =
-        error instanceof Error ? error.message : 'Unable to fetch a random card.'
+      handleWorkflowError(
+        error,
+        workflow,
+        'Unable to fetch a random card.'
+      )
     } finally {
-      if (controller.value === current) {
-        isLoading.value = false
-      }
+      finishWorkflow(workflow)
     }
   }
 
   const randomizePartnerForPrimary = async () => {
     const primary = primaryCard.value
     if (!primary) return
-    errorMessage.value = ''
-    const current = new AbortController()
-    controller.value?.abort()
-    controller.value = current
-    isLoading.value = true
+    const workflow = beginWorkflow()
+    if (!workflow) return
     try {
-      const partner = await fetchPartnerForCard(
-        primary,
-        current.signal,
-        colorCountNumber.value
-      )
+      const partner = await fetchPartnerForCard(primary, workflow)
       if (!partner) {
         throw new Error("This commander doesn't have a compatible partner.")
       }
-      cards.value = [primary, partner]
+      assertCurrentWorkflow(workflow)
+      const provenance = provenanceFromConfig(workflow.config)
+      cards.value = requireLegalPartnerPair(primary, partner)
       choices.value = []
-      addHistory(buildRecord(cards.value))
+      sparkPalette.value = null
+      resultProvenance.value = provenance
+      addHistory(buildRecord(cards.value, undefined, provenance))
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return
-      }
-      errorMessage.value =
-        error instanceof Error ? error.message : 'Unable to fetch a partner.'
+      handleWorkflowError(error, workflow, 'Unable to fetch a partner.')
     } finally {
-      if (controller.value === current) {
-        isLoading.value = false
-      }
+      finishWorkflow(workflow)
     }
   }
 
@@ -1020,24 +1410,13 @@ export const useRandomanderStore = defineStore('randomander', () => {
     const choice = choices.value[index]
     const primary = choice?.cards[0]
     if (!primary) return
-    errorMessage.value = ''
-    const current = new AbortController()
-    controller.value?.abort()
-    controller.value = current
-    isLoading.value = true
+    const workflow = beginWorkflow()
+    if (!workflow) return
     try {
       const primaryIsBackground = isBackgroundCard(primary)
       const companion = primaryIsBackground
-        ? await fetchCommanderForBackground(
-            primary,
-            current.signal,
-            colorCountNumber.value
-          )
-        : await fetchPartnerForCard(
-            primary,
-            current.signal,
-            colorCountNumber.value
-          )
+        ? await fetchCommanderForBackground(primary, workflow)
+        : await fetchPartnerForCard(primary, workflow)
       if (!companion) {
         throw new Error(
           primaryIsBackground
@@ -1045,87 +1424,126 @@ export const useRandomanderStore = defineStore('randomander', () => {
             : "This commander doesn't have a compatible partner."
         )
       }
+      assertCurrentWorkflow(workflow)
+      const currentChoice = choices.value[index]
+      if (!currentChoice || currentChoice.id !== choice.id) {
+        throw new DOMException('The draw workflow was cancelled.', 'AbortError')
+      }
       choices.value[index] = {
-        ...choice,
+        ...currentChoice,
         cards: primaryIsBackground
-          ? [companion, primary]
-          : [primary, companion],
+          ? requireLegalPartnerPair(companion, primary)
+          : requireLegalPartnerPair(primary, companion),
       }
-      addHistory(buildRecord([], choices.value))
+      const provenance = provenanceFromConfig(workflow.config)
+      resultProvenance.value = provenance
+      addHistory(buildRecord([], choices.value, provenance))
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return
-      }
-      errorMessage.value =
-        error instanceof Error ? error.message : 'Unable to fetch a partner.'
+      handleWorkflowError(error, workflow, 'Unable to fetch a partner.')
     } finally {
-      if (controller.value === current) {
-        isLoading.value = false
-      }
+      finishWorkflow(workflow)
     }
   }
 
   const randomizeCommanderForBackground = async () => {
     const background = primaryCard.value
     if (!isBackgroundCard(background)) return
-    errorMessage.value = ''
-    const current = new AbortController()
-    controller.value?.abort()
-    controller.value = current
-    isLoading.value = true
+    const workflow = beginWorkflow()
+    if (!workflow) return
     try {
-      const commander = await fetchCommanderForBackground(
-        background,
-        current.signal,
-        colorCountNumber.value
-      )
-      cards.value = [commander, background]
+      const commander = await fetchCommanderForBackground(background, workflow)
+      assertCurrentWorkflow(workflow)
+      const provenance = provenanceFromConfig(workflow.config)
+      cards.value = requireLegalPartnerPair(commander, background)
       choices.value = []
-      addHistory(buildRecord(cards.value))
+      sparkPalette.value = null
+      resultProvenance.value = provenance
+      addHistory(buildRecord(cards.value, undefined, provenance))
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return
-      }
-      errorMessage.value =
-        error instanceof Error ? error.message : 'Unable to fetch a commander.'
+      handleWorkflowError(error, workflow, 'Unable to fetch a commander.')
     } finally {
-      if (controller.value === current) {
-        isLoading.value = false
-      }
+      finishWorkflow(workflow)
     }
   }
 
-  const loadTagsForGroups = async (groups: ScryfallCard[][]) => {
-    if (!display.showTags || mode.value === 'spark' || !metadataSurfaceVisible.value) {
-      return
-    }
+  const getMetadataTargetsForGroups = (groups: ScryfallCard[][]) => {
     const targets = new Map<string, string[]>()
     groups.forEach((group) => {
       if (!group.length) return
       if (display.usePairTags && isPairGroup(group)) {
         if (group.some((card) => usesCommanderLink(card))) {
           const pairSlug = getPairSlug(group)
+          if (!pairSlug) return
           const alphabeticalSlug = group
             .map((card) => getCardSlug(card))
             .slice()
             .sort((a, b) => a.localeCompare(b))
             .join('-')
           const candidates =
-            alphabeticalSlug === pairSlug ? [pairSlug] : [pairSlug, alphabeticalSlug]
+            alphabeticalSlug === pairSlug
+              ? [pairSlug]
+              : [pairSlug, alphabeticalSlug]
           targets.set(pairSlug, candidates)
         }
         return
       }
       group.forEach((card) => {
         if (!shouldShowTags(card)) return
-          const slug = getCardSlug(card)
+        const slug = getCardSlug(card)
+        if (!slug) return
         targets.set(slug, [slug])
       })
     })
+    return targets
+  }
+
+  const metadataFailureMessage = (error: unknown) => {
+    if (error instanceof RequestTimeoutError) {
+      return 'EDHREC metadata timed out. Try again.'
+    }
+    if (error instanceof HttpError) {
+      return `EDHREC metadata could not load (${error.status}). Try again.`
+    }
+    if (error instanceof RuntimeDataError) {
+      return `EDHREC metadata could not be used. ${error.message}`
+    }
+    return 'EDHREC metadata could not load. Try again.'
+  }
+
+  const abortMetadataRequests = () => {
+    tagRequestId.value += 1
+    tagController.value?.abort()
+    tagController.value = null
+  }
+
+  const clearMetadataMemory = () => {
+    abortMetadataRequests()
+    tagLookup.value = {}
+    metadataStateLookup.value = {}
+    metaCache.clear()
+  }
+
+  const loadTagsForGroups = async (
+    groups: ScryfallCard[][],
+    forceKeys: ReadonlySet<string> = new Set()
+  ) => {
+    if (
+      !AUTOMATED_EDHREC_METADATA_ENABLED ||
+      !display.showTags ||
+      mode.value === 'spark' ||
+      !metadataSurfaceVisible.value
+    ) {
+      return
+    }
+    const targets = getMetadataTargetsForGroups(groups)
     if (targets.size === 0) return
 
     const missing = Array.from(targets.keys()).filter(
-      (key) => !(key in tagLookup.value)
+      (key) => {
+        if (forceKeys.has(key)) return true
+        const state = metadataStateLookup.value[key]?.status ?? 'idle'
+        return state === 'idle'
+      }
     )
     if (missing.length === 0) return
 
@@ -1134,34 +1552,86 @@ export const useRandomanderStore = defineStore('randomander', () => {
     const current = new AbortController()
     tagController.value?.abort()
     tagController.value = current
+    metadataStateLookup.value = {
+      ...metadataStateLookup.value,
+      ...Object.fromEntries(
+        missing.map((key) => [key, { status: 'loading', error: '' }])
+      ),
+    }
 
     await Promise.all(
       missing.map(async (slug) => {
         try {
           const candidates = targets.get(slug) ?? [slug]
-          let tags: EdhrecTag[] | null = null
+          let meta: EdhrecMeta | null = null
+          let lastError: unknown = null
           for (const candidate of candidates) {
             try {
-              const meta = await getEdhrecMeta(candidate, current.signal)
-              tags = meta.tags
+              meta = await getEdhrecMeta(candidate, current.signal)
               break
             } catch (error) {
               if (error instanceof Error && error.name === 'AbortError') {
                 throw error
               }
+              lastError = error
             }
           }
+          if (!meta) {
+            throw lastError ?? new Error('No metadata response was available.')
+          }
           if (tagRequestId.value !== requestId) return
-          tagLookup.value = { ...tagLookup.value, [slug]: tags ?? [] }
+          tagLookup.value = { ...tagLookup.value, [slug]: meta.tags }
+          metadataStateLookup.value = {
+            ...metadataStateLookup.value,
+            [slug]: {
+              status: meta.tags.length > 0 ? 'success-data' : 'success-empty',
+              error: '',
+            },
+          }
         } catch (error) {
           if (error instanceof Error && error.name === 'AbortError') {
             return
           }
           if (tagRequestId.value !== requestId) return
-          tagLookup.value = { ...tagLookup.value, [slug]: [] }
+          const nextTags = { ...tagLookup.value }
+          delete nextTags[slug]
+          tagLookup.value = nextTags
+          metadataStateLookup.value = {
+            ...metadataStateLookup.value,
+            [slug]: {
+              status: 'error',
+              error: metadataFailureMessage(error),
+            },
+          }
         }
       })
     )
+    if (tagRequestId.value === requestId) {
+      tagController.value = null
+    }
+  }
+
+  const retryMetadataForCard = (
+    card: ScryfallCard,
+    group: ScryfallCard[]
+  ) => {
+    if (!AUTOMATED_EDHREC_METADATA_ENABLED) return false
+    const key = getTagKeyForCard(card, group)
+    if (!key) return false
+    const targets = getMetadataTargetsForGroups([group])
+    const candidates = targets.get(key)
+    if (!candidates) return false
+
+    const nextTags = { ...tagLookup.value }
+    delete nextTags[key]
+    tagLookup.value = nextTags
+    candidates.forEach((candidate) => metaCache.delete(candidate))
+    metadataStateLookup.value = {
+      ...metadataStateLookup.value,
+      [key]: { status: 'idle', error: '' },
+    }
+    void loadTagsForGroups([group], new Set([key]))
+    return true
   }
 
   const openPanel = (panel: ActivePanelKey) => {
@@ -1196,7 +1666,87 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const clearNetworkCache = () => {
-    clearCache()
+    const result = removeCache()
+    if (result.ok) {
+      clearMetadataMemory()
+      if (pendingDurabilityAction === clearNetworkCache) {
+        pendingDurabilityAction = null
+        persistenceError.value = ''
+      }
+      persistenceNotice.value = 'Cached responses and loaded metadata were cleared.'
+      return true
+    }
+    pendingDurabilityAction = clearNetworkCache
+    persistenceNotice.value = ''
+    persistenceError.value =
+      `Browser storage could not clear the persistent response cache. ${persistenceFailureMessage(result.kind)}`
+    return false
+  }
+
+  const applyClearedLocalState = () => {
+    if (activeWorkflow) cancelWorkflow(activeWorkflow, 'user')
+    suppressQueryInvalidation = true
+    try {
+      view.value = 'draw'
+      mode.value = 'commander'
+      Object.assign(options, {
+        ...DEFAULT_OPTIONS,
+        selectedColors: [],
+        limitByDecks: false,
+      })
+      Object.assign(display, {
+        ...DEFAULT_DISPLAY,
+        showTags: AUTOMATED_EDHREC_METADATA_ENABLED
+          ? DEFAULT_DISPLAY.showTags
+          : false,
+      })
+      Object.assign(cacheSettings, DEFAULT_CACHE)
+      Object.assign(performance, DEFAULT_PERFORMANCE)
+      theme.value = 'system'
+      history.value = []
+      saved.value = []
+      cards.value = []
+      choices.value = []
+      sparkPalette.value = null
+      resultProvenance.value = null
+      metadataSurfaceVisible.value = false
+      errorMessage.value = ''
+      isLoading.value = false
+    } finally {
+      suppressQueryInvalidation = false
+    }
+  }
+
+  const clearAllLocalData = () => {
+    const cacheResult = removeCache()
+    if (!cacheResult.ok) {
+      pendingDurabilityAction = clearAllLocalData
+      persistenceNotice.value = ''
+      persistenceError.value =
+        `Local data was left unchanged because the response cache could not be cleared. ${persistenceFailureMessage(cacheResult.kind)}`
+      return false
+    }
+
+    const stateResult = removeStorage(STORAGE_KEY)
+    if (!stateResult.ok) {
+      pendingDurabilityAction = clearAllLocalData
+      persistenceNotice.value = ''
+      persistenceError.value =
+        `Cached responses were cleared, but settings, History, and Saved pulls remain because browser storage could not clear them. ${persistenceFailureMessage(stateResult.kind)}`
+      return false
+    }
+
+    pendingDurabilityAction = null
+    clearMetadataMemory()
+    suppressPersistenceWatch = true
+    applyClearedLocalState()
+    queueMicrotask(() => {
+      suppressPersistenceWatch = false
+    })
+    persistenceError.value = ''
+    persistenceNotice.value =
+      'All local Randomander data was cleared from this browser.'
+    return true
   }
 
   const applyPerformancePreset = (preset: 'standard' | 'low-power') => {
@@ -1227,29 +1777,34 @@ export const useRandomanderStore = defineStore('randomander', () => {
       () => options.useRankCutoff,
     ],
     () => {
-      errorMessage.value = ''
-    }
+      if (!suppressQueryInvalidation) invalidateResultsForConfiguration()
+    },
+    { deep: true, flush: 'sync' }
   )
 
-  watch([() => mode.value, () => options.colorCount], () => {
-    if (mode.value !== 'spark') {
-      options.excludeGameChangers = false
-    }
-    sparkPalette.value = null
-    if (mode.value === 'spark') {
-      options.twoChoices = false
-      choices.value = []
-      options.limitByDecks = false
-      options.useRankCutoff = false
-    }
-  })
+  watch(
+    [() => mode.value, () => options.colorCount],
+    () => {
+      if (mode.value !== 'spark') {
+        options.excludeGameChangers = false
+      }
+      sparkPalette.value = null
+      if (mode.value === 'spark') {
+        options.twoChoices = false
+        choices.value = []
+        options.limitByDecks = false
+        options.useRankCutoff = false
+      }
+    },
+    { flush: 'sync' }
+  )
 
   watch(
     () => options.selectedColors,
     () => {
       sparkPalette.value = null
     },
-    { deep: true }
+    { deep: true, flush: 'sync' }
   )
 
   watch(
@@ -1258,7 +1813,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
       if (value) {
         options.limitByDecks = false
       }
-    }
+    },
+    { flush: 'sync' }
   )
 
   watch(
@@ -1269,7 +1825,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
       } else {
         choices.value = []
       }
-    }
+    },
+    { flush: 'sync' }
   )
 
   watch(
@@ -1292,25 +1849,16 @@ export const useRandomanderStore = defineStore('randomander', () => {
     { deep: true }
   )
 
+  let isInitialPersistenceWatch = true
   watch(
     [view, activePanel, mode, options, display, cacheSettings, performance, theme, history, saved],
     () => {
-      const persistedPanel =
-        activePanel.value === 'history' || activePanel.value === 'saved'
-          ? activePanel.value
-          : null
-      const payload: PersistedState = {
-        view: persistedPanel ?? view.value,
-        mode: mode.value,
-        options: { ...options },
-        display: { ...display },
-        cache: { ...cacheSettings },
-        performance: { ...performance },
-        theme: theme.value,
-        history: history.value,
-        saved: saved.value,
+      if (suppressPersistenceWatch) return
+      if (isInitialPersistenceWatch) {
+        isInitialPersistenceWatch = false
+        if (!shouldPersistDecodedState) return
       }
-      writeStorage(STORAGE_KEY, payload)
+      persistCurrentState()
     },
     { deep: true, immediate: true }
   )
@@ -1336,6 +1884,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     sparkPalette,
     isLoading,
     errorMessage,
+    persistenceError,
+    persistenceNotice,
+    metadataStateLookup,
     isOptionsOpen,
     isCurrentSaved,
     drawCount,
@@ -1348,6 +1899,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
     selectedColorSet,
     allowedColors,
     colorFilterLabel,
+    colorFilterProblem,
+    colorComparisonDescription,
     sparkPaletteLabel,
     modeLabel,
     stageTitle,
@@ -1369,6 +1922,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     shouldRenderTagPanel,
     getTagsForCard,
     hasTagEntry,
+    getMetadataStateForCard,
     getDeckCountForCard,
     getTagUrlForCard,
     getPartnerButtonLabel,
@@ -1376,6 +1930,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     getRecordFingerprint,
     isRecordSaved,
     randomize,
+    cancelActiveRequest,
     randomizePartnerForPrimary,
     randomizePartnerForChoice,
     addHistory,
@@ -1393,8 +1948,12 @@ export const useRandomanderStore = defineStore('randomander', () => {
     closeOptions,
     closePanel,
     clearNetworkCache,
+    clearAllLocalData,
+    retryPersistence,
+    dismissPersistenceNotice,
     applyPerformancePreset,
     setMetadataSurfaceVisible,
+    retryMetadataForCard,
     formatColorIdentity,
     getTypeLine,
     getTagKeyForCard,

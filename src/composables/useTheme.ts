@@ -20,6 +20,9 @@ export const useTheme = () => {
     const shouldUseDark =
       theme.value === 'dark' || (theme.value === 'system' && prefersDark)
     document.documentElement.classList.toggle('dark', shouldUseDark)
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', shouldUseDark ? '#151218' : '#fff8fb')
   }
 
   onMounted(() => {

@@ -14,6 +14,26 @@ const createCardResponse = (id: string) =>
     }),
   }) as Response
 
+const createSearchResponse = (page: number, totalCards: number) => {
+  const startIndex = (page - 1) * 175
+  const pageLength = Math.min(175, totalCards - startIndex)
+
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers(),
+    json: async () => ({
+      total_cards: totalCards,
+      data: Array.from({ length: pageLength }, (_, index) => ({
+        id: String(startIndex + index),
+        name: `Card ${startIndex + index}`,
+        scryfall_uri: `https://scryfall.com/card/test/${startIndex + index}`,
+        color_identity: [],
+      })),
+    }),
+  } as Response
+}
+
 describe('Scryfall request policy', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -24,12 +44,44 @@ describe('Scryfall request policy', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
+  it.each([
+    ['the first card after the skipped indices', 0, 1, '40'],
+    ['the end of the partially eligible first page', 134.25 / 360, 1, '174'],
+    ['the start of the full middle page', 135.25 / 360, 2, '175'],
+    ['the middle of the full middle page', 180.25 / 360, 2, '220'],
+    ['the start of the partial final page', 310.25 / 360, 3, '350'],
+    ['the end of the partial final page', 359.25 / 360, 3, '399'],
+  ])(
+    'samples %s uniformly across eligible cards',
+    async (_description, randomValue, expectedPage, expectedId) => {
+      const fetchMock = vi.fn((input: string | URL | Request) => {
+        const page = Number(new URL(String(input)).searchParams.get('page') ?? '1')
+        return Promise.resolve(createSearchResponse(page, 400))
+      })
+      vi.stubGlobal('fetch', fetchMock)
+      vi.spyOn(Math, 'random').mockReturnValue(randomValue as number)
+      const { fetchRankedRandomCard } = await import('../../services/scryfall')
+
+      const result = fetchRankedRandomCard('is:commander')
+      await vi.runAllTimersAsync()
+
+      await expect(result).resolves.toMatchObject({ id: expectedId })
+      expect(fetchMock).toHaveBeenCalledTimes(expectedPage === 1 ? 1 : 2)
+      if (expectedPage > 1) {
+        expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
+          `&page=${expectedPage}`
+        )
+      }
+    }
+  )
+
   it('paces independent random-card requests below the upstream limit', async () => {
     let requestNumber = 0
-    const fetchMock = vi.fn(() =>
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve(createCardResponse(String(++requestNumber)))
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -85,36 +137,31 @@ describe('Scryfall request policy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('treats an opaque CORS failure as a cooldown instead of retrying', async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.reject(new TypeError('NetworkError when attempting to fetch resource.'))
-    )
+  it('allows the next paced request to recover immediately after an offline failure', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new TypeError('NetworkError when attempting to fetch resource.')
+      )
+      .mockResolvedValueOnce(createCardResponse('online'))
     vi.stubGlobal('fetch', fetchMock)
     const { fetchRandomCard } = await import('../../services/scryfall')
 
     const first = fetchRandomCard('is:commander')
-    const firstRejection = expect(first).rejects.toThrow(
-      /may be rate-limiting this connection/i
-    )
+    const firstRejection = expect(first).rejects.toMatchObject({
+      kind: 'network',
+      recoverable: true,
+    })
     await vi.advanceTimersByTimeAsync(0)
     await firstRejection
 
-    const blocked = fetchRandomCard('is:commander')
-    const blockedRejection = expect(blocked).rejects.toThrow(
-      /may be rate-limiting this connection/i
-    )
-    await vi.advanceTimersByTimeAsync(0)
-    await blockedRejection
+    const recovered = fetchRandomCard('is:commander')
+    await vi.advanceTimersByTimeAsync(149)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
 
-    await vi.advanceTimersByTimeAsync(59_999)
-    const stillBlocked = fetchRandomCard('is:commander')
-    const stillBlockedRejection = expect(stillBlocked).rejects.toThrow(
-      /may be rate-limiting this connection/i
-    )
-    await vi.advanceTimersByTimeAsync(0)
-    await stillBlockedRejection
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await expect(recovered).resolves.toMatchObject({ id: 'online' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('cancels a queued request without sending it', async () => {
@@ -196,5 +243,71 @@ describe('Scryfall request policy', () => {
       fetchCardByExactName('Cached Card', undefined, cache)
     ).resolves.toMatchObject({ id: 'cached' })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns a typed recoverable data error for a malformed card response', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ id: 'missing-required-fields' }),
+      } as Response)
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchRandomCard } = await import('../../services/scryfall')
+
+    const draw = fetchRandomCard('is:commander')
+    const rejection = expect(draw).rejects.toMatchObject({
+      name: 'ScryfallRequestError',
+      kind: 'data',
+      recoverable: true,
+      cause: {
+        name: 'RuntimeDataError',
+        source: 'scryfall',
+      },
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await rejection
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects malformed ranked search envelopes without a follow-up request', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ data: 'not-an-array', total_cards: 10 }),
+      } as Response)
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchRankedRandomCard } = await import('../../services/scryfall')
+
+    const draw = fetchRankedRandomCard('is:commander')
+    const rejection = expect(draw).rejects.toMatchObject({ kind: 'data' })
+    await vi.advanceTimersByTimeAsync(0)
+    await rejection
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('evicts a malformed named-card cache entry and recovers from the network', async () => {
+    const { setCachedValue } = await import('../../lib/cache')
+    const cache = {
+      enabled: true,
+      ttlMs: 60_000,
+      maxEntries: 10,
+      key: 'named-card-fixture',
+    }
+    setCachedValue(cache.key, { id: 'malformed' }, cache.ttlMs, cache.maxEntries)
+    const fetchMock = vi.fn(() => Promise.resolve(createCardResponse('recovered')))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+
+    const request = fetchCardByExactName('Recovered', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+
+    await expect(request).resolves.toMatchObject({ id: 'recovered' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

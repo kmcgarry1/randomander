@@ -1,0 +1,29 @@
+name: Documentation report
+description: Report missing, incorrect, or unclear documentation.
+title: "[Docs]: "
+labels: [documentation, needs-triage]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Page or section
+      placeholder: docs/user-guide.md — Partner pair mode
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is incorrect or unclear?
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: Suggested correction or missing information
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked the current default-branch documentation.
+          required: true

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, ref } from "vue";
 import { storeToRefs } from "pinia";
 import {
   ArrowLeftIcon,
@@ -7,10 +8,15 @@ import {
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/vue/24/outline";
-import { useRandomanderStore, modes } from "../../stores/randomander";
-import { getCardImageUrl } from "../../lib/scryfall";
+import {
+  MAX_SAVED,
+  useRandomanderStore,
+  modes,
+} from "../../stores/randomander";
+import { getCardThumbnailUrl } from "../../lib/scryfall";
 import type { PullRecord } from "../../stores/randomander";
 import ManaIdentity from "../../components/mtg/ManaIdentity.vue";
+import ConfirmationDialog from "../../components/layout/ConfirmationDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -23,6 +29,10 @@ const props = withDefaults(
 
 const store = useRandomanderStore();
 const { saved } = storeToRefs(store);
+const clearDialogOpen = ref(false);
+const clearCount = ref(0);
+const announcement = ref("");
+const closeButtonRef = ref<HTMLButtonElement | null>(null);
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("en-US", {
@@ -69,8 +79,22 @@ const handleRemove = (record: PullRecord) => {
   store.removeSaved(record.id);
 };
 
-const handleClear = () => {
-  store.clearSaved();
+const requestClear = () => {
+  if (!saved.value.length) return;
+  clearCount.value = saved.value.length;
+  clearDialogOpen.value = true;
+};
+
+const confirmClear = async () => {
+  const count = clearCount.value;
+  const didClear = store.clearSaved();
+  clearDialogOpen.value = false;
+  if (!didClear) return;
+  announcement.value = "";
+  await nextTick();
+  announcement.value = `Cleared ${count} saved pull${count === 1 ? "" : "s"}.`;
+  await nextTick();
+  closeButtonRef.value?.focus({ preventScroll: true });
 };
 
 const handleClose = () => {
@@ -80,13 +104,19 @@ const handleClose = () => {
   }
   store.view = "draw";
 };
+
+const goToDraw = async () => {
+  handleClose();
+  await nextTick();
+  document.getElementById("draw-randomize")?.focus({ preventScroll: true });
+};
 </script>
 
 <template>
   <section
     :class="['mx-auto max-w-6xl space-y-6', props.panel ? '' : 'mt-6']"
   >
-    <header class="flex items-start gap-3 px-1 sm:gap-4">
+    <header class="flex flex-wrap items-start gap-3 px-1 sm:gap-4">
       <div
         class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)] sm:flex"
         aria-hidden="true"
@@ -104,19 +134,29 @@ const handleClose = () => {
           <BookmarkIcon class="h-4 w-4" aria-hidden="true" />
           <span>{{ saved.length }} saved</span>
         </div>
+        <p class="mt-2 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+          Saved holds up to {{ MAX_SAVED }} pulls. At capacity, you choose before
+          the oldest pull is replaced.
+        </p>
       </div>
 
-      <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+      <div class="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
         <button
           type="button"
-          class="m3-button m3-button--text text-[var(--md-sys-color-error)]"
+          class="m3-button m3-button--text max-w-full whitespace-normal px-3 text-center text-[var(--md-sys-color-error)]"
           :disabled="saved.length === 0"
-          @click="handleClear"
+          :aria-label="
+            saved.length
+              ? `Clear all ${saved.length} saved pull${saved.length === 1 ? '' : 's'}`
+              : 'Clear saved pulls (empty)'
+          "
+          @click="requestClear"
         >
           <TrashIcon class="h-5 w-5" aria-hidden="true" />
           Clear saved
         </button>
         <button
+          ref="closeButtonRef"
           type="button"
           class="m3-icon-button"
           :aria-label="props.panel ? 'Close' : 'Back to draw'"
@@ -127,6 +167,10 @@ const handleClose = () => {
         </button>
       </div>
     </header>
+
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {{ announcement }}
+    </p>
 
     <section
       v-if="saved.length === 0"
@@ -150,6 +194,14 @@ const handleClose = () => {
       >
         Save a draw to find it here.
       </p>
+      <button
+        type="button"
+        class="m3-button m3-button--filled mt-5"
+        @click="goToDraw"
+      >
+        Start a draw
+        <ArrowRightIcon class="h-5 w-5" aria-hidden="true" />
+      </button>
     </section>
 
     <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4" role="list">
@@ -188,9 +240,9 @@ const handleClose = () => {
               <img
                 v-for="card in group"
                 :key="card.id"
-                :src="getCardImageUrl(card)"
+                :src="getCardThumbnailUrl(card)"
                 :alt="card.name"
-                class="h-20 w-[3.6rem] rounded-[0.65rem] border-2 border-[var(--md-sys-color-surface-container)] object-cover shadow-sm sm:h-24 sm:w-[4.3rem]"
+                class="h-20 w-[3.6rem] rounded-[0.65rem] border-2 border-[var(--md-sys-color-surface-container)] bg-black object-contain shadow-sm sm:h-24 sm:w-[4.3rem]"
                 loading="lazy"
               />
             </div>
@@ -248,5 +300,15 @@ const handleClose = () => {
         </div>
       </article>
     </div>
+
+    <ConfirmationDialog
+      v-if="clearDialogOpen"
+      :title="`Clear ${clearCount} saved pull${clearCount === 1 ? '' : 's'}?`"
+      :description="`This will permanently remove ${clearCount} saved pull${clearCount === 1 ? '' : 's'} from this device.`"
+      :confirm-label="`Clear ${clearCount} pull${clearCount === 1 ? '' : 's'}`"
+      danger
+      @cancel="clearDialogOpen = false"
+      @confirm="confirmClear"
+    />
   </section>
 </template>

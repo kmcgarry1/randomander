@@ -25,7 +25,9 @@ For a feature request, explain the user problem before proposing an implementati
 
 ## Development environment
 
-Installed Vite tooling requires Node.js `^20.19.0` or `>=22.12.0`. CI currently uses Node.js 20; for local development, prefer a maintained Vite-compatible release such as Node.js 22.12+ or 24. npm ships with Node.
+The supported runtimes are Node.js `^22.12.0` and `^24.0.0`. CI verifies both LTS lines, and `.nvmrc` selects Node.js 24 for local development. npm ships with Node; the repository pins the expected npm version in `package.json`.
+
+The 1.0 browser baseline is Chrome/Edge 112+, Firefox 112+, and Safari/iOS Safari 16.4+. Vite emits ES2020 syntax. CI uses Playwright's bundled Chromium, Firefox, and WebKit engines on desktop plus Chromium/WebKit phone emulation; release sign-off still requires current physical iOS Safari and Android Chrome checks.
 
 No API key, `.env` file, local database, or application server is required. The browser makes direct requests to Scryfall and EDHREC.
 
@@ -54,6 +56,15 @@ npm run dev -- --host
 # Complete test suite
 npm run test
 
+# Type-check test and browser-test sources
+npm run typecheck:test
+
+# Enforce risk-based coverage floors
+npm run test:coverage
+
+# Run mocked release journeys in desktop and phone browser projects
+npm run test:e2e
+
 # Watch tests
 npm run test:watch
 
@@ -70,7 +81,7 @@ npm run build
 npm run preview
 ```
 
-There are no standalone lint, format, typecheck, coverage, or deployment scripts at present. Do not report an unconfigured command as a completed check.
+There are no standalone lint or format scripts. Test-source type-checking, coverage, browser E2E, security, and deployment-smoke commands are configured; see [Testing and release evidence](docs/testing.md) for their scope and prerequisites.
 
 ## Branch and commit workflow
 
@@ -184,14 +195,17 @@ Add the narrowest test that would have prevented the regression, then cover the 
 
 ### Required automated checks
 
-Run both before requesting review:
+Run the release gates before requesting review:
 
 ```bash
 npm run test
+npm run typecheck:test
+npm run test:coverage
+npm run test:e2e
 npm run build
 ```
 
-`npm run build` excludes test files from its TypeScript project, so a successful build does not imply tests compiled or passed.
+`npm run build` excludes test files from its TypeScript project, so a successful build does not imply tests compiled or passed. Install Playwright's browser engines as described in [Testing and release evidence](docs/testing.md) before the first E2E run.
 
 If a check cannot run, explain exactly why in the pull request. Do not mark it complete based only on expected behavior.
 
@@ -261,6 +275,8 @@ Before opening or updating a pull request:
 - [ ] Unrelated work and formatting were left intact.
 - [ ] Behavior changes include appropriate tests.
 - [ ] `npm run test` passes.
+- [ ] `npm run typecheck:test` and `npm run test:coverage` pass.
+- [ ] `npm run test:e2e` passes when the change affects a release journey or browser behavior.
 - [ ] `npm run build` passes.
 - [ ] Relevant mobile and desktop layouts were checked.
 - [ ] Keyboard, focus, and reduced-motion behavior were checked when applicable.

@@ -15,7 +15,7 @@ npm run test
 npm run build
 ```
 
-The installed Vite toolchain requires Node.js `^20.19.0` or `>=22.12.0`. CI currently uses Node.js 20. For normal local development, prefer a maintained Vite-compatible release such as Node.js 22.12+ or 24.
+The supported runtimes are Node.js `^22.12.0` and `^24.0.0`. CI verifies both LTS lines, and `.nvmrc` selects Node.js 24 for local development.
 
 No `.env`, API token, database, or local API process is required.
 
@@ -23,7 +23,7 @@ No `.env`, API token, database, or local API process is required.
 
 ### Unsupported engine or syntax errors
 
-Check `node --version`. Upgrade to Node 20.19 or later, or 22.12 or later, then reinstall from the lockfile:
+Check `node --version`. Switch to Node 22.12 or later on the 22.x line, or Node 24, then reinstall from the lockfile:
 
 ```bash
 npm ci
@@ -174,13 +174,15 @@ Randomander preloads artwork but has a four-second safety timeout before proceed
 
 ### Interface feels slow on mobile
 
-Use the **Low power** performance preset, which reduces motion, simplifies the card-art backdrop, and removes translucent blur. You can also disable Card reveal animation and Card-art backdrop separately.
+Use the **Low power** performance preset, which reduces motion, simplifies the decorative backdrop, and removes translucent blur. You can also disable Card reveal animation and Ambient backdrop separately.
 
 Use **Hide** on the mobile Draw mode card to reduce vertical space. The fixed Randomize button should remain above bottom navigation and device safe-area insets.
 
 ## History, Saved, or settings are missing
 
 Durable data is stored only in the current browser profile under `randomander:state:v2`. It does not sync across devices, browsers, normal/private windows, or profiles.
+
+On Draw, **Save pull** adds the current result to Saved; the disabled **Pull saved** state confirms it is already there. History records use the shorter **Save**/**Saved** labels for the same action and state.
 
 Data can disappear when:
 
@@ -191,7 +193,7 @@ Data can disappear when:
 - a quota/security error prevented a write;
 - a different origin, port, protocol, or deployment URL is being used.
 
-History and Saved each retain at most 40 records. Adding a 41st removes the oldest record in that collection.
+History and Saved each retain at most 40 records. History removes its oldest record automatically; Saved asks for confirmation before replacing its oldest record.
 
 ### Inspect stored keys
 
@@ -216,21 +218,21 @@ If only the cache is suspect, do not remove `randomander:state:v2`.
 
 ## Test failures
 
-### Node reports localStorage initialization failure
+### Node reports a localStorage initialization warning
 
-Some newer Node releases expose an experimental global `localStorage`. A local Vitest run can fail before jsdom setup with a message similar to:
+The test setup replaces Node's global `localStorage` with an isolated in-memory implementation, so a plain `npm run test` should pass on both supported Node lines. If Node still prints a message similar to:
 
 ```text
 SecurityError: Cannot initialize local storage without a --localstorage-file path
 ```
 
-As a compatibility diagnostic, reproduce with CI's configured Node 20.19+ line. For normal development, prefer a maintained supported Node release. As a temporary macOS/Linux workaround on a release that exposes the conflicting experimental storage, give it an isolated temporary file:
+confirm that `node --version` reports a supported release and that your shell or editor is not injecting custom Node options:
 
 ```bash
-env NODE_OPTIONS=--localstorage-file=/tmp/randomander-node-localstorage.json npm run test
+env -u NODE_OPTIONS npm run test
 ```
 
-This workaround is not required in CI and should not be added to package scripts without first deciding the project's supported Node policy.
+If the warning persists on Node 22 or 24, include the exact Node and npm versions in a bug report.
 
 ### Tests time out around Scryfall requests
 
@@ -254,10 +256,11 @@ Clear Pinia instances, fetch mocks, `randomander:state:v2`, and `randomander:cac
 
 ### Build passes while a test type error exists
 
-`npm run build` runs the application TypeScript project and Vite, and that TypeScript project excludes `src/__tests__`. Always run both:
+`npm run build` runs the application TypeScript project and Vite, and that TypeScript project excludes test and E2E sources. Run the dedicated test-source compiler as well:
 
 ```bash
 npm run test
+npm run typecheck:test
 npm run build
 ```
 
@@ -293,6 +296,6 @@ If the issue remains reproducible, open a GitHub issue with:
 - steps, expected behavior, and actual behavior;
 - the exact failing command and complete relevant error;
 - console/network evidence with tokens, cookies, and personal data removed;
-- whether clearing cache, reloading, or using Node 20 changed the result.
+- whether clearing cache, reloading, or switching between supported Node 22 and 24 changed the result.
 
 For a visual bug, include a screenshot that shows the full affected surface, not only the misaligned element. For an accessibility bug, name the assistive technology or keyboard sequence when possible.

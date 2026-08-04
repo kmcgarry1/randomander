@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  supported-runtime:
+    name: Supported runtime gate (Node.js 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --global npm@11.6.2
+      - run: npm ci
+      - run: npm run test
+      - run: npm run typecheck:test
+      - run: npm run build
+
+  release:
+    needs: supported-runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --global npm@11.6.2
+      - run: npm ci
+      - run: node scripts/verify-release-tag.mjs
+      - run: npm run release:verify
+      - name: Retain release coverage evidence
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: coverage-release-${{ github.ref_name }}
+          path: coverage
+          if-no-files-found: warn
+          retention-days: 90
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:e2e
+      - name: Retain release browser evidence
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: playwright-release-${{ github.ref_name }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 90
+      - run: npm sbom --package-lock-only --sbom-format=cyclonedx --sbom-type=application > randomander-sbom.json
+      - run: node scripts/generate-license-inventory.mjs > randomander-licenses.json
+      - run: tar -czf randomander-dist-${{ github.ref_name }}.tar.gz dist
+      - run: shasum -a 256 randomander-dist-${{ github.ref_name }}.tar.gz randomander-sbom.json randomander-licenses.json > SHA256SUMS
+      - name: Create draft release with immutable evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --draft \
+            --verify-tag \
+            --target "${GITHUB_SHA}" \
+            --title "Randomander ${GITHUB_REF_NAME}" \
+            --notes "Automated gate evidence: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Before publishing this draft, record the immutable production deployment URL, successful production smoke, known-good rollback deployment, owner/legal approvals, and manual accessibility evidence." \
+            --generate-notes \
+            "randomander-dist-${GITHUB_REF_NAME}.tar.gz" \
+            randomander-sbom.json \
+            randomander-licenses.json \
+            SHA256SUMS
