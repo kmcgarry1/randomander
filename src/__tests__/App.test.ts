@@ -727,6 +727,17 @@ describe('Randomander', () => {
     const inspiration = screen.getByRole('complementary', {
       name: /deck inspiration/i,
     })
+    const detailsToggle = within(inspiration).getByRole('button', {
+      name: /show option details/i,
+    })
+    expect(detailsToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      within(inspiration).queryByRole('region', { name: /option [12]/i })
+    ).not.toBeInTheDocument()
+
+    await user.click(detailsToggle)
+    expect(detailsToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(detailsToggle).toHaveAccessibleName(/hide option details/i)
     const optionRegions = within(inspiration).getAllByRole('region', {
       name: /option [12]/i,
     })
@@ -1034,6 +1045,12 @@ describe('Randomander', () => {
     const inspiration = screen.getByRole('complementary', {
       name: /deck inspiration/i,
     })
+    const detailsToggle = within(inspiration).getByRole('button', {
+      name: /show option details/i,
+    })
+    expect(detailsToggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(detailsToggle)
+    expect(detailsToggle).toHaveAttribute('aria-expanded', 'true')
     const optionRegions = within(inspiration).getAllByRole('region', {
       name: /option [12]/i,
     })

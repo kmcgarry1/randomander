@@ -66,6 +66,9 @@ describe("responsive and image-integrity contracts", () => {
     const cardList = screen.getByRole("list", { name: "Cards in option 1" });
     expect(cardList).toHaveClass("flex-col", "sm:flex-row", "min-w-0");
     expect(cardList.className).not.toContain("min-[360px]:flex-row");
+    expect(cardList.className).not.toContain("min-h-[17rem]");
+    expect(cardList.className).not.toContain("sm:min-h-[21rem]");
+    expect(cardList).not.toHaveClass("justify-end");
     for (const item of within(cardList).getAllByRole("listitem")) {
       expect(item).toHaveClass("w-full", "min-w-0");
     }
@@ -107,24 +110,21 @@ describe("responsive and image-integrity contracts", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders an unavailable label instead of an invalid EDHREC link", () => {
+  it("renders an unavailable detail instead of an invalid EDHREC link", () => {
     const cardWithoutAnEdhrecIdentifier = createCard("non-latin", "東京");
-    render(ChoiceOptionsSection, {
+    render(ResultDetailsSection, {
       props: {
-        choices: [
-          { id: "choice-without-edhrec", cards: [cardWithoutAnEdhrecIdentifier] },
-        ],
-        isLoading: false,
-        revealComplete: true,
-        canRandomizeChoicePartner: () => false,
-        onChoicePartner: () => undefined,
-        getPartnerButtonLabel: () => "Find partner",
+        cards: [cardWithoutAnEdhrecIdentifier],
+        group: [cardWithoutAnEdhrecIdentifier],
+        showLinks: true,
+        showMetadata: false,
       },
+      global: { plugins: [createPinia()] },
     });
 
-    expect(screen.getByText("東京 EDHREC unavailable")).toBeInTheDocument();
+    expect(screen.getByText("EDHREC unavailable")).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /東京 edhrec/i }),
+      screen.queryByRole("link", { name: /edhrec/i }),
     ).not.toBeInTheDocument();
   });
 

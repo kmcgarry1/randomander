@@ -141,6 +141,56 @@ test('completes a choice and turns a double-faced card independently', async ({
     .getByRole('list', { name: 'Cards in option 2' })
     .locator('xpath=ancestor::article')
 
+  const [optionOneBox, optionTwoBox, resultBox, inspirationBox] =
+    await Promise.all([
+      optionOne.boundingBox(),
+      optionTwo.boundingBox(),
+      page.getByRole('region', { name: 'Randomizer result' }).boundingBox(),
+      page
+        .getByRole('complementary', { name: 'Deck inspiration' })
+        .boundingBox(),
+    ])
+  expect(optionOneBox).not.toBeNull()
+  expect(optionTwoBox).not.toBeNull()
+  expect(resultBox).not.toBeNull()
+  expect(inspirationBox).not.toBeNull()
+  if (optionOneBox && optionTwoBox) {
+    if ((page.viewportSize()?.width ?? 0) >= 1280) {
+      expect(Math.abs(optionOneBox.y - optionTwoBox.y)).toBeLessThanOrEqual(1)
+      expect(optionOneBox.x + optionOneBox.width).toBeLessThanOrEqual(
+        optionTwoBox.x + 1,
+      )
+    } else {
+      expect(optionTwoBox.y).toBeGreaterThanOrEqual(
+        optionOneBox.y + optionOneBox.height - 1,
+      )
+    }
+  }
+  if (resultBox && inspirationBox) {
+    expect(inspirationBox.y).toBeGreaterThanOrEqual(
+      resultBox.y + resultBox.height - 1,
+    )
+  }
+
+  const optionOneMedia = optionOne.locator('[data-choice-media]')
+  const [mediaBox, firstCardBox] = await Promise.all([
+    optionOneMedia.boundingBox(),
+    optionOneMedia.getByRole('listitem').boundingBox(),
+  ])
+  expect(mediaBox).not.toBeNull()
+  expect(firstCardBox).not.toBeNull()
+  if (mediaBox && firstCardBox) {
+    expect(Math.abs(firstCardBox.y - mediaBox.y)).toBeLessThanOrEqual(1)
+  }
+
+  const inspiration = page.getByRole('complementary', {
+    name: 'Deck inspiration',
+  })
+  await expect(
+    inspiration.getByRole('button', { name: 'Show option details' }),
+  ).toHaveAttribute('aria-expanded', 'false')
+  await expect(optionOne.getByRole('link')).toHaveCount(0)
+
   await optionTwo
     .getByRole('button', { name: 'Show Fixture Back (back face)' })
     .click()

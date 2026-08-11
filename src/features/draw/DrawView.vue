@@ -638,6 +638,7 @@ watchEffect(() => {
 
       <section
         class="relative min-w-0 overflow-hidden rounded-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container-lowest)] p-3 shadow-[var(--md-sys-elevation-1)] sm:p-6"
+        :class="{ 'xl:col-span-2': isChoiceMode && choices.length }"
         aria-label="Randomizer result"
       >
         <DrawBackdrop
@@ -669,7 +670,6 @@ watchEffect(() => {
             v-if="isChoiceMode && choices.length"
             :choices="choices"
             :is-loading="isLoading || revealInProgress"
-            :show-links="display.showLinks && revealComplete"
             :can-randomize-choice-partner="canRandomizeChoicePartner"
             :on-choice-partner="handleChoicePartner"
             :get-partner-button-label="store.getPartnerButtonLabel"
@@ -736,7 +736,12 @@ watchEffect(() => {
       </section>
 
       <aside
-        class="m3-card m3-card--filled min-w-0 p-4 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-8 xl:p-5"
+        class="m3-card m3-card--filled min-w-0 p-4 lg:col-start-2 xl:p-5"
+        :class="
+          isChoiceMode && choices.length
+            ? 'xl:col-span-2 xl:col-start-2 xl:row-start-2'
+            : 'xl:col-start-3 xl:row-start-1 xl:sticky xl:top-8'
+        "
         aria-labelledby="inspiration-title"
       >
         <div class="flex min-w-0 flex-col items-start gap-3 sm:flex-row">
@@ -768,25 +773,49 @@ watchEffect(() => {
 
         <div
           v-else-if="isChoiceMode && choices.length"
-          class="mt-5 min-w-0 max-w-full space-y-4"
+          class="mt-5 min-w-0 max-w-full"
         >
-          <section
-            v-for="(choice, choiceIndex) in choices"
-            :key="`${choice.id}-inspiration`"
-            class="min-w-0 max-w-full rounded-2xl bg-[var(--md-sys-color-surface-container-lowest)] p-4"
-            :aria-label="`Option ${choiceIndex + 1}: ${choice.cards.map((card) => card.name).join(' + ')}`"
+          <button
+            type="button"
+            class="m3-button m3-button--tonal w-full justify-between"
+            :aria-expanded="detailsOpen"
+            aria-controls="choice-details-panel"
+            @click="toggleDetails"
           >
-            <h3 class="m3-label mb-4">
-              Option {{ choiceIndex + 1 }}
-            </h3>
-            <ResultDetailsSection
-              :cards="choice.cards"
-              :group="choice.cards"
-              :show-links="display.showLinks"
-              :show-metadata="display.showTags"
-              :pair-link-url="getPairLinkUrl(choice.cards)"
+            <span>{{ detailsOpen ? "Hide option details" : "Show option details" }}</span>
+            <component
+              :is="detailsOpen ? ChevronUpIcon : ChevronDownIcon"
+              class="h-5 w-5 shrink-0"
+              aria-hidden="true"
             />
-          </section>
+          </button>
+
+          <Transition name="details-sheet">
+            <div
+              v-if="detailsOpen"
+              id="choice-details-panel"
+              data-choice-details-grid
+              class="mt-4 grid min-w-0 max-w-full items-start gap-4 xl:grid-cols-2"
+            >
+              <section
+                v-for="(choice, choiceIndex) in choices"
+                :key="`${choice.id}-inspiration`"
+                class="min-w-0 max-w-full rounded-2xl bg-[var(--md-sys-color-surface-container-lowest)] p-4"
+                :aria-label="`Option ${choiceIndex + 1}: ${choice.cards.map((card) => card.name).join(' + ')}`"
+              >
+                <p class="m3-label mb-4">
+                  Option {{ choiceIndex + 1 }}
+                </p>
+                <ResultDetailsSection
+                  :cards="choice.cards"
+                  :group="choice.cards"
+                  :show-links="display.showLinks"
+                  :show-metadata="display.showTags"
+                  :pair-link-url="getPairLinkUrl(choice.cards)"
+                />
+              </section>
+            </div>
+          </Transition>
         </div>
 
         <div v-else class="mt-5">
