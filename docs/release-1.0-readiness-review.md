@@ -7,6 +7,8 @@
 
 This document is the cross-functional handoff from Product, UX, Accessibility, Engineering, Data/API, Performance, QA, Security, Privacy/Legal, DevOps/Release, and Support/Documentation. Each numbered item is written so it can be copied into a GitHub issue with minimal editing.
 
+For the implementation state after this historical review, see the [1.0 remediation status](release-1.0-remediation-status.md). The original findings and commit decision remain unchanged for auditability.
+
 No GitHub issues were created by this review. On 2026-08-03, repository-scoped read-only GitHub issue searches were run separately for open and closed issues in `kmcgarry1/randomander`; neither returned an existing issue to deduplicate against, so every item below is currently treated as net-new.
 
 ## Executive summary

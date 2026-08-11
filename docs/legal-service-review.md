@@ -13,7 +13,7 @@
 | Scryfall data/images | The [Scryfall API rules](https://scryfall.com/docs/api#use-of-scryfall-data-and-images) permit value-added Magic software subject to access and image-handling conditions. | Keep the product free/value-added, retain Scryfall attribution/navigation, and ship only after the image/rate-limit checks below pass. |
 | EDHREC metadata | The [EDHREC Terms of Service](https://edhrec.com/terms) prohibit software/automated agents or scripts from generating automated searches, requests, or queries. No official public-API permission for `json.edhrec.com` was found in the linked terms, FAQ, or guide during this review. | Do not enable automated EDHREC JSON metadata in the public 1.0 build without written permission or owner-approved legal advice establishing another basis. User-initiated outbound links may remain. |
 | Marketplace links | Randomander displays only allowlisted purchase URLs supplied by Scryfall and does not process a purchase or claim its own affiliate relationship. | Approve that description; disclose any future operator affiliate arrangement before enabling it. |
-| Analytics/privacy | [Vercel Web Analytics](https://vercel.com/docs/analytics/privacy-policy) is cookieless/aggregated but still processes page/referrer, approximate location, browser/OS, and device information; reporting retention can vary by plan. | Analytics remains build-time disabled unless the controller, contact, target jurisdictions, lawful basis/consent or opt-out decision, and retention are owner-approved and reflected in the notice. |
+| Analytics/privacy | [Vercel Web Analytics](https://vercel.com/docs/analytics/privacy-policy) is cookieless/aggregated but still processes page/referrer, approximate location, browser/OS, and device information; reporting retention can vary by plan. | Analytics is disabled and rejected by the 1.0 production-policy scan. Enabling it requires controller/contact, jurisdiction, lawful-basis/consent or opt-out, retention, CSP, notice, and scanner decisions to be owner-approved together. |
 | Fonts | Google Fonts was removed; the shipped application uses system fonts. | Confirm production has no third-party font request. |
 
 ## Scryfall implementation checklist
@@ -31,7 +31,7 @@ Scryfall's current API documentation asks browser clients to retain the browser 
 
 ## Fan-content notice
 
-Use this owner-approved substance in the application notice and project documentation:
+The following proposed substance still requires owner approval before use as final legal wording:
 
 > Randomander is unofficial fan content permitted under Wizards of the Coast's Fan Content Policy. Wizards does not approve or endorse it. Some materials are property of Wizards of the Coast LLC. © Wizards of the Coast LLC.
 
@@ -39,9 +39,11 @@ The Randomander “R” mark must not imitate a Wizards, Magic, or set logo. Car
 
 ## EDHREC release gate
 
-The existing browser integration derives commander/pair identifiers and requests `https://json.edhrec.com/pages/commanders/*.json` for deck counts and themes. Those requests are automated even though they originate in each visitor's browser. Caching, throttling, and a low call count reduce load but do not by themselves supply permission.
+The repository retains an internal EDHREC adapter for deterministic contract tests and any future separately approved integration. If enabled, it derives commander/pair identifiers and requests `https://json.edhrec.com/pages/commanders/*.json` for deck counts and themes. Those requests would be automated even though they originate in each visitor's browser; caching, throttling, and a low call count would not by themselves supply permission.
 
-For 1.0, choose one and record the evidence:
+The 1.0 implementation uses the default-off option: public builds compile the automated adapter and endpoint out, force the deck-count filter and metadata display off, retain only validated user-initiated EDHREC links, and fail the production build if an EDHREC JSON endpoint appears in `dist`. The release owner must still approve that boundary and the accompanying notice.
+
+Any future change must use one of these recorded bases:
 
 1. **Default-off (recommended until permission):** compile automated EDHREC metadata out of the public build, keep safe outbound EDHREC links, and explain that metadata can be enabled only after approval.
 2. **Written permission:** retain the approval and any rate, attribution, endpoint, caching, or revocation conditions with the release record.

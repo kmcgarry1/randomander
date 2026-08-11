@@ -10,13 +10,18 @@ import {
   DEFAULT_CACHE,
   DEFAULT_DISPLAY,
   DEFAULT_OPTIONS,
+  DEFAULT_PERFORMANCE,
   PERSISTED_COLLECTION_LIMIT,
   PERSISTED_COLLECTION_SCAN_LIMIT,
   PERSISTED_CARD_LIMITS,
+  PERSISTED_STATE_TARGET_BYTES,
+  PERSISTED_STATE_TRANSFORM_BUDGET_MS,
   PERSISTED_STATE_VERSION,
   decodePersistedState,
   projectPersistedCard,
   projectPersistedRecord,
+  projectPersistedState,
+  type PersistedStateV2,
 } from '../../stores/randomanderPersistence'
 import type { PullRecord } from '../../stores/randomander'
 
@@ -287,9 +292,16 @@ describe('versioned persisted-state decoding', () => {
     expect(decoded.value.history[0]?.choices?.[0]?.cards).toHaveLength(2)
   })
 
-  it('keeps maximum collections plus the 1.5 MB cache inside the conservative storage budget', () => {
-    const rawState = {
+  it('projects maximum collections inside explicit payload and transform budgets', () => {
+    const rawState: PersistedStateV2 = {
       version: PERSISTED_STATE_VERSION,
+      view: 'draw',
+      mode: 'partner',
+      options: { ...DEFAULT_OPTIONS, selectedColors: ['W', 'U'] },
+      display: { ...DEFAULT_DISPLAY },
+      cache: { ...DEFAULT_CACHE },
+      performance: { ...DEFAULT_PERFORMANCE },
+      theme: 'system',
       history: Array.from({ length: PERSISTED_COLLECTION_LIMIT }, (_, index) =>
         representativeChoiceRecord(index)
       ),
@@ -297,25 +309,70 @@ describe('versioned persisted-state decoding', () => {
         representativeChoiceRecord(index + PERSISTED_COLLECTION_LIMIT)
       ),
     }
-    const serialized = JSON.stringify(rawState)
-    const rawStateBytes = new TextEncoder().encode(serialized).byteLength
+    const rawSerialized = JSON.stringify(rawState)
+    const rawStateBytes = new TextEncoder().encode(rawSerialized).byteLength
     const startedAt = performance.now()
+    const projected = projectPersistedState(rawState)
+    const serialized = JSON.stringify(projected)
     const decoded = decodePersistedState(JSON.parse(serialized))
-    const parseAndDecodeDurationMs = performance.now() - startedAt
+    const transformDurationMs = performance.now() - startedAt
 
     expect(decoded.ok).toBe(true)
     if (!decoded.ok) return
+    expect(decoded.repaired).toBe(false)
     expect(decoded.value.history).toHaveLength(PERSISTED_COLLECTION_LIMIT)
     expect(decoded.value.saved).toHaveLength(PERSISTED_COLLECTION_LIMIT)
-    const stateBytes = new TextEncoder().encode(
-      JSON.stringify(decoded.value)
-    ).byteLength
+    const stateBytes = new TextEncoder().encode(serialized).byteLength
 
     expect(stateBytes).toBeLessThan(rawStateBytes * 0.25)
+    expect(stateBytes).toBeLessThanOrEqual(PERSISTED_STATE_TARGET_BYTES)
     expect(stateBytes + DEFAULT_CACHE_MAX_BYTES).toBeLessThanOrEqual(
       CONSERVATIVE_WEB_STORAGE_BUDGET_BYTES
     )
-    expect(parseAndDecodeDurationMs).toBeLessThan(1_000)
+    expect(transformDurationMs).toBeLessThan(
+      PERSISTED_STATE_TRANSFORM_BUDGET_MS
+    )
+  })
+
+  it('strips unknown state, option, and record fields at the write boundary', () => {
+    const source = {
+      version: PERSISTED_STATE_VERSION,
+      view: 'draw',
+      mode: 'commander',
+      options: {
+        ...DEFAULT_OPTIONS,
+        selectedColors: ['W'],
+        privateFilterDraft: 'do not persist',
+      },
+      display: { ...DEFAULT_DISPLAY, privateDisplayDraft: true },
+      cache: { ...DEFAULT_CACHE, privateCacheDraft: true },
+      performance: { ...DEFAULT_PERFORMANCE, privatePerformanceDraft: true },
+      theme: 'system',
+      history: [
+        {
+          ...representativeChoiceRecord(1),
+          privateRecordDraft: 'do not persist',
+        },
+      ],
+      saved: [],
+      privateRootDraft: 'do not persist',
+    } as unknown as PersistedStateV2
+
+    const serialized = JSON.stringify(projectPersistedState(source))
+
+    expect(serialized).not.toContain('private')
+    expect(Object.keys(JSON.parse(serialized))).toEqual([
+      'version',
+      'view',
+      'mode',
+      'options',
+      'display',
+      'cache',
+      'performance',
+      'theme',
+      'history',
+      'saved',
+    ])
   })
 
   it('projects only post-load display and partner-continuation fields', () => {

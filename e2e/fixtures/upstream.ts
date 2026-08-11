@@ -5,6 +5,7 @@ type CardResponse = {
   kind: 'card'
   card: ScryfallCard
   delayMs?: number
+  waitUntil?: Promise<void>
 }
 
 type ErrorResponse = {
@@ -12,6 +13,7 @@ type ErrorResponse = {
   status: number
   delayMs?: number
   retryAfter?: string
+  waitUntil?: Promise<void>
 }
 
 export type PlannedScryfallResponse = CardResponse | ErrorResponse
@@ -22,6 +24,7 @@ export type MockedUpstream = {
   externalAssetRequests: string[]
   unexpectedExternalRequests: string[]
   remainingScryfallResponses: () => number
+  waitForScryfallIdle: () => Promise<void>
 }
 
 const svgDataUrl = (label: string, hue: number) => {
@@ -85,6 +88,17 @@ export const cardResponse = (
   delayMs?: number,
 ): PlannedScryfallResponse => ({ kind: 'card', card, delayMs })
 
+export const deferredCardResponse = (card: ScryfallCard) => {
+  let release!: () => void
+  const waitUntil = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  return {
+    response: { kind: 'card', card, waitUntil } satisfies CardResponse,
+    release,
+  }
+}
+
 export const errorResponse = (
   status: number,
   retryAfter?: string,
@@ -107,6 +121,20 @@ export const installMockedUpstream = async (
   const edhrecRequests: string[] = []
   const externalAssetRequests: string[] = []
   const unexpectedExternalRequests: string[] = []
+  let activeScryfallHandlers = 0
+  const scryfallIdleWaiters = new Set<() => void>()
+
+  const waitForScryfallIdle = () => {
+    if (activeScryfallHandlers === 0) return Promise.resolve()
+    return new Promise<void>((resolve) => scryfallIdleWaiters.add(resolve))
+  }
+
+  const markScryfallHandlerIdle = () => {
+    activeScryfallHandlers -= 1
+    if (activeScryfallHandlers !== 0) return
+    for (const resolve of scryfallIdleWaiters) resolve()
+    scryfallIdleWaiters.clear()
+  }
 
   await page.route('**/*', async (route) => {
     const requestUrl = route.request().url()
@@ -118,33 +146,45 @@ export const installMockedUpstream = async (
     }
 
     if (url.hostname === 'api.scryfall.com') {
-      scryfallRequests.push(requestUrl)
-      const planned = queue.shift()
-      if (!planned) {
+      activeScryfallHandlers += 1
+      try {
+        scryfallRequests.push(requestUrl)
+        const planned = queue.shift()
+        if (!planned) {
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: jsonBody({
+              object: 'error',
+              details: 'Mock Scryfall queue exhausted.',
+            }),
+          })
+          return
+        }
+        if (planned.waitUntil) await planned.waitUntil
+        if (planned.delayMs) await sleep(planned.delayMs)
+        if (planned.kind === 'card') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: jsonBody(planned.card),
+          })
+          return
+        }
         await route.fulfill({
-          status: 500,
+          status: planned.status,
+          headers: planned.retryAfter
+            ? { 'Retry-After': planned.retryAfter }
+            : undefined,
           contentType: 'application/json',
-          body: jsonBody({ object: 'error', details: 'Mock Scryfall queue exhausted.' }),
+          body: jsonBody({
+            object: 'error',
+            details: `Mock failure ${planned.status}.`,
+          }),
         })
-        return
+      } finally {
+        markScryfallHandlerIdle()
       }
-      if (planned.delayMs) await sleep(planned.delayMs)
-      if (planned.kind === 'card') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: jsonBody(planned.card),
-        })
-        return
-      }
-      await route.fulfill({
-        status: planned.status,
-        headers: planned.retryAfter
-          ? { 'Retry-After': planned.retryAfter }
-          : undefined,
-        contentType: 'application/json',
-        body: jsonBody({ object: 'error', details: `Mock failure ${planned.status}.` }),
-      })
       return
     }
 
@@ -201,5 +241,6 @@ export const installMockedUpstream = async (
     externalAssetRequests,
     unexpectedExternalRequests,
     remainingScryfallResponses: () => queue.length,
+    waitForScryfallIdle,
   }
 }

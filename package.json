@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build && node scripts/check-bundle-budget.mjs",
+    "build": "vue-tsc -b && vite build && node scripts/check-production-policy.mjs && node scripts/check-bundle-budget.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

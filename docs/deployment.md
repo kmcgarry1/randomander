@@ -16,7 +16,8 @@ The application deliberately uses Vite `base: '/'`. Subpath hosting is not suppo
 - Node 22 or 24 and the npm version pinned in `package.json`.
 - Clean install with `npm ci`.
 - Production bundle with `npm run build`; output is `dist/`.
-- Analytics is off unless the production build explicitly sets `VITE_ENABLE_ANALYTICS=true` after privacy approval.
+- Analytics is off and the production-policy scanner rejects analytics endpoints. Enabling it requires an owner-approved privacy decision plus a reviewed CSP, notice, and policy-scanner change.
+- Automated EDHREC JSON metadata is compiled out; only validated user-initiated outbound EDHREC links remain.
 - No application API keys are required.
 
 `vercel.json` is the authoritative hosting configuration. It defines the build/output, root hosting, CSP and response headers, HTML revalidation, and immutable caching for hashed assets.
@@ -24,7 +25,7 @@ The application deliberately uses Vite `base: '/'`. Subpath hosting is not suppo
 ## Promotion checklist
 
 1. Confirm the commit passed unit/integration, test type-check, coverage, browser E2E, audit, and production build gates.
-2. Inspect the preview network log. Only documented Scryfall, EDHREC, Vercel Analytics (when enabled), and same-origin requests are permitted.
+2. Inspect the preview network log. Only same-origin assets, the Scryfall API, and documented Scryfall image/symbol hosts are permitted. Verify there are no Google Fonts, automated EDHREC, or analytics requests.
 3. Run `npm run smoke:deployment -- <preview-url>` and complete the manual browser/assistive-technology matrix.
 4. Promote that exact Vercel deployment to the production alias; do not rebuild a different commit for production.
 5. Run the smoke command against <https://randomander.vercel.app/> and record the deployment URL, commit, checks, and rollback target in the GitHub release.

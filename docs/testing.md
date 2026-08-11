@@ -3,7 +3,8 @@
 Randomander uses two complementary automated suites. Vitest exercises domain,
 state, component, persistence, and integration contracts in jsdom. Playwright
 exercises release-critical journeys in real browser engines against deterministic
-mocked Scryfall and EDHREC responses.
+mocked Scryfall responses; the internal EDHREC adapter is exercised only by
+test-mode unit/integration contracts because public builds are link-only.
 
 ## Local commands
 
@@ -73,15 +74,17 @@ queue was consumed as expected.
 
 This contract keeps the suite repeatable and prevents CI from adding traffic to
 public APIs. Live integration availability belongs in deployment smoke checks,
-not in the browser test suite.
+not in the browser test suite. The public browser flows also prove that no
+automated EDHREC, font, image-backdrop, analytics, or unrecognized external
+request escapes the fixture.
 
 ## Risk-based coverage policy
 
 Coverage is intentionally scoped to the release-critical orchestration and data
 boundary: `src/stores/**/*.ts`, `src/services/**/*.ts`, and the cache,
 operational-metrics, Scryfall-domain, and storage helpers under `src/lib/`. The
-initial Node 24 baseline measured 87.04% statements, 81.96% branches, 92.37%
-functions, and 87.04% lines.
+final local Node 24 candidate measured 88.95% statements, 82.98% branches,
+94.89% functions, and 88.95% lines across 33 files / 274 tests.
 CI enforces these floors:
 
 | Metric | Required minimum |
@@ -100,14 +103,14 @@ The risk-focused suite includes these contracts:
 | Risk | Primary automated evidence |
 | --- | --- |
 | Result snapshot immutability and provenance | `stores/randomander.test.ts`, `stores/workflowContracts.test.ts` |
-| Persisted state, corruption/quota recovery, and cache budgets | `lib/storage.test.ts`, `lib/cache.test.ts`, `stores/randomander.test.ts`, service cache tests |
+| Persisted state, corruption/quota recovery, partition migration/reconciliation, and cache budgets | `lib/storage.test.ts`, `lib/cache.test.ts`, `stores/persistenceDecode.test.ts`, `stores/persistenceCoordinator.test.ts`, `stores/randomander.test.ts`, service cache tests |
 | Commander, Partner, Spark, and choice behavior | `App.test.ts`, `stores/workflowContracts.test.ts`, Playwright release smoke |
 | Pair legality and partner/background invariants | `lib/partnerAndEdhrecContracts.test.ts`, `stores/partnerContracts.test.ts` |
 | Color, popularity, choice, and Spark filter combinations | `App.test.ts` and Scryfall-domain contract tests |
 | Shared request budgets, deadlines, cancellation, and late-result suppression | `stores/workflowContracts.test.ts` |
 | Ranked-search page/index boundary sampling | `services/scryfall.test.ts` |
 | Rate-limit, CORS, timeout, HTTP error, retry, and recovery behavior | service tests, `DrawRecovery.test.ts`, Playwright release smoke |
-| Bounded operational counters and redacted diagnostic snapshots | `lib/operationalMetrics.test.ts` |
+| Bounded operational counters, redacted diagnostic snapshots, and draw classification | `lib/operationalMetrics.test.ts`, `lib/drawOutcomeMetrics.test.ts`, store workflow contracts |
 
 `npm run typecheck:test` separately compiles test sources, E2E fixtures, and test
 configuration so type errors outside the production TypeScript project cannot
@@ -117,10 +120,9 @@ silently reach CI.
 
 `npm run build` finishes by measuring the generated assets with gzip level 9. It
 enforces a 90 KiB ceiling for total JavaScript, 75 KiB for the largest JavaScript
-chunk, and 20 KiB for total CSS. On Node 24, the measured 1.0 candidate is 80.92
-KiB total JavaScript, 66.36 KiB for its largest chunk, and 9.85 KiB CSS; the
-Node 22 release gate reports 81.25 KiB, 66.61 KiB, and 9.87 KiB respectively
-because its gzip implementation differs slightly. Raising a ceiling
+chunk, and 20 KiB for total CSS. On the final local snapshot, Node 22 and Node 24
+both report 85.38 KiB total JavaScript across nine chunks, 69.49 KiB for the
+largest chunk, and 9.88 KiB CSS. Raising a ceiling
 requires explicit performance/release review and a pull-request rationale; it
 must not be an incidental response to a failed build.
 

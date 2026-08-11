@@ -83,10 +83,7 @@ requireDirectiveTokens(directives, 'base-uri', ["'self'"])
 requireDirectiveTokens(directives, 'object-src', ["'none'"])
 requireDirectiveTokens(directives, 'frame-ancestors', ["'none'"])
 requireDirectiveTokens(directives, 'form-action', ["'self'"])
-requireDirectiveTokens(directives, 'script-src', [
-  "'self'",
-  'https://va.vercel-scripts.com',
-])
+requireDirectiveTokens(directives, 'script-src', ["'self'"])
 requireDirectiveTokens(directives, 'img-src', [
   "'self'",
   'data:',
@@ -96,14 +93,15 @@ requireDirectiveTokens(directives, 'img-src', [
 requireDirectiveTokens(directives, 'connect-src', [
   "'self'",
   'https://api.scryfall.com',
-  'https://json.edhrec.com',
-  'https://vitals.vercel-insights.com',
 ])
 if (!directives.has('upgrade-insecure-requests')) {
   throw new Error('CSP is missing upgrade-insecure-requests.')
 }
 if (/\*|\bhttp:\/\//i.test(csp)) {
   throw new Error('CSP contains a wildcard or insecure HTTP source.')
+}
+if (/json\.edhrec\.com|va\.vercel-scripts\.com|vitals\.vercel-insights\.com/i.test(csp)) {
+  throw new Error('CSP permits a disabled EDHREC or external analytics origin.')
 }
 
 const hsts = response.headers.get('strict-transport-security') ?? ''

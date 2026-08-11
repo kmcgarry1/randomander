@@ -82,9 +82,8 @@ Try these in order:
 
 1. switch color count from **Exactly** to **Up to** or **Any**;
 2. clear Color focus;
-3. disable the EDHREC deck threshold;
-4. disable Skip top 10%;
-5. randomize again.
+3. disable Skip top 10%;
+4. randomize again.
 
 For Partner pair, remember that the color rule applies to the combined identity of both cards. A legal first card can still have no compatible second card within the active limit.
 
@@ -96,7 +95,7 @@ When successful, the result order should be commander first and Background secon
 
 ### Scryfall cooldown or rate-limit error
 
-Randomander spaces Scryfall request starts by at least 150 ms. An HTTP 429 starts a cooldown of at least 60 seconds, or longer when Scryfall sends a longer `Retry-After`. A network/CORS failure also starts a 60-second cooldown.
+Randomander spaces Scryfall request starts by at least 150 ms. An HTTP 429 starts a cooldown of at least 60 seconds, or longer when Scryfall sends a longer valid `Retry-After`. An ordinary offline, DNS, CORS, or other network `TypeError` does not start that rate-limit cooldown, so a restored connection can recover immediately.
 
 The cooldown is not an automatic retry. Wait for it to expire, then try once. Repeatedly pressing Randomize cannot bypass it.
 
@@ -117,21 +116,15 @@ For a transforming or modal double-faced card, the **Back face** control appears
 
 ## Deck inspiration issues
 
-### Themes never appear
+### EDHREC deck counts or themes do not appear
 
-Confirm all of the following:
+This is expected in the public build. Automated EDHREC JSON requests are disabled, the deck-count filter is hidden, and Settings shows this release boundary instead of a metadata toggle. Deck inspiration retains validated user-initiated links to EDHREC pages.
 
-- the mode is Commander or Partner pair, not 3-card spark;
-- **Settings → EDHREC metadata** is enabled;
-- the reveal has completed or was skipped;
-- the result has a corresponding EDHREC card, commander, or pair page;
-- the browser can reach EDHREC's JSON host.
+If an EDHREC link is absent, Randomander could not derive or validate an `https://edhrec.com` destination for that card or pair. The Scryfall result remains usable. Do not enable the internal adapter in a public deployment without the documented permission and privacy review.
 
-Post-reveal metadata loads only after the result is visible, and failures there degrade to empty metadata rather than failing the Scryfall result. The EDHREC deck-threshold filter is a separate, blocking selection path: if it is enabled, an unavailable count/request can fail the draw.
+### Choice mode shows the wrong option's details or links
 
-### Choice mode shows the wrong option's metadata
-
-Each choice should have a separate **Option 1** or **Option 2** body under Deck inspiration. A pair's deck count/themes should be calculated using only the cards in that option.
+Each choice should have a separate **Option 1** or **Option 2** body under Deck inspiration. Card details and outbound links must use only the cards in that option.
 
 If content is crossed or combined, report both complete choices, which follow-up pairing action was used, and whether the problem started before or after loading from History.
 
@@ -141,19 +134,9 @@ Prices are estimates included in the Scryfall payload for the exact printing tha
 
 Check **Settings → Prices → Marketplace** if the currency is unexpected. Loading a History or Saved record restores its stored price snapshot. Only a future fresh Scryfall draw of that printing can provide a newer snapshot; loading History or Saved does not refresh it. Changing the marketplace can only show a value that exists in that stored card object.
 
-### Metadata looks stale after Clear cache
+### An exact-name lookup looks stale after Clear cache
 
-**Settings → Clear cache** clears persistent `randomander:cache:v1`, but metadata already loaded in the current Pinia session can remain in memory. After clearing:
-
-1. reload the page;
-2. load or redraw the result;
-3. open Deck inspiration again.
-
-The cache has lazy expiration: an expired entry is removed when read. Reducing the maximum entry count takes full effect as subsequent eligible responses are written.
-
-### Deck threshold includes/excludes an edge value
-
-The implementation accepts a reported EDHREC deck count only when it is strictly **less than** the configured value. A card whose count equals the value is excluded.
+**Settings → Clear cache** clears persistent `randomander:cache:v1` and the store's in-memory metadata state. The cache has lazy expiration: an expired entry is removed when read. Reducing the maximum entry count takes full effect as subsequent eligible responses are written.
 
 ## Reveal and motion issues
 
@@ -180,7 +163,7 @@ Use **Hide** on the mobile Draw mode card to reduce vertical space. The fixed Ra
 
 ## History, Saved, or settings are missing
 
-Durable data is stored only in the current browser profile under `randomander:state:v2`. It does not sync across devices, browsers, normal/private windows, or profiles.
+Durable data is stored only in the current browser profile under three `randomander:state:v3:*` partitions. Same-origin tabs reconcile those partitions, but data does not sync across devices, browsers, normal/private windows, or profiles.
 
 On Draw, **Save pull** adds the current result to Saved; the disabled **Pull saved** state confirms it is already there. History records use the shorter **Save**/**Saved** labels for the same action and state.
 
@@ -197,24 +180,28 @@ History and Saved each retain at most 40 records. History removes its oldest rec
 
 ### Inspect stored keys
 
-In browser developer tools, open Application/Storage → Local Storage and select the exact Randomander origin. The expected keys are:
+In browser developer tools, open Application/Storage → Local Storage and select the exact Randomander origin. The expected current keys are:
 
-- `randomander:state:v2`
+- `randomander:state:v3:preferences`
+- `randomander:state:v3:history`
+- `randomander:state:v3:saved`
 - `randomander:cache:v1`
 
-Storage helpers log parse, quota, or access failures as console warnings and keep the in-memory session running where possible.
+`randomander:state:v2` can appear briefly during migration. It is removed only after all three v3 partitions are written. If migration is interrupted by quota or blocked storage, the app retains the v2 recovery copy and exposes a durability warning/retry path.
+
+Storage failures are represented as typed outcomes. The app keeps the in-memory session running where possible, shows an accessible persistence warning, and does not claim a durable save or clear when the browser rejected it.
 
 ### Clear only network cache
 
-Use **Settings → Clear cache**. This preserves mode, settings, History, and Saved pulls. Reload afterward when clearing already-loaded metadata.
+Use **Settings → Clear cache**. This preserves mode, settings, History, and Saved pulls.
 
 ### Fully reset the application
 
 This is destructive: it permanently removes local preferences, History, and Saved pulls for the current origin. There is no undo or remote backup.
 
-After confirming that loss is acceptable, remove both Randomander keys through the browser's site-storage controls and reload. Prefer the browser UI over pasting an unfamiliar script into developer tools.
+Use **Settings → Clear all local data**, review the exact History/Saved counts, and confirm the destructive action. This resets preferences and the current result and removes History, Saved, cached responses, and any legacy v2 state. If the app cannot start, remove the Randomander keys through the browser's site-storage controls and reload; prefer the browser UI over pasting an unfamiliar script into developer tools.
 
-If only the cache is suspect, do not remove `randomander:state:v2`.
+If only the cache is suspect, do not remove any `randomander:state:*` key.
 
 ## Test failures
 
@@ -252,7 +239,7 @@ npm run test -- src/__tests__/services/scryfall.test.ts
 
 ### App tests leak state between cases
 
-Clear Pinia instances, fetch mocks, `randomander:state:v2`, and `randomander:cache:v1` as the existing app-test setup does. A stored result, cooldown, or cache entry can otherwise make a later test order-dependent.
+Clear Pinia instances, fetch mocks, all three `randomander:state:v3:*` partitions, the legacy `randomander:state:v2` migration key, and `randomander:cache:v1` as the existing app-test setup does. A stored result, cooldown, or cache entry can otherwise make a later test order-dependent.
 
 ### Build passes while a test type error exists
 
@@ -281,7 +268,7 @@ npm run preview
 
 ### Direct external requests work locally but fail when deployed
 
-Check the deployed site's Content Security Policy, HTTPS/mixed-content rules, corporate proxy, and host allowlist. The browser must reach Scryfall, EDHREC, Scryfall image/symbol hosts, Google Fonts, and Vercel Analytics according to the enabled features.
+Check the deployed site's Content Security Policy, HTTPS/mixed-content rules, corporate proxy, and host allowlist. The 1.0 public build permits same-origin application assets, the Scryfall API, and the documented Scryfall image/symbol hosts. It does not load Google Fonts, automated EDHREC metadata, or Vercel Analytics.
 
 Randomander has no backend proxy to change those requests at runtime.
 

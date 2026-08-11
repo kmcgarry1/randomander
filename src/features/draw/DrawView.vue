@@ -739,14 +739,19 @@ watchEffect(() => {
         class="m3-card m3-card--filled min-w-0 p-4 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-8 xl:p-5"
         aria-labelledby="inspiration-title"
       >
-        <div class="flex items-start gap-3">
+        <div class="flex min-w-0 flex-col items-start gap-3 sm:flex-row">
           <span
             class="grid h-10 w-10 shrink-0 place-items-center rounded-[1rem_1rem_1rem_0.35rem] bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)]"
           >
             <LightBulbIcon class="h-5 w-5" aria-hidden="true" />
           </span>
-          <div class="min-w-0 flex-1">
-            <h2 id="inspiration-title" class="text-xl font-bold">Deck inspiration</h2>
+          <div class="min-w-0 max-w-full flex-1">
+            <h2
+              id="inspiration-title"
+              class="max-w-full break-words text-xl font-bold [overflow-wrap:anywhere]"
+            >
+              Deck inspiration
+            </h2>
           </div>
         </div>
 

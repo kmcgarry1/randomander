@@ -4,6 +4,7 @@ import {
   cardResponse,
   createCard,
   createDoubleFacedCard,
+  deferredCardResponse,
   errorResponse,
   installMockedUpstream,
   type MockedUpstream,
@@ -184,10 +185,23 @@ test('persists, reloads, and restores a saved pull in native Web Storage', async
   await expectResult(page, savedCard.name)
 
   const savedCount = await page.evaluate(() => {
-    const value = localStorage.getItem('randomander:state:v2')
+    const value = localStorage.getItem('randomander:state:v3:saved')
     if (!value) return 0
-    const payload = JSON.parse(value) as { saved?: unknown[] }
-    return payload.saved?.length ?? 0
+    const envelope = JSON.parse(value) as {
+      schema?: unknown
+      version?: unknown
+      partition?: unknown
+      value?: unknown
+    }
+    if (
+      envelope.schema !== 'randomander-partition' ||
+      envelope.version !== 1 ||
+      envelope.partition !== 'saved' ||
+      !Array.isArray(envelope.value)
+    ) {
+      return 0
+    }
+    return envelope.value.length
   })
   expect(savedCount).toBe(1)
   expectIsolated(upstream)
@@ -219,36 +233,36 @@ test('traps keyboard focus, restores the opener, and passes axe scans', async ({
 test('recovers after a request timeout and an upstream HTTP failure', async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const nativeSetTimeout = window.setTimeout.bind(window)
-    let shortenNextDrawDeadline = true
-    window.setTimeout = ((
-      handler: TimerHandler,
-      timeout = 0,
-      ...args: unknown[]
-    ) => {
-      const shouldShorten = shortenNextDrawDeadline && timeout === 10_000
-      if (shouldShorten) shortenNextDrawDeadline = false
-      return nativeSetTimeout(
-        handler,
-        shouldShorten ? 50 : timeout,
-        ...args,
-      )
-    }) as typeof window.setTimeout
-  })
-
+  await page.clock.install()
   const recovered = createCard('Recovered Commander')
+  const delayed = deferredCardResponse(createCard('Too Slow'))
   const upstream = await installMockedUpstream(page, [
-    cardResponse(createCard('Too Slow'), 300),
+    delayed.response,
     errorResponse(503),
     cardResponse(recovered),
   ])
 
   await page.goto('/')
   await randomize(page)
+  await expect.poll(() => upstream.scryfallRequests.length).toBe(1)
+  await page.clock.fastForward(10_000)
   await expect(page.getByRole('alert')).toContainText(
     'This draw timed out after 10 seconds.',
   )
+  delayed.release()
+  await upstream.waitForScryfallIdle()
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  )
+  await expect(page.getByRole('alert')).toContainText(
+    'This draw timed out after 10 seconds.',
+  )
+  await expect(
+    page.getByRole('heading', { name: 'Too Slow', exact: true }),
+  ).toHaveCount(0)
 
   await randomize(page)
   await expect(page.getByRole('alert')).toContainText('Request failed (503).')

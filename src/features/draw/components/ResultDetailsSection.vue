@@ -150,13 +150,22 @@ const retryMetadata = (card: ScryfallCard) => {
           <TagIcon class="h-4 w-4" aria-hidden="true" />
           DECK THEMES
         </p>
-        <p
+        <div
           v-if="pairMetadataState.status === 'idle'"
-          class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+          class="mt-2"
           role="status"
         >
-          EDHREC themes are ready to load.
-        </p>
+          <p class="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            EDHREC themes are ready to load.
+          </p>
+          <button
+            type="button"
+            class="m3-button m3-button--text mt-2 min-h-9 px-2 py-1 text-xs"
+            @click="retryMetadata(combinedPair[0]!)"
+          >
+            Load metadata
+          </button>
+        </div>
         <p
           v-else-if="pairMetadataState.status === 'loading'"
           class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
@@ -278,13 +287,22 @@ const retryMetadata = (card: ScryfallCard) => {
           <TagIcon class="h-4 w-4" aria-hidden="true" />
           DECK THEMES
         </p>
-        <p
+        <div
           v-if="store.getMetadataStateForCard(card, group).status === 'idle'"
-          class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+          class="mt-2"
           role="status"
         >
-          EDHREC themes are ready to load.
-        </p>
+          <p class="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            EDHREC themes are ready to load.
+          </p>
+          <button
+            type="button"
+            class="m3-button m3-button--text mt-2 min-h-9 px-2 py-1 text-xs"
+            @click="retryMetadata(card)"
+          >
+            Load metadata
+          </button>
+        </div>
         <p
           v-else-if="store.getMetadataStateForCard(card, group).status === 'loading'"
           class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"

@@ -3,7 +3,6 @@ import { computed, nextTick, reactive, ref, shallowRef, watch } from 'vue'
 import {
   formatColorIdentity,
   getCardSlug,
-  getEdhrecPairIdentifier,
   getPartnerKind,
   getPartnerVariant,
   getPartnerWithName,
@@ -22,11 +21,10 @@ import {
 } from '../services/scryfall'
 import type { EdhrecTag, EdhrecMeta } from '../services/edhrec'
 import {
-  readStorageResult,
-  removeStorage,
-  writeStorage,
   type StorageFailureKind,
 } from '../lib/storage'
+import { recordDrawMetric } from '../lib/operationalMetrics'
+import { mapDrawOutcome } from '../lib/drawOutcomeMetrics'
 import { clearCache, removeCache } from '../lib/cache'
 import {
   compileColorFilter,
@@ -48,7 +46,6 @@ import {
   type DrawWorkflowStopReason,
 } from './drawWorkflow'
 import {
-  decodePersistedState,
   DEFAULT_CACHE,
   DEFAULT_DISPLAY,
   DEFAULT_OPTIONS,
@@ -57,6 +54,32 @@ import {
   PERSISTED_STATE_VERSION,
   type PersistedStateV2,
 } from './randomanderPersistence'
+import {
+  PERSISTED_PARTITIONS,
+  createPersistenceCoordinator,
+  createPersistenceWriterId,
+  loadPersistedState,
+  type PersistedPartition,
+  type PersistedPartitionValues,
+  type PersistenceFlushResult,
+} from './persistenceCoordinator'
+import {
+  getPullRecordFingerprint,
+  getResultFingerprint,
+  getResultGroups,
+  prependHistoryRecord,
+  snapshotPullRecord,
+} from './randomanderRecords'
+import {
+  getMetadataFailureMessage,
+  getMetadataKey,
+  getMetadataTargets,
+  usesCommanderMetadataLink,
+} from './randomanderMetadata'
+import {
+  getPartnerActionLabel,
+  requireLegalPartnerPair,
+} from './randomanderPairing'
 
 export {
   DRAW_WORKFLOW_CALL_BUDGET,
@@ -143,7 +166,6 @@ export type SaveRecordOptions = Readonly<{
   replaceOldest?: boolean
 }>
 
-const STORAGE_KEY = 'randomander:state:v2'
 export const MAX_HISTORY = PERSISTED_COLLECTION_LIMIT
 export const MAX_SAVED = PERSISTED_COLLECTION_LIMIT
 
@@ -256,12 +278,6 @@ const createId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`
 
-// Pull records cross the JSON persistence boundary, so clone them through the
-// same representation. This also unwraps Vue proxies and prevents current,
-// History, and Saved state from sharing nested card or choice references.
-const snapshotRecord = (record: PullRecord): PullRecord =>
-  JSON.parse(JSON.stringify(record)) as PullRecord
-
 const persistenceFailureMessage = (kind: StorageFailureKind) => {
   if (kind === 'quota') {
     return 'Browser storage is full, so these changes are only available in this tab.'
@@ -276,9 +292,8 @@ const persistenceFailureMessage = (kind: StorageFailureKind) => {
 }
 
 export const useRandomanderStore = defineStore('randomander', () => {
-  const persistedReadResult = readStorageResult<unknown>(STORAGE_KEY, null)
-  const persistedDecodeResult = decodePersistedState(persistedReadResult.value)
-  const persisted = persistedDecodeResult.value
+  const loadedPersistence = loadPersistedState()
+  const persisted = loadedPersistence.state
   const persistedView = persisted.view
   const initialPanel =
     persistedView === 'history' || persistedView === 'saved' ? persistedView : null
@@ -311,20 +326,12 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const isLoading = ref(false)
   const errorMessage = ref('')
   const initialPersistenceFailure: StorageFailureKind | null =
-    !persistedReadResult.ok
-      ? persistedReadResult.kind
-      : !persistedDecodeResult.ok
-        ? 'invalid-data'
-        : null
+    loadedPersistence.failures[0] ?? null
   const persistenceError = ref(
     initialPersistenceFailure
       ? persistenceFailureMessage(initialPersistenceFailure)
       : ''
   )
-  const shouldPersistDecodedState =
-    persistedReadResult.ok &&
-    persistedDecodeResult.ok &&
-    (persistedDecodeResult.migrated || persistedDecodeResult.repaired)
   const persistenceNotice = ref('')
   const metadataSurfaceVisible = ref(false)
   const resultProvenance = shallowRef<ResultProvenance | null>(null)
@@ -332,6 +339,11 @@ export const useRandomanderStore = defineStore('randomander', () => {
   let activeWorkflow: ActiveDrawWorkflow | null = null
   let suppressQueryInvalidation = false
   let suppressPersistenceWatch = false
+  let persistenceCoordinator: ReturnType<
+    typeof createPersistenceCoordinator
+  > | null = null
+  const workflowMetricStartedAt = new Map<string, number>()
+  const workflowMetricErrors = new Map<string, unknown>()
   const tagController = ref<AbortController | null>(null)
   const tagLookup = ref<Record<string, EdhrecTag[]>>({})
   const metadataStateLookup = ref<Record<string, MetadataLoadState>>({})
@@ -483,26 +495,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     () => !hasResults.value && !errorMessage.value && !isLoading.value
   )
 
-  const getPartnerButtonLabel = (card: ScryfallCard | null) => {
-    if (isBackgroundCard(card)) return 'Find commander'
-    const partnerKind = card ? getPartnerKind(card) : null
-    switch (partnerKind) {
-      case 'partner_with': {
-        const partnerName = card ? getPartnerWithName(card) : null
-        return partnerName ? `Get ${partnerName}` : 'Get partner'
-      }
-      case 'choose_background':
-        return 'Randomize background'
-      case 'friends_forever':
-        return 'Randomize friend'
-      case 'doctors_companion':
-        return 'Randomize doctor'
-      case 'partner':
-        return 'Randomize partner'
-      default:
-        return 'Randomize partner'
-    }
-  }
+  const getPartnerButtonLabel = getPartnerActionLabel
 
   const partnerButtonLabel = computed(() =>
     getPartnerButtonLabel(primaryCard.value)
@@ -632,10 +625,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
   ): ResultProvenance =>
     Object.freeze({ mode: config.mode, options: config.options })
 
-  const usesCommanderLink = (card: ScryfallCard) => {
-    if (mode.value === 'spark') return false
-    return !isBackgroundCard(card)
-  }
+  const usesCommanderLink = (card: ScryfallCard) =>
+    usesCommanderMetadataLink(mode.value, card)
 
   const shouldShowTags = (card: ScryfallCard) =>
     AUTOMATED_EDHREC_METADATA_ENABLED &&
@@ -645,30 +636,19 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const getGroupsForState = (
     cardsToCheck: ScryfallCard[],
     choiceRecords?: CommanderChoice[]
-  ) =>
-    choiceRecords?.length
-      ? choiceRecords.map((choice) => choice.cards)
-      : cardsToCheck.length > 0
-        ? [cardsToCheck]
-        : []
+  ) => getResultGroups(cardsToCheck, choiceRecords) as ScryfallCard[][]
 
   const getFingerprintForGroups = (
     modeToFingerprint: Mode,
     cardsToFingerprint: ScryfallCard[],
     choiceRecords?: CommanderChoice[]
-  ) => {
-    const groups = getGroupsForState(cardsToFingerprint, choiceRecords)
-    if (groups.length === 0) return null
+  ) => getResultFingerprint(
+    modeToFingerprint,
+    cardsToFingerprint,
+    choiceRecords
+  )
 
-    const normalizedGroups = groups
-      .map((group) => group.map((card) => card.id).slice().sort().join(','))
-      .sort()
-
-    return `${modeToFingerprint}:${normalizedGroups.join('|')}`
-  }
-
-  const getRecordFingerprint = (record: PullRecord) =>
-    getFingerprintForGroups(record.mode, record.cards ?? [], record.choices)
+  const getRecordFingerprint = getPullRecordFingerprint
 
   const savedFingerprints = computed(
     () =>
@@ -697,17 +677,11 @@ export const useRandomanderStore = defineStore('randomander', () => {
     return fingerprint ? savedFingerprints.value.has(fingerprint) : false
   }
 
-  const isPairGroup = (group: ScryfallCard[]) => group.length === 2
-  const getPairSlug = (group: ScryfallCard[]) =>
-    getEdhrecPairIdentifier(group)
-
-  const getPartnerSlugForGroup = (group: ScryfallCard[]) => getPairSlug(group)
+  const getPartnerSlugForGroup = (group: ScryfallCard[]) =>
+    group[0] ? getMetadataKey(group[0], group, true) : null
 
   const getTagKeyForCard = (card: ScryfallCard, group: ScryfallCard[]) => {
-    if (display.usePairTags && isPairGroup(group)) {
-      return getPairSlug(group)
-    }
-    return getCardSlug(card)
+    return getMetadataKey(card, group, display.usePairTags)
   }
 
   const shouldRenderTagPanel = (card: ScryfallCard) =>
@@ -753,14 +727,27 @@ export const useRandomanderStore = defineStore('randomander', () => {
       : tag.href
   }
 
-  const requireLegalPartnerPair = (
-    first: ScryfallCard,
-    second: ScryfallCard
-  ): [ScryfallCard, ScryfallCard] => {
-    if (!isLegalPartnerPair(first, second)) {
-      throw new Error('Scryfall returned an incompatible commander pair.')
-    }
-    return [first, second]
+  const metricNow = () =>
+    globalThis.performance?.now?.() ?? Date.now()
+
+  const finishWorkflowMetric = (
+    workflow: ActiveDrawWorkflow,
+    completed: boolean
+  ) => {
+    const startedAt = workflowMetricStartedAt.get(workflow.id)
+    if (startedAt === undefined) return
+    const error = workflowMetricErrors.get(workflow.id)
+    recordDrawMetric({
+      outcome: mapDrawOutcome({
+        completed,
+        stopReason: workflow.stopReason,
+        ...(error === undefined ? {} : { error }),
+      }),
+      durationMs: Math.max(0, metricNow() - startedAt),
+      requestCount: workflow.callsUsed,
+    })
+    workflowMetricStartedAt.delete(workflow.id)
+    workflowMetricErrors.delete(workflow.id)
   }
 
   const cancelWorkflow = (
@@ -769,6 +756,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   ) => {
     workflow.cancel(reason)
     workflow.finish()
+    finishWorkflowMetric(workflow, false)
     if (activeWorkflow === workflow) {
       activeWorkflow = null
       isLoading.value = false
@@ -782,12 +770,18 @@ export const useRandomanderStore = defineStore('randomander', () => {
     if (config.colorFilter.problem) {
       errorMessage.value = config.colorFilter.problem.message
       isLoading.value = false
+      recordDrawMetric({
+        outcome: 'configuration-error',
+        durationMs: 0,
+        requestCount: 0,
+      })
       return null
     }
     const workflow = createDrawWorkflowContext(
       createId(),
       config
     )
+    workflowMetricStartedAt.set(workflow.id, metricNow())
     activeWorkflow = workflow
     isLoading.value = true
     return workflow
@@ -806,6 +800,10 @@ export const useRandomanderStore = defineStore('randomander', () => {
 
   const finishWorkflow = (workflow: ActiveDrawWorkflow) => {
     workflow.finish()
+    finishWorkflowMetric(
+      workflow,
+      workflow.stopReason === null && !workflowMetricErrors.has(workflow.id)
+    )
     if (activeWorkflow === workflow) {
       activeWorkflow = null
       isLoading.value = false
@@ -863,6 +861,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     fallback: string
   ) => {
     if (activeWorkflow !== workflow) return
+    workflowMetricErrors.set(workflow.id, error)
     const message = getWorkflowErrorMessage(error, workflow, fallback)
     if (message !== null) errorMessage.value = message
   }
@@ -1104,7 +1103,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     choiceRecords: CommanderChoice[] | undefined,
     provenance: ResultProvenance
   ): PullRecord =>
-    snapshotRecord({
+    snapshotPullRecord({
       id: createId(),
       createdAt: new Date().toISOString(),
       mode: provenance.mode,
@@ -1142,22 +1141,111 @@ export const useRandomanderStore = defineStore('randomander', () => {
     }
   }
 
-  const persistCurrentState = () => {
-    let result = writeStorage(STORAGE_KEY, createPersistedPayload())
-    if (!result.ok && result.kind === 'quota') {
-      clearCache()
-      result = writeStorage(STORAGE_KEY, createPersistedPayload())
-    }
+  const handlePersistenceFlush = (result: PersistenceFlushResult) => {
     if (result.ok) {
-      if (persistenceError.value) {
+      if (result.partitions.length > 0 && persistenceError.value) {
         persistenceNotice.value = 'Changes are saved to this browser again.'
       }
-      persistenceError.value = ''
-      return true
+      if (result.partitions.length > 0) persistenceError.value = ''
+      return
     }
     persistenceNotice.value = ''
     persistenceError.value = persistenceFailureMessage(result.kind)
-    return false
+  }
+
+  const withPersistenceWatchSuppressed = (action: () => void) => {
+    const wasSuppressed = suppressPersistenceWatch
+    suppressPersistenceWatch = true
+    try {
+      action()
+    } finally {
+      suppressPersistenceWatch = wasSuppressed
+    }
+  }
+
+  const applyRemotePersistencePartition = <
+    Partition extends PersistedPartition,
+  >(
+    partition: Partition,
+    value: PersistedPartitionValues[Partition]
+  ) => {
+    withPersistenceWatchSuppressed(() => {
+      if (partition === 'history') {
+        history.value = (value as PersistedPartitionValues['history']).map(
+          snapshotPullRecord
+        )
+        return
+      }
+      if (partition === 'saved') {
+        saved.value = (value as PersistedPartitionValues['saved']).map(
+          snapshotPullRecord
+        )
+        return
+      }
+
+      const preferences = value as PersistedPartitionValues['preferences']
+      const previousSignature = getCurrentRequestSignature()
+      suppressQueryInvalidation = true
+      try {
+        view.value = 'draw'
+        activePanel.value =
+          preferences.view === 'history' || preferences.view === 'saved'
+            ? preferences.view
+            : null
+        mode.value = preferences.mode
+        Object.assign(options, {
+          ...preferences.options,
+          selectedColors: [...preferences.options.selectedColors],
+          limitByDecks: AUTOMATED_EDHREC_METADATA_ENABLED
+            ? preferences.options.limitByDecks
+            : false,
+        })
+        Object.assign(display, {
+          ...preferences.display,
+          showTags: AUTOMATED_EDHREC_METADATA_ENABLED
+            ? preferences.display.showTags
+            : false,
+        })
+        Object.assign(cacheSettings, preferences.cache)
+        Object.assign(performance, preferences.performance)
+        theme.value = preferences.theme
+      } finally {
+        suppressQueryInvalidation = false
+      }
+      if (getCurrentRequestSignature() !== previousSignature) {
+        invalidateResultsForConfiguration()
+      }
+    })
+  }
+
+  persistenceCoordinator = createPersistenceCoordinator({
+    writerId: createPersistenceWriterId(),
+    initial: loadedPersistence,
+    getState: createPersistedPayload,
+    onRemotePartition: applyRemotePersistencePartition,
+    onFlush: handlePersistenceFlush,
+  })
+
+  const persistCurrentState = (
+    partitions: readonly PersistedPartition[] = PERSISTED_PARTITIONS
+  ) => {
+    const coordinator = persistenceCoordinator
+    if (!coordinator) return false
+    coordinator.schedule(partitions)
+    let result = coordinator.flush()
+    if (!result.ok && result.kind === 'quota') {
+      clearCache()
+      result = coordinator.retry()
+    }
+    return result.ok
+  }
+
+  if (loadedPersistence.needsMigration) {
+    let migrationResult = persistenceCoordinator.flush()
+    if (!migrationResult.ok && migrationResult.kind === 'quota') {
+      clearCache()
+      migrationResult = persistenceCoordinator.retry()
+    }
   }
 
   const retryPersistence = () =>
@@ -1169,14 +1257,17 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const addHistory = (record: PullRecord) => {
-    history.value = [snapshotRecord(record), ...history.value].slice(0, MAX_HISTORY)
+    withPersistenceWatchSuppressed(() => {
+      history.value = prependHistoryRecord(history.value, record, MAX_HISTORY)
+    })
+    persistCurrentState(['history'])
   }
 
   const saveRecord = (
     record: PullRecord,
     saveOptions: SaveRecordOptions = {}
   ) => {
-    const snapshot = snapshotRecord(record)
+    const snapshot = snapshotPullRecord(record)
     const fingerprint = getRecordFingerprint(snapshot)
     if (!fingerprint) return false
     const exists = saved.value.some(
@@ -1187,11 +1278,16 @@ export const useRandomanderStore = defineStore('randomander', () => {
       return false
     }
     const previousSaved = saved.value
-    saved.value = saveOptions.replaceOldest
-      ? [snapshot, ...saved.value].slice(0, MAX_SAVED)
-      : [snapshot, ...saved.value]
-    if (!persistCurrentState()) {
-      saved.value = previousSaved
+    withPersistenceWatchSuppressed(() => {
+      saved.value = saveOptions.replaceOldest
+        ? [snapshot, ...saved.value].slice(0, MAX_SAVED)
+        : [snapshot, ...saved.value]
+    })
+    if (!persistCurrentState(['saved'])) {
+      withPersistenceWatchSuppressed(() => {
+        saved.value = previousSaved
+      })
+      persistenceCoordinator?.schedule(['saved'])
       return false
     }
     return true
@@ -1206,7 +1302,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const loadRecord = (record: PullRecord) => {
-    const snapshot = snapshotRecord(record)
+    const snapshot = snapshotPullRecord(record)
     if (activeWorkflow) cancelWorkflow(activeWorkflow, 'superseded')
     suppressQueryInvalidation = true
     try {
@@ -1242,9 +1338,14 @@ export const useRandomanderStore = defineStore('randomander', () => {
     const nextSaved = saved.value.filter((record) => record.id !== id)
     if (nextSaved.length === saved.value.length) return false
     const previousSaved = saved.value
-    saved.value = nextSaved
-    if (!persistCurrentState()) {
-      saved.value = previousSaved
+    withPersistenceWatchSuppressed(() => {
+      saved.value = nextSaved
+    })
+    if (!persistCurrentState(['saved'])) {
+      withPersistenceWatchSuppressed(() => {
+        saved.value = previousSaved
+      })
+      persistenceCoordinator?.schedule(['saved'])
       return false
     }
     return true
@@ -1253,9 +1354,14 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const clearHistory = () => {
     if (history.value.length === 0) return false
     const previousHistory = history.value
-    history.value = []
-    if (!persistCurrentState()) {
-      history.value = previousHistory
+    withPersistenceWatchSuppressed(() => {
+      history.value = []
+    })
+    if (!persistCurrentState(['history'])) {
+      withPersistenceWatchSuppressed(() => {
+        history.value = previousHistory
+      })
+      persistenceCoordinator?.schedule(['history'])
       return false
     }
     return true
@@ -1264,9 +1370,14 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const clearSaved = () => {
     if (saved.value.length === 0) return false
     const previousSaved = saved.value
-    saved.value = []
-    if (!persistCurrentState()) {
-      saved.value = previousSaved
+    withPersistenceWatchSuppressed(() => {
+      saved.value = []
+    })
+    if (!persistCurrentState(['saved'])) {
+      withPersistenceWatchSuppressed(() => {
+        saved.value = previousSaved
+      })
+      persistenceCoordinator?.schedule(['saved'])
       return false
     }
     return true
@@ -1467,48 +1578,15 @@ export const useRandomanderStore = defineStore('randomander', () => {
   }
 
   const getMetadataTargetsForGroups = (groups: ScryfallCard[][]) => {
-    const targets = new Map<string, string[]>()
-    groups.forEach((group) => {
-      if (!group.length) return
-      if (display.usePairTags && isPairGroup(group)) {
-        if (group.some((card) => usesCommanderLink(card))) {
-          const pairSlug = getPairSlug(group)
-          if (!pairSlug) return
-          const alphabeticalSlug = group
-            .map((card) => getCardSlug(card))
-            .slice()
-            .sort((a, b) => a.localeCompare(b))
-            .join('-')
-          const candidates =
-            alphabeticalSlug === pairSlug
-              ? [pairSlug]
-              : [pairSlug, alphabeticalSlug]
-          targets.set(pairSlug, candidates)
-        }
-        return
-      }
-      group.forEach((card) => {
-        if (!shouldShowTags(card)) return
-        const slug = getCardSlug(card)
-        if (!slug) return
-        targets.set(slug, [slug])
-      })
+    return getMetadataTargets(groups, {
+      enabled: AUTOMATED_EDHREC_METADATA_ENABLED,
+      mode: mode.value,
+      showTags: display.showTags,
+      usePairTags: display.usePairTags,
     })
-    return targets
   }
 
-  const metadataFailureMessage = (error: unknown) => {
-    if (error instanceof RequestTimeoutError) {
-      return 'EDHREC metadata timed out. Try again.'
-    }
-    if (error instanceof HttpError) {
-      return `EDHREC metadata could not load (${error.status}). Try again.`
-    }
-    if (error instanceof RuntimeDataError) {
-      return `EDHREC metadata could not be used. ${error.message}`
-    }
-    return 'EDHREC metadata could not load. Try again.'
-  }
+  const metadataFailureMessage = getMetadataFailureMessage
 
   const abortMetadataRequests = () => {
     tagRequestId.value += 1
@@ -1688,6 +1766,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     suppressQueryInvalidation = true
     try {
       view.value = 'draw'
+      activePanel.value = null
       mode.value = 'commander'
       Object.assign(options, {
         ...DEFAULT_OPTIONS,
@@ -1727,7 +1806,11 @@ export const useRandomanderStore = defineStore('randomander', () => {
       return false
     }
 
-    const stateResult = removeStorage(STORAGE_KEY)
+    const stateResult = persistenceCoordinator?.clear() ?? {
+      ok: false as const,
+      kind: 'unavailable' as const,
+      error: new Error('Browser persistence is unavailable.'),
+    }
     if (!stateResult.ok) {
       pendingDurabilityAction = clearAllLocalData
       persistenceNotice.value = ''
@@ -1740,7 +1823,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     clearMetadataMemory()
     suppressPersistenceWatch = true
     applyClearedLocalState()
-    queueMicrotask(() => {
+    void nextTick(() => {
       suppressPersistenceWatch = false
     })
     persistenceError.value = ''
@@ -1849,18 +1932,33 @@ export const useRandomanderStore = defineStore('randomander', () => {
     { deep: true }
   )
 
-  let isInitialPersistenceWatch = true
   watch(
-    [view, activePanel, mode, options, display, cacheSettings, performance, theme, history, saved],
+    [view, activePanel, mode, options, display, cacheSettings, performance, theme],
     () => {
       if (suppressPersistenceWatch) return
-      if (isInitialPersistenceWatch) {
-        isInitialPersistenceWatch = false
-        if (!shouldPersistDecodedState) return
-      }
-      persistCurrentState()
+      persistenceCoordinator?.schedule(['preferences'])
     },
-    { deep: true, immediate: true }
+    { deep: true, flush: 'sync' }
+  )
+
+  watch(
+    history,
+    () => {
+      if (suppressPersistenceWatch) return
+      persistenceCoordinator?.schedule(['history'])
+      persistenceCoordinator?.flush()
+    },
+    { deep: true, flush: 'sync' }
+  )
+
+  watch(
+    saved,
+    () => {
+      if (suppressPersistenceWatch) return
+      persistenceCoordinator?.schedule(['saved'])
+      persistenceCoordinator?.flush()
+    },
+    { deep: true, flush: 'sync' }
   )
 
   const getColorOptionLabel = (option: { value: ColorCount; label: string }) => {

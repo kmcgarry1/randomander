@@ -104,13 +104,14 @@ describe('Scryfall request policy', () => {
   })
 
   it('does not retry a 429 and blocks follow-up traffic during cooldown', async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve({
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
         ok: false,
         status: 429,
         headers: new Headers({ 'Retry-After': '120' }),
       } as Response)
-    )
+      .mockResolvedValueOnce(createCardResponse('after-cooldown'))
     vi.stubGlobal('fetch', fetchMock)
     const { fetchRandomCard } = await import('../../services/scryfall')
 
@@ -135,6 +136,13 @@ describe('Scryfall request policy', () => {
     await vi.advanceTimersByTimeAsync(0)
     await stillBlockedRejection
     expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(60_001)
+    const recovered = fetchRandomCard('is:commander')
+    await vi.advanceTimersByTimeAsync(0)
+
+    await expect(recovered).resolves.toMatchObject({ id: 'after-cooldown' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('allows the next paced request to recover immediately after an offline failure', async () => {

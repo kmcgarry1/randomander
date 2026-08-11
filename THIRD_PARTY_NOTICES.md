@@ -9,7 +9,7 @@ Randomander is an unofficial fan project. This file records the external softwar
 | Vue and Vue runtime/compiler packages | UI runtime and production compilation | MIT |
 | Pinia | Client state management | MIT |
 | Heroicons for Vue | Interface icons | MIT |
-| Vercel Analytics | Optional, environment-gated production analytics | MPL-2.0 |
+| Vercel Analytics | Installed optional dependency; disabled and excluded by the 1.0 production policy | MPL-2.0 |
 
 The lockfile is authoritative for exact versions and transitive packages. The release workflow generates a CycloneDX SBOM and machine-readable license inventory from that lockfile. Source and license text for each package are available from its npm distribution and upstream repository.
 
@@ -18,9 +18,9 @@ Tailwind CSS, Vite, Vitest, TypeScript, Playwright, axe-core, and related packag
 ## Data and hosted services
 
 - [Scryfall](https://scryfall.com/docs/api) supplies card data, legality/search results, images, prices, and purchase URLs. Randomander follows Scryfall's API access guidance and is not endorsed by Scryfall.
-- [EDHREC](https://edhrec.com/) supplies optional deck counts, themes, and inspiration links. Availability and metadata are not guaranteed.
+- [EDHREC](https://edhrec.com/) is a user-initiated outbound inspiration destination. The public build does not send automated deck-count or theme requests to EDHREC.
 - Cardmarket, TCGplayer, and Cardhoarder are optional outbound marketplace destinations derived from allowlisted Scryfall purchase URLs. Randomander does not process a purchase.
-- Vercel hosts the canonical deployment. Vercel Web Analytics is disabled unless explicitly enabled after privacy approval.
+- Vercel hosts the canonical deployment. Vercel Web Analytics is disabled; enabling it requires a reviewed privacy, CSP, and production-policy change rather than only an environment variable.
 
 ## Magic: The Gathering content
 

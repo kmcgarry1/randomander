@@ -157,4 +157,34 @@ describe('Web Storage outcomes', () => {
       /private|card|commander|filter|history/i
     )
   })
+
+  it('redacts keys and exception details from failure metrics', () => {
+    const sink = vi.fn()
+    configureOperationalMetricSink(sink)
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        setItem: () => {
+          throw new DOMException(
+            'Quota failed for private-card-id and saved history',
+            'QuotaExceededError'
+          )
+        },
+      },
+    })
+
+    expect(
+      writeStorage('private-card-id', {
+        history: 'private commander and filter details',
+      })
+    ).toMatchObject({ ok: false, kind: 'quota' })
+    expect(sink).toHaveBeenCalledTimes(1)
+    expect(sink).toHaveBeenCalledWith({
+      type: 'storage',
+      outcome: 'quota',
+    })
+    expect(JSON.stringify(sink.mock.calls)).not.toMatch(
+      /private|card|commander|filter|history/i
+    )
+  })
 })

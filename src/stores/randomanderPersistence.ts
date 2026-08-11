@@ -27,6 +27,11 @@ export const PERSISTED_OPTIONS_COLOR_SCAN_LIMIT = 32
 // Project budget for state plus the disposable cache. This deliberately leaves
 // headroom instead of targeting a browser's full Web Storage quota.
 export const CONSERVATIVE_WEB_STORAGE_BUDGET_BYTES = 4_000_000
+// The response cache has its own 1.5 MB cap. Keeping durable application state
+// below this target leaves another 250 kB for serialization and browser quota
+// variance while staying inside the shared conservative storage budget.
+export const PERSISTED_STATE_TARGET_BYTES = 2_250_000
+export const PERSISTED_STATE_TRANSFORM_BUDGET_MS = 250
 export const MAX_DECK_LIMIT = 1_000_000
 export const MAX_CACHE_TTL_HOURS = 8_760
 export const MAX_CACHE_ENTRIES = 1_000
@@ -417,24 +422,79 @@ const decodePersistedCard = (
 export const projectPersistedCard = (card: ScryfallCard): ScryfallCard =>
   decodePersistedCard(card, 'card').value
 
-export const projectPersistedRecord = (record: PullRecord): PullRecord => ({
-  id: record.id.slice(0, PERSISTED_RECORD_LIMITS.idLength),
-  createdAt: record.createdAt.slice(
-    0,
-    PERSISTED_RECORD_LIMITS.createdAtLength
-  ),
-  mode: record.mode,
-  options: {
-    ...record.options,
-    selectedColors: record.options.selectedColors.slice(0, 6),
-  },
-  cards: record.cards.slice(0, 3).map(projectPersistedCard),
-  choices: record.choices
+const projectPersistedOptions = (options: OptionsState): OptionsState => ({
+  colorCount: options.colorCount,
+  selectedColors: options.selectedColors.slice(0, COLORS.length),
+  limitByDecks: options.limitByDecks,
+  maxDecks: options.maxDecks,
+  twoChoices: options.twoChoices,
+  excludeGameChangers: options.excludeGameChangers,
+  useRankCutoff: options.useRankCutoff,
+  colorCountMode: options.colorCountMode,
+})
+
+export const projectPersistedRecord = (record: PullRecord): PullRecord => {
+  const choices = record.choices
     ?.slice(0, 2)
     .map((choice) => ({
       id: choice.id.slice(0, PERSISTED_RECORD_LIMITS.idLength),
       cards: choice.cards.slice(0, 2).map(projectPersistedCard),
-    })),
+    }))
+
+  return {
+    id: record.id.slice(0, PERSISTED_RECORD_LIMITS.idLength),
+    createdAt: record.createdAt.slice(
+      0,
+      PERSISTED_RECORD_LIMITS.createdAtLength
+    ),
+    mode: record.mode,
+    options: projectPersistedOptions(record.options),
+    cards: record.cards.slice(0, 3).map(projectPersistedCard),
+    ...(choices?.length ? { choices } : {}),
+  }
+}
+
+// Keep the durable wire payload independent from reactive/store objects and
+// from unused fields that may be added to live domain models in the future.
+// This pure projection is also the single place where collection and nested
+// record caps are applied before serialization.
+export const projectPersistedState = (
+  state: PersistedStateV2
+): PersistedStateV2 => ({
+  version: PERSISTED_STATE_VERSION,
+  view: state.view,
+  mode: state.mode,
+  options: projectPersistedOptions(state.options),
+  display: {
+    showHeader: state.display.showHeader,
+    showStatus: state.display.showStatus,
+    showChips: state.display.showChips,
+    showCardTitles: state.display.showCardTitles,
+    showColorIdentity: state.display.showColorIdentity,
+    showLinks: state.display.showLinks,
+    showTags: state.display.showTags,
+    usePairTags: state.display.usePairTags,
+    showAmbient: state.display.showAmbient,
+    enablePrestigeReveal: state.display.enablePrestigeReveal,
+    priceProvider: state.display.priceProvider,
+  },
+  cache: {
+    enabled: state.cache.enabled,
+    ttlHours: state.cache.ttlHours,
+    maxEntries: state.cache.maxEntries,
+  },
+  performance: {
+    reduceMotion: state.performance.reduceMotion,
+    simplifyBackdrop: state.performance.simplifyBackdrop,
+    reduceTransparency: state.performance.reduceTransparency,
+  },
+  theme: state.theme,
+  history: state.history
+    .slice(0, PERSISTED_COLLECTION_LIMIT)
+    .map(projectPersistedRecord),
+  saved: state.saved
+    .slice(0, PERSISTED_COLLECTION_LIMIT)
+    .map(projectPersistedRecord),
 })
 
 export const decodePersistedState = (

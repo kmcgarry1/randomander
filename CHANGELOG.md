@@ -15,10 +15,10 @@ All notable user-visible changes to Randomander are documented here. The project
 ### Changed
 
 - History and Saved pulls are immutable snapshots.
-- EDHREC identifiers are Unicode-safe and large responses are normalized before caching.
+- EDHREC identifiers are Unicode-safe; automated metadata and deck-count filtering are compiled out of the public build while validated user-initiated links remain.
 - External navigation uses HTTPS host allowlists.
 - Node 22 and 24 are the supported development/CI runtimes.
-- Analytics is disabled by default and third-party font loading was removed.
+- Analytics is disabled and excluded by the 1.0 production policy, and third-party font loading was removed.
 
 ### Security
 

@@ -65,6 +65,7 @@ describe('production deployment policy', () => {
     expect(csp['object-src']).toEqual(["'none'"])
     expect(csp['frame-ancestors']).toEqual(["'none'"])
     expect(csp['form-action']).toEqual(["'self'"])
+    expect(csp['script-src']).toEqual(["'self'"])
     expect(csp['img-src']).toEqual([
       "'self'",
       'data:',
@@ -74,8 +75,6 @@ describe('production deployment policy', () => {
     expect(csp['connect-src']).toEqual([
       "'self'",
       'https://api.scryfall.com',
-      'https://json.edhrec.com',
-      'https://vitals.vercel-insights.com',
     ])
     expect(csp['upgrade-insecure-requests']).toEqual([])
     expect(cspValue).not.toMatch(/\*|\bhttp:\/\//i)
@@ -87,11 +86,11 @@ describe('production deployment policy', () => {
       [
         'https://api.scryfall.com',
         'https://cards.scryfall.io',
-        'https://json.edhrec.com',
         'https://svgs.scryfall.io',
-        'https://va.vercel-scripts.com',
-        'https://vitals.vercel-insights.com',
       ].sort()
+    )
+    expect(cspValue).not.toMatch(
+      /json\.edhrec\.com|va\.vercel-scripts\.com|vitals\.vercel-insights\.com/
     )
   })
 

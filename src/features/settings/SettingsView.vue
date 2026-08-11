@@ -42,6 +42,12 @@ const { display, theme, cacheSettings, history, saved, performance } =
   storeToRefs(store);
 const clearAllDialogOpen = ref(false);
 
+const clearAllDescription = computed(() => {
+  const historyLabel = `${history.value.length} History pull${history.value.length === 1 ? "" : "s"}`;
+  const savedLabel = `${saved.value.length} Saved pull${saved.value.length === 1 ? "" : "s"}`;
+  return `This permanently resets settings and removes ${historyLabel}, ${savedLabel}, cached responses, and the current result from this browser. It cannot be undone.`;
+});
+
 const themeOptions: Array<{
   value: ThemeMode;
   label: string;
@@ -600,15 +606,37 @@ const closeSettings = () => {
           <p class="mt-3 max-w-2xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]">
             New draws send card queries to Scryfall. Price and EDHREC links contact
             those services only after you select a link. Automated EDHREC metadata
-            is disabled in this build. Optional analytics is build-time gated and
-            described in the privacy notice.
+            is disabled in this build. Analytics is disabled for 1.0 by release
+            policy, as described in the privacy notice.
           </p>
-          <p class="mt-3 max-w-2xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]">
-            Card information, images, and price links are supplied through
-            Scryfall. Randomander is unofficial fan content permitted under
-            Wizards of the Coast's Fan Content Policy. Wizards does not approve
-            or endorse it. Some materials are property of Wizards of the Coast
-            LLC. © Wizards of the Coast LLC.
+          <p class="mt-3 max-w-2xl break-words text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)] [overflow-wrap:anywhere]">
+            Card data, images, price snapshots, and allowlisted marketplace
+            destinations are supplied through
+            <a
+              href="https://scryfall.com/docs/api"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex max-w-full flex-wrap items-center gap-1 font-semibold underline"
+            >
+              Scryfall
+              <ExternalLinkHint class="shrink-0" />
+            </a>. Randomander is not produced by or endorsed by Scryfall and does
+            not process purchases. EDHREC is an independent, user-selected
+            outbound destination in this build.
+          </p>
+          <p class="mt-3 max-w-2xl break-words text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)] [overflow-wrap:anywhere]">
+            Randomander is unofficial fan content permitted under Wizards of
+            the Coast's
+            <a
+              href="https://company.wizards.com/en/legal/fancontentpolicy"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex max-w-full flex-wrap items-center gap-1 font-semibold underline"
+            >
+              Fan Content Policy
+              <ExternalLinkHint class="shrink-0" />
+            </a>. Wizards does not approve or endorse it. Some materials are
+            property of Wizards of the Coast LLC. © Wizards of the Coast LLC.
           </p>
         </div>
         <div class="mt-5 flex flex-col gap-3 border-t border-[var(--md-sys-color-outline-variant)] pt-5 sm:flex-row sm:flex-wrap">
@@ -636,7 +664,7 @@ const closeSettings = () => {
     <ConfirmationDialog
       v-if="clearAllDialogOpen"
       title="Clear all local data?"
-      description="This permanently resets settings and removes History, Saved pulls, cached responses, and the current result from this browser. It cannot be undone."
+      :description="clearAllDescription"
       confirm-label="Clear all local data"
       danger
       @cancel="clearAllDialogOpen = false"

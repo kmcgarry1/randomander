@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
 import {
   useRandomanderStore,
   type OptionsState,
   type PullRecord,
 } from '../../stores/randomander'
 import type { ScryfallCard } from '../../lib/scryfall'
+import {
+  PERSISTED_PARTITION_KEYS,
+  decodePartitionEnvelope,
+} from '../../stores/persistenceCoordinator'
 
 const options: OptionsState = {
   colorCount: 'any',
@@ -130,7 +135,7 @@ describe('Randomander record snapshots', () => {
     expect(store.retryPersistence()).toBe(true)
     expect(store.persistenceError).toBe('')
     expect(store.persistenceNotice).toMatch(/saved/i)
-    expect(values.get('randomander:state:v2')).toBeTruthy()
+    expect(values.get(PERSISTED_PARTITION_KEYS.saved)).toBeTruthy()
   })
 
   it('evicts disposable cache before retrying durable personal state', () => {
@@ -187,12 +192,15 @@ describe('Randomander record snapshots', () => {
       version: 1,
       entries: {},
     })
-    expect(
-      JSON.parse(values.get('randomander:state:v2') ?? '{}').saved
-    ).toHaveLength(1)
-    expect(
-      JSON.parse(values.get('randomander:state:v2') ?? '{}').version
-    ).toBe(2)
+    const saved = decodePartitionEnvelope(
+      JSON.parse(values.get(PERSISTED_PARTITION_KEYS.saved) ?? 'null'),
+      'saved'
+    )
+    expect(saved.ok && saved.envelope.value).toHaveLength(1)
+    expect(values.has(PERSISTED_PARTITION_KEYS.preferences)).toBe(true)
+    expect(values.has(PERSISTED_PARTITION_KEYS.history)).toBe(true)
+    expect(values.has(PERSISTED_PARTITION_KEYS.saved)).toBe(true)
+    expect(values.has('randomander:state:v2')).toBe(false)
   })
 
   it('surfaces malformed persisted JSON without overwriting it on startup', () => {
@@ -268,5 +276,92 @@ describe('Randomander record snapshots', () => {
     expect(store.clearSaved()).toBe(false)
     expect(store.saved.map((record) => record.id)).toEqual([savedRecord.id])
     expect(store.persistenceError).toMatch(/could not save/i)
+  })
+
+  it('clears both storage keys without a watcher rewriting them, then resumes persistence', async () => {
+    const store = useRandomanderStore()
+    store.addHistory(createRecord('history'))
+    expect(store.saveRecord(createRecord('saved'))).toBe(true)
+    store.openSettingsPanel()
+    localStorage.setItem(
+      'randomander:cache:v1',
+      JSON.stringify({ version: 1, entries: {} })
+    )
+
+    expect(store.clearAllLocalData()).toBe(true)
+    expect(store.activePanel).toBeNull()
+    expect(store.history).toEqual([])
+    expect(store.saved).toEqual([])
+    expect(localStorage.getItem('randomander:state:v2')).toBeNull()
+    expect(localStorage.getItem(PERSISTED_PARTITION_KEYS.preferences)).toBeNull()
+    expect(localStorage.getItem(PERSISTED_PARTITION_KEYS.history)).toBeNull()
+    expect(localStorage.getItem(PERSISTED_PARTITION_KEYS.saved)).toBeNull()
+    expect(localStorage.getItem('randomander:cache:v1')).toBeNull()
+
+    await nextTick()
+    expect(localStorage.getItem('randomander:state:v2')).toBeNull()
+    expect(localStorage.getItem('randomander:cache:v1')).toBeNull()
+
+    store.theme = 'dark'
+    expect(store.retryPersistence()).toBe(true)
+    const preferences = decodePartitionEnvelope(
+      JSON.parse(
+        localStorage.getItem(PERSISTED_PARTITION_KEYS.preferences) ?? 'null'
+      ),
+      'preferences'
+    )
+    expect(preferences.ok && preferences.envelope.value.theme).toBe('dark')
+  })
+
+  it('keeps personal state in memory when clear-all only clears the disposable cache', async () => {
+    let rejectStateRemoval = true
+    const values = new Map<string, string>()
+    const storage = {
+      get length() {
+        return values.size
+      },
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => [...values.keys()][index] ?? null,
+      removeItem: (key: string) => {
+        if (rejectStateRemoval && key === 'randomander:state:v2') {
+          throw new DOMException('Blocked', 'SecurityError')
+        }
+        values.delete(key)
+      },
+      setItem: (key: string, value: string) => values.set(key, value),
+    } satisfies Storage
+    vi.stubGlobal('localStorage', storage)
+    setActivePinia(createPinia())
+    const store = useRandomanderStore()
+    const historyRecord = createRecord('history')
+    const savedRecord = createRecord('saved')
+    store.addHistory(historyRecord)
+    expect(store.saveRecord(savedRecord)).toBe(true)
+    values.set(
+      'randomander:cache:v1',
+      JSON.stringify({ version: 1, entries: {} })
+    )
+
+    expect(store.clearAllLocalData()).toBe(false)
+    expect(store.history.map((record) => record.id)).toEqual([historyRecord.id])
+    expect(store.saved.map((record) => record.id)).toEqual([savedRecord.id])
+    expect(values.has(PERSISTED_PARTITION_KEYS.history)).toBe(true)
+    expect(values.has(PERSISTED_PARTITION_KEYS.saved)).toBe(true)
+    expect(values.has('randomander:cache:v1')).toBe(false)
+    expect(store.persistenceError).toMatch(
+      /cached responses were cleared.*history.*saved pulls remain/i
+    )
+
+    rejectStateRemoval = false
+    expect(store.retryPersistence()).toBe(true)
+    await nextTick()
+    expect(store.history).toEqual([])
+    expect(store.saved).toEqual([])
+    expect(values.has('randomander:state:v2')).toBe(false)
+    expect(values.has(PERSISTED_PARTITION_KEYS.preferences)).toBe(false)
+    expect(values.has(PERSISTED_PARTITION_KEYS.history)).toBe(false)
+    expect(values.has(PERSISTED_PARTITION_KEYS.saved)).toBe(false)
+    expect(values.has('randomander:cache:v1')).toBe(false)
   })
 })
