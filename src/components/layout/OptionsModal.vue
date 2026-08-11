@@ -8,6 +8,7 @@ import {
   XMarkIcon,
 } from "@heroicons/vue/24/outline";
 import {
+  AUTOMATED_EDHREC_METADATA_ENABLED,
   COLOR_CHOICES,
   colorOptions,
   modes,
@@ -91,7 +92,11 @@ const resetFilters = () => {
   store.resetOptions();
 };
 
-useModalFocus(dialogRef, close);
+useModalFocus(dialogRef, close, {
+  initialTarget: () => dialogRef.value,
+  restoreTarget: () =>
+    document.querySelector<HTMLElement>('[data-options-invoker="true"]'),
+});
 </script>
 
 <template>
@@ -242,11 +247,7 @@ useModalFocus(dialogRef, close);
               </button>
             </div>
             <p class="mt-3 text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]">
-              {{
-                colorComparisonOptions.find(
-                  (item) => item.value === options.colorCountMode,
-                )?.description
-              }}
+              {{ store.colorComparisonDescription }}
             </p>
           </section>
         </div>
@@ -270,13 +271,23 @@ useModalFocus(dialogRef, close);
               {{ store.getColorOptionLabel(option) }}
             </button>
           </div>
+          <p
+            v-if="store.colorFilterProblem"
+            role="alert"
+            class="mt-4 rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] px-3 py-2 text-sm text-[var(--md-sys-color-on-error-container)]"
+          >
+            {{ store.colorFilterProblem }}
+          </p>
         </section>
 
         <div class="mt-4 grid gap-4 lg:grid-cols-3">
           <section class="m3-card m3-card--filled p-4 sm:p-5">
             <h3 class="text-base font-semibold">Deck popularity</h3>
             <div class="mt-4 space-y-4">
-              <label class="flex min-h-12 items-center justify-between gap-4">
+              <label
+                v-if="AUTOMATED_EDHREC_METADATA_ENABLED"
+                class="flex min-h-12 items-center justify-between gap-4"
+              >
                 <span class="text-sm">Limit by EDHREC decks</span>
                 <input
                   v-model="options.limitByDecks"
@@ -285,7 +296,11 @@ useModalFocus(dialogRef, close);
                   :disabled="options.useRankCutoff || mode === 'spark'"
                 />
               </label>
-              <label class="block" for="max-edhrec-decks">
+              <label
+                v-if="AUTOMATED_EDHREC_METADATA_ENABLED"
+                class="block"
+                for="max-edhrec-decks"
+              >
                 <span class="m3-label">Deck count below</span>
                 <span class="mt-1 flex items-center gap-3">
                   <input
@@ -315,6 +330,13 @@ useModalFocus(dialogRef, close);
                   :disabled="mode === 'spark'"
                 />
               </label>
+              <p
+                v-if="!AUTOMATED_EDHREC_METADATA_ENABLED"
+                class="text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+              >
+                Direct EDHREC deck-count requests are disabled. Ranked sampling
+                uses Scryfall's EDHREC ordering and does not contact EDHREC.
+              </p>
             </div>
           </section>
 

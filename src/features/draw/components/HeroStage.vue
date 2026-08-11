@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, type PropType } from "vue";
-import { ArrowTopRightOnSquareIcon, SparklesIcon } from "@heroicons/vue/24/outline";
+import { SparklesIcon } from "@heroicons/vue/24/outline";
 import type { ScryfallCard } from "../../../lib/scryfall";
 import { getTypeLine, isBackgroundCard } from "../../../lib/scryfall";
-import type { Mode } from "../../../stores/randomander";
+import { modes, type Mode } from "../../../stores/randomander";
+import ExternalLinkHint from "../../../components/ExternalLinkHint.vue";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
 import PrestigeCard from "./PrestigeCard.vue";
 
@@ -54,25 +55,17 @@ const listClasses = computed(() => {
 
 const cardFrameClass = (index: number) => {
   if (layoutVariant.value === "single") {
-    return "w-full max-w-[17rem] sm:max-w-[20rem]";
+    return "min-w-0 w-full max-w-[17rem] sm:max-w-[20rem]";
   }
   if (layoutVariant.value === "dual") {
     return index === 0
-      ? "w-[9.6rem] sm:w-[14rem] lg:w-[15rem] sm:translate-y-3 sm:-rotate-2"
-      : "w-[9.6rem] sm:w-[14rem] lg:w-[15rem] sm:rotate-2";
+      ? "min-w-0 w-full max-w-[9.6rem] sm:max-w-[14rem] lg:max-w-[15rem] sm:translate-y-3 sm:-rotate-2"
+      : "min-w-0 w-full max-w-[9.6rem] sm:max-w-[14rem] lg:max-w-[15rem] sm:rotate-2";
   }
   return index === 1
-    ? "relative z-10 w-full max-w-[12rem] sm:max-w-[14rem]"
-    : "w-full max-w-[10rem] translate-y-2 sm:max-w-[12rem] sm:translate-y-5";
+    ? "relative z-10 min-w-0 w-full max-w-[12rem] sm:max-w-[14rem]"
+    : "min-w-0 w-full max-w-[10rem] translate-y-2 sm:max-w-[12rem] sm:translate-y-5";
 };
-
-const edhrecLabel = computed(() =>
-  props.mode === "partner" || props.heroCards.length === 2
-    ? "Open pair on EDHREC"
-    : isBackgroundCard(props.heroCards[0])
-      ? "Open Background on EDHREC"
-      : "Open commander on EDHREC",
-);
 
 const edhrecLinkText = computed(() => {
   if (props.heroCards.length === 2) return "EDHREC pair";
@@ -113,7 +106,7 @@ const edhrecLinkText = computed(() => {
           <h2
             data-result-heading
             tabindex="-1"
-            class="text-[clamp(1.9rem,5vw,3.25rem)] font-[760] leading-[1.02] tracking-[-0.035em]"
+            class="break-words text-[clamp(1.9rem,5vw,3.25rem)] font-[760] leading-[1.02] tracking-[-0.035em] [overflow-wrap:anywhere]"
           >
             {{ heroCardName }}
           </h2>
@@ -125,7 +118,9 @@ const edhrecLinkText = computed(() => {
               class="flex items-center gap-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
             >
               <ManaIdentity :colors="card.color_identity ?? []" compact />
-              <span class="max-w-xs truncate">{{ getTypeLine(card) }}</span>
+              <span class="max-w-xs break-words text-left [overflow-wrap:anywhere]">
+                {{ getTypeLine(card) }}
+              </span>
             </div>
           </div>
 
@@ -138,7 +133,7 @@ const edhrecLinkText = computed(() => {
               class="m3-button m3-button--text"
             >
               Scryfall
-              <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+              <ExternalLinkHint />
             </a>
             <a
               v-if="heroEdhrecUrl"
@@ -146,11 +141,17 @@ const edhrecLinkText = computed(() => {
               target="_blank"
               rel="noreferrer"
               class="m3-button m3-button--text"
-              :aria-label="edhrecLabel"
             >
               {{ edhrecLinkText }}
-              <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+              <ExternalLinkHint />
             </a>
+            <span
+              v-else
+              class="m3-button m3-button--text opacity-70"
+              aria-disabled="true"
+            >
+              {{ edhrecLinkText }} unavailable
+            </span>
           </div>
         </template>
         <template v-else>
@@ -161,7 +162,7 @@ const edhrecLinkText = computed(() => {
       </div>
     </div>
 
-    <div v-else class="mx-auto mt-4 max-w-xl rounded-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container)] px-6 py-10 sm:mt-6 sm:py-14">
+    <div v-else class="mx-auto mt-4 max-w-3xl rounded-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container)] px-4 py-8 sm:mt-6 sm:px-6 sm:py-12">
       <span
         class="mx-auto grid h-20 w-16 place-items-center rounded-[1rem] border-2 border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-primary)] shadow-[var(--md-sys-elevation-1)]"
         aria-hidden="true"
@@ -169,6 +170,28 @@ const edhrecLinkText = computed(() => {
         <SparklesIcon class="h-8 w-8" />
       </span>
       <h2 class="mt-5 text-2xl font-bold">{{ placeholderTitle }}</h2>
+      <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--md-sys-color-on-surface-variant)]">
+        Pick the kind of idea you want, then use Randomize to draw it.
+      </p>
+      <ul
+        class="mx-auto mt-5 grid max-w-2xl gap-2 text-left sm:grid-cols-3"
+        aria-label="Draw mode guide"
+      >
+        <li
+          v-for="option in modes"
+          :key="option.id"
+          class="min-w-0 rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-3"
+        >
+          <span class="block break-words text-sm font-bold">
+            {{ option.label }}
+          </span>
+          <span
+            class="mt-1 block break-words text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+          >
+            {{ option.description }}
+          </span>
+        </li>
+      </ul>
     </div>
   </div>
 </template>

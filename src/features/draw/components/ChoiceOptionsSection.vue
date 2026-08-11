@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, type PropType } from "vue";
-import { ArrowTopRightOnSquareIcon, SparklesIcon } from "@heroicons/vue/24/outline";
+import { SparklesIcon } from "@heroicons/vue/24/outline";
 import type { ScryfallCard } from "../../../lib/scryfall";
 import {
   getEdhrecCardUrl,
   getEdhrecCommanderUrl,
+  getSafeScryfallUrl,
   getTypeLine,
   isBackgroundCard,
 } from "../../../lib/scryfall";
 import type { CommanderChoice } from "../../../stores/randomander";
+import ExternalLinkHint from "../../../components/ExternalLinkHint.vue";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
 import PrestigeCard from "./PrestigeCard.vue";
 
@@ -76,10 +78,10 @@ const getEdhrecUrl = (card: ScryfallCard) =>
       <article
         v-for="(choice, choiceIndex) in choices"
         :key="choice.id"
-        class="rounded-[var(--md-sys-shape-corner-large)] bg-[var(--md-sys-color-surface-container)] p-4"
+        class="min-w-0 rounded-[var(--md-sys-shape-corner-large)] bg-[var(--md-sys-color-surface-container)] p-3 sm:p-4"
       >
-        <div class="flex min-h-11 items-start justify-between gap-3">
-          <div>
+        <div class="flex min-h-11 flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
             <p class="m3-label">Option {{ choiceIndex + 1 }}</p>
           </div>
           <button
@@ -90,7 +92,7 @@ const getEdhrecUrl = (card: ScryfallCard) =>
               props.canRandomizeChoicePartner(choice.cards[0])
             "
             type="button"
-            class="m3-button m3-button--tonal min-h-10 px-3 py-2 text-xs"
+            class="m3-button m3-button--tonal min-h-10 max-w-full whitespace-normal px-3 py-2 text-center text-xs"
             :disabled="isLoading"
             @click="props.onChoicePartner(choiceIndex)"
           >
@@ -100,17 +102,18 @@ const getEdhrecUrl = (card: ScryfallCard) =>
         </div>
 
         <div
-          class="mt-4 flex min-h-[17rem] items-end justify-center gap-2 sm:min-h-[21rem]"
+          class="mt-4 flex min-h-[17rem] w-full min-w-0 flex-col items-center justify-end gap-5 px-1 sm:min-h-[21rem] sm:flex-row sm:items-end sm:gap-3 sm:px-2"
           role="list"
           :aria-label="`Cards in option ${choiceIndex + 1}`"
         >
           <div
             v-for="(card, cardIndex) in choice.cards"
             :key="card.id"
-            class="w-[9.5rem] sm:w-[12.5rem]"
+            class="w-full max-w-[11rem] min-w-0 sm:flex-1 sm:max-w-[12.5rem]"
             :class="{
-              '-rotate-2 translate-y-2': choice.cards.length > 1 && cardIndex === 0,
-              'rotate-2': choice.cards.length > 1 && cardIndex === 1,
+              'sm:-rotate-2 sm:translate-y-2':
+                choice.cards.length > 1 && cardIndex === 0,
+              'sm:rotate-2': choice.cards.length > 1 && cardIndex === 1,
             }"
             role="listitem"
           >
@@ -126,7 +129,9 @@ const getEdhrecUrl = (card: ScryfallCard) =>
         </div>
 
         <div v-if="revealComplete" class="mt-5 border-t border-[var(--md-sys-color-outline-variant)] pt-4">
-          <h3 class="text-lg font-bold leading-tight">{{ getChoiceTitle(choice) }}</h3>
+          <h3 class="break-words text-lg font-bold leading-tight [overflow-wrap:anywhere]">
+            {{ getChoiceTitle(choice) }}
+          </h3>
           <div class="mt-3 space-y-2">
             <div
               v-for="card in choice.cards"
@@ -134,30 +139,54 @@ const getEdhrecUrl = (card: ScryfallCard) =>
               class="flex items-start gap-2 text-xs text-[var(--md-sys-color-on-surface-variant)]"
             >
               <ManaIdentity :colors="card.color_identity ?? []" compact />
-              <span>{{ getTypeLine(card) }}</span>
+              <span class="min-w-0 break-words [overflow-wrap:anywhere]">
+                {{ getTypeLine(card) }}
+              </span>
             </div>
           </div>
 
           <div v-if="showLinks" class="mt-4 flex flex-wrap gap-1">
             <template v-for="card in choice.cards" :key="`${choice.id}-${card.id}-links`">
               <a
-                :href="card.scryfall_uri"
+                v-if="getSafeScryfallUrl(card)"
+                :href="getSafeScryfallUrl(card) ?? undefined"
                 target="_blank"
                 rel="noreferrer"
-                class="m3-button m3-button--text min-h-9 px-2.5 py-1.5 text-xs"
+                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
               >
-                {{ card.name }} Scryfall
-                <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                  {{ card.name }} Scryfall
+                </span>
+                <ExternalLinkHint class="shrink-0" />
               </a>
+              <span
+                v-else
+                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs opacity-70 [overflow-wrap:anywhere]"
+              >
+                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                  {{ card.name }} Scryfall unavailable
+                </span>
+              </span>
               <a
-                :href="getEdhrecUrl(card)"
+                v-if="getEdhrecUrl(card)"
+                :href="getEdhrecUrl(card) ?? undefined"
                 target="_blank"
                 rel="noreferrer"
-                class="m3-button m3-button--text min-h-9 px-2.5 py-1.5 text-xs"
+                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
               >
-                {{ card.name }} EDHREC
-                <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                  {{ card.name }} EDHREC
+                </span>
+                <ExternalLinkHint class="shrink-0" />
               </a>
+              <span
+                v-else
+                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs opacity-70 [overflow-wrap:anywhere]"
+              >
+                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                  {{ card.name }} EDHREC unavailable
+                </span>
+              </span>
             </template>
           </div>
         </div>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { useModalFocus } from "../../composables/useModalFocus";
 
-defineProps<{ label: string }>();
+const props = defineProps<{ label: string }>();
 
 const emit = defineEmits<{
   (event: "close"): void;
@@ -11,7 +11,19 @@ const emit = defineEmits<{
 const close = () => emit("close");
 const dialogRef = ref<HTMLElement | null>(null);
 
-useModalFocus(dialogRef, close);
+useModalFocus(dialogRef, close, {
+  initialTarget: () => dialogRef.value,
+  restoreTarget: () =>
+    document.querySelector<HTMLElement>('[data-panel-invoker="true"]'),
+});
+
+watch(
+  () => props.label,
+  async () => {
+    await nextTick();
+    dialogRef.value?.focus({ preventScroll: true });
+  },
+);
 </script>
 
 <template>

@@ -1,0 +1,72 @@
+name: Bug report
+description: Report reproducible incorrect Randomander behavior.
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include localStorage dumps, secrets, cookies, analytics identifiers, or private data.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v1.0.0 or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, OS, and viewport
+      placeholder: Safari 18, iOS 18, 390 × 844
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Commander
+        - Partner pair
+        - 3-card spark
+        - History or Saved
+        - Settings or Filters
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: filters
+    attributes:
+      label: Active filters and settings
+      description: Describe relevant controls. Do not paste browser storage.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Choose…\n2. Select…\n3. Press…"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted screenshots or console messages
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched open and closed issues for duplicates.
+          required: true
+        - label: I removed secrets, identifiers, and personal/browser-storage data.
+          required: true

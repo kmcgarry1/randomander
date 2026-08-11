@@ -3,11 +3,24 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc -b && vite build && node scripts/check-production-policy.mjs && node scripts/check-bundle-budget.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "typecheck:test": "vue-tsc --noEmit -p tsconfig.test.json",
+    "security:audit": "npm audit --audit-level=high && npm audit --omit=dev --audit-level=high",
+    "security:secrets": "node scripts/scan-secrets.mjs",
+    "license:inventory": "node scripts/generate-license-inventory.mjs",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
+    "release:verify": "npm run security:audit && npm run security:secrets && npm run typecheck:test && npm run test:coverage && npm run license:inventory && npm run build",
     "prepare": "husky install",
     "test:watch": "vitest"
   },
@@ -18,19 +31,22 @@
     "vue": "^3.5.24"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.1.18",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/user-event": "^14.6.1",
     "@testing-library/vue": "^8.1.0",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@vitest/coverage-v8": "^3.2.7",
     "@vue/tsconfig": "^0.8.1",
     "husky": "^9.0.3",
     "jsdom": "^25.0.1",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4",
-    "vitest": "^3.0.7",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7",
     "vue-tsc": "^3.1.4"
   }
 }

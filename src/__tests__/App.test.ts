@@ -5,6 +5,11 @@ import { createPinia } from 'pinia'
 import App from '../App.vue'
 import type { ScryfallCard } from '../lib/scryfall'
 import { clearCache } from '../lib/cache'
+import { useRandomanderStore } from '../stores/randomander'
+import {
+  PERSISTED_PARTITION_KEYS,
+  decodePartitionEnvelope,
+} from '../stores/persistenceCoordinator'
 
 const createCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
   id: 'card-1',
@@ -56,10 +61,10 @@ const createFetchMock = (...cards: ScryfallCard[]) => {
   })
 }
 
-const renderApp = () =>
+const renderApp = (pinia = createPinia()) =>
   render(App, {
     global: {
-      plugins: [createPinia()],
+      plugins: [pinia],
     },
   })
 
@@ -74,6 +79,13 @@ const expectNoEdhrecMetadataFetch = (fetchMock: ReturnType<typeof vi.fn>) => {
     return url.includes('json.edhrec.com')
   })
   expect(requestedEdhrecJson).toBe(false)
+}
+
+const readPersistedPreferences = () => {
+  const raw = localStorage.getItem(PERSISTED_PARTITION_KEYS.preferences)
+  if (!raw) return null
+  const decoded = decodePartitionEnvelope(JSON.parse(raw), 'preferences')
+  return decoded.ok ? decoded.envelope.value : null
 }
 
 afterEach(() => {
@@ -110,6 +122,18 @@ describe('Randomander', () => {
 
     expect(randomize).toHaveClass('fixed', 'sm:relative', 'sm:inset-auto')
     expect(randomize).not.toHaveClass('sm:static')
+  })
+
+  it('allows the Deck inspiration heading to reflow at narrow text sizes', () => {
+    renderApp()
+    const heading = screen.getByRole('heading', { name: /deck inspiration/i })
+
+    expect(heading).toHaveClass('break-words', '[overflow-wrap:anywhere]')
+    expect(heading.parentElement?.parentElement).toHaveClass(
+      'min-w-0',
+      'flex-col',
+      'sm:flex-row'
+    )
   })
 
   it('keeps mobile draw controls compact until the user expands them', async () => {
@@ -152,6 +176,8 @@ describe('Randomander', () => {
     const fetchMock = createFetchMock(
       createCard({
         name: 'Atraxa, Praetors Voice',
+        type_line: 'Legendary Creature — Phyrexian Angel Horror',
+        oracle_text: 'Flying, vigilance, deathtouch, lifelink',
         prices: { eur: '1.25', usd: '2.50' },
         purchase_uris: {
           cardmarket: 'https://www.cardmarket.com/en/Magic/Products/example',
@@ -190,6 +216,15 @@ describe('Randomander', () => {
     const inspiration = screen.getByRole('complementary', {
       name: /deck inspiration/i,
     })
+    const cardText = within(inspiration).getByRole('region', {
+      name: /card text for atraxa, praetors voice/i,
+    })
+    expect(
+      within(inspiration).getByText('Legendary Creature — Phyrexian Angel Horror')
+    ).toBeInTheDocument()
+    expect(
+      within(cardText).getByText('Flying, vigilance, deathtouch, lifelink')
+    ).toBeInTheDocument()
     expect(
       within(inspiration).getByRole('link', {
         name: /cardmarket price for atraxa.*€1\.25/i,
@@ -208,10 +243,69 @@ describe('Randomander', () => {
     expect(await screen.findByText(/500 decks/i)).toBeInTheDocument()
     expect(screen.getByText('DECK THEMES')).toBeInTheDocument()
     expect(await screen.findByText('Infect')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Infect' })).toHaveAttribute(
+    expect(
+      screen.getByRole('link', { name: 'Infect (opens in a new tab)' })
+    ).toHaveAttribute(
       'href',
       'https://edhrec.com/commanders/atraxa-praetors-voice/infect'
     )
+  })
+
+  it('distinguishes metadata errors, retries them, and clears loaded metadata', async () => {
+    const card = createCard({
+      name: 'Atraxa, Praetors Voice',
+      type_line: 'Legendary Creature — Phyrexian Angel Horror',
+    })
+    let metadataAttempts = 0
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('api.scryfall.com')) {
+        return Promise.resolve(mockResponse(card))
+      }
+      if (url.includes('json.edhrec.com')) {
+        metadataAttempts += 1
+        return Promise.resolve(
+          metadataAttempts === 1
+            ? ({
+                ok: false,
+                status: 500,
+                headers: new Headers(),
+              } as Response)
+            : mockEdhrecResponse()
+        )
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const pinia = createPinia()
+    renderApp(pinia)
+    const store = useRandomanderStore(pinia)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+    await screen.findAllByText('Atraxa, Praetors Voice')
+    await user.click(screen.getByRole('button', { name: /show details/i }))
+
+    const retry = await screen.findByRole('button', { name: /retry metadata/i })
+    expect(retry.closest('[role="alert"]')).toHaveTextContent(
+      /could not load \(500\)/i
+    )
+
+    await user.click(retry)
+    expect(await screen.findByText('Infect')).toBeInTheDocument()
+    expect(metadataAttempts).toBe(2)
+    expect(store.getMetadataStateForCard(card, [card]).status).toBe(
+      'success-data'
+    )
+
+    expect(store.clearNetworkCache()).toBe(true)
+    expect(store.getMetadataStateForCard(card, [card]).status).toBe('idle')
+    expect(store.getTagsForCard(card, [card])).toEqual([])
+    expect(await screen.findByText(/themes are ready to load/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /load metadata/i })
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/could not load \(500\)/i)).not.toBeInTheDocument()
   })
 
   it('uses the alphabetical EDHREC pair page and combines partner details', async () => {
@@ -372,7 +466,9 @@ describe('Randomander', () => {
     ).toBeInTheDocument()
     const findCommander = screen.getByRole('button', { name: /find commander/i })
     expect(
-      screen.getByRole('link', { name: /open background on edhrec/i })
+      screen.getByRole('link', {
+        name: /edhrec card \(opens in a new tab\)/i,
+      })
     ).toHaveAttribute(
       'href',
       'https://edhrec.com/cards/agent-of-the-iron-throne'
@@ -438,18 +534,78 @@ describe('Randomander', () => {
 
     renderApp()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
+    const randomize = screen.getByRole('button', { name: /^randomize$/i })
+    await user.click(randomize)
 
-    const loadingOverlay = screen.getByRole('status', { name: /loading cards/i })
+    const loadingOverlay = screen.getByRole('dialog', {
+      name: /shuffling cards/i,
+    })
     expect(loadingOverlay).toBeInTheDocument()
+    expect(loadingOverlay).toHaveAttribute('aria-modal', 'true')
     expect(loadingOverlay).toHaveTextContent(/shuffling cards/i)
+    expect(screen.getByTestId('app-background')).toHaveAttribute('inert')
+    expect(screen.getByTestId('persistence-background')).toHaveAttribute('inert')
+    await vi.waitFor(() =>
+      expect(
+        within(loadingOverlay).getByRole('button', { name: /cancel draw/i })
+      ).toHaveFocus()
+    )
 
     resolveCard!(mockResponse(createCard()))
     await screen.findAllByText('Atraxa, Praetors Voice')
 
     await vi.waitFor(() => {
-      expect(screen.queryByRole('status', { name: /loading cards/i })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('dialog', { name: /shuffling cards/i })
+      ).not.toBeInTheDocument()
+      expect(randomize).toHaveFocus()
     })
+  })
+
+  it('cancels an active draw, restores focus, and permits a successful retry', async () => {
+    const stalledResponse = new Promise<Response>(() => {})
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(stalledResponse)
+      .mockResolvedValueOnce(
+        mockResponse(createCard({ id: 'recovered', name: 'Recovered Commander' }))
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp()
+    const user = userEvent.setup()
+    const randomize = screen.getByRole('button', { name: /^randomize$/i })
+    await user.click(randomize)
+
+    const loadingOverlay = screen.getByRole('dialog', {
+      name: /shuffling cards/i,
+    })
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    await user.click(
+      within(loadingOverlay).getByRole('button', { name: /cancel draw/i })
+    )
+
+    await vi.waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: /shuffling cards/i })
+      ).not.toBeInTheDocument()
+      expect(randomize).toHaveFocus()
+    })
+    expect(screen.getByTestId('app-background')).not.toHaveAttribute('inert')
+    expect(screen.getByTestId('persistence-background')).not.toHaveAttribute('inert')
+    const cancellation = screen.getByRole('alert')
+    expect(cancellation).toHaveTextContent(/draw cancelled/i)
+    const retry = within(cancellation).getByRole('button', { name: /try again/i })
+
+    await user.click(retry)
+    expect(await screen.findAllByText('Recovered Commander')).not.toHaveLength(0)
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        (typeof input === 'string' ? input : input.toString()).includes(
+          'api.scryfall.com'
+        )
+      )
+    ).toHaveLength(2)
   })
 
   it('keeps the result and EDHREC inspiration concealed until a prestige reveal is skipped', async () => {
@@ -486,7 +642,7 @@ describe('Randomander', () => {
 
     const revealedHeading = await screen.findByText('Atraxa, Praetors Voice')
     expect(revealedHeading).toBeInTheDocument()
-    expect(revealedHeading).toHaveFocus()
+    await vi.waitFor(() => expect(revealedHeading).toHaveFocus())
     await vi.waitFor(() => {
       expect(
         fetchMock.mock.calls.some(([input]) => {
@@ -549,7 +705,7 @@ describe('Randomander', () => {
     expect(screen.queryByText('Tymna the Weaver')).not.toBeInTheDocument()
     expectNoEdhrecMetadataFetch(fetchMock)
 
-    await user.click(screen.getByRole('button', { name: /skip reveal/i }))
+    await user.click(await screen.findByRole('button', { name: /skip reveal/i }))
 
     expect(screen.getAllByText('Tymna the Weaver').length).toBeGreaterThan(0)
     expect(screen.getAllByText("Kraum, Ludevic's Opus").length).toBeGreaterThan(0)
@@ -580,7 +736,10 @@ describe('Randomander', () => {
       name: /option 1/i,
     })
     expect(
-      within(optionOne).getByRole('heading', { name: 'Tymna the Weaver' })
+      within(optionOne).getByRole('heading', {
+        level: 3,
+        name: 'Tymna the Weaver',
+      })
     ).toBeInTheDocument()
     expect(
       within(optionOne).getByText('Legendary Creature - Human Cleric')
@@ -596,7 +755,11 @@ describe('Randomander', () => {
     )
     expect(within(optionOne).queryByText('€4.20')).not.toBeInTheDocument()
     expect(within(optionOne).getByText('DECK THEMES')).toBeInTheDocument()
-    expect(within(optionOne).getByRole('link', { name: 'Infect' })).toHaveAttribute(
+    expect(
+      within(optionOne).getByRole('link', {
+        name: 'Infect (opens in a new tab)',
+      })
+    ).toHaveAttribute(
       'href',
       'https://edhrec.com/commanders/tymna-the-weaver/infect'
     )
@@ -605,7 +768,10 @@ describe('Randomander', () => {
       name: /option 2/i,
     })
     expect(
-      within(optionTwo).getByRole('heading', { name: "Kraum, Ludevic's Opus" })
+      within(optionTwo).getByRole('heading', {
+        level: 3,
+        name: "Kraum, Ludevic's Opus",
+      })
     ).toBeInTheDocument()
     expect(
       within(optionTwo).getByText('Legendary Creature - Zombie Horror')
@@ -621,7 +787,11 @@ describe('Randomander', () => {
     )
     expect(within(optionTwo).queryByText('€3.10')).not.toBeInTheDocument()
     expect(within(optionTwo).getByText('DECK THEMES')).toBeInTheDocument()
-    expect(within(optionTwo).getByRole('link', { name: 'Infect' })).toHaveAttribute(
+    expect(
+      within(optionTwo).getByRole('link', {
+        name: 'Infect (opens in a new tab)',
+      })
+    ).toHaveAttribute(
       'href',
       'https://edhrec.com/commanders/kraum-ludevics-opus/infect'
     )
@@ -838,7 +1008,7 @@ describe('Randomander', () => {
     expect(screen.getByText(/option 2/i)).toBeInTheDocument()
     expectNoEdhrecMetadataFetch(fetchMock)
 
-    await user.click(screen.getByRole('button', { name: /skip reveal/i }))
+    await user.click(await screen.findByRole('button', { name: /skip reveal/i }))
 
     const firstPairName =
       'Prava of the Steel Legion + Malcolm, Keen-Eyed Navigator'
@@ -882,7 +1052,11 @@ describe('Randomander', () => {
         'href',
         `https://edhrec.com/commanders/${slug}`
       )
-      expect(within(region).getByRole('link', { name: 'Infect' })).toHaveAttribute(
+      expect(
+        within(region).getByRole('link', {
+          name: 'Infect (opens in a new tab)',
+        })
+      ).toHaveAttribute(
         'href',
         `https://edhrec.com/commanders/${slug}/infect`
       )
@@ -902,7 +1076,9 @@ describe('Randomander', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
 
-    expect(await screen.findByText('Request failed (500).')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Scryfall upstream failure: Request failed (500).')
+    ).toBeInTheDocument()
     expect(screen.queryByText(/draw issue/i)).not.toBeInTheDocument()
   })
 
@@ -926,7 +1102,7 @@ describe('Randomander', () => {
     const user = userEvent.setup()
     const dialog = await openFiltersDialog(user)
     const comparisonSection = within(dialog)
-      .getByText(/comparison/i)
+      .getByRole('heading', { level: 3, name: /comparison/i })
       .closest('section')
 
     expect(comparisonSection).not.toBeNull()
@@ -950,7 +1126,7 @@ describe('Randomander', () => {
     ).toBeInTheDocument()
   })
 
-  it('applies the low-power preset to the shell and backdrop', async () => {
+  it('applies the low-power preset without rendering a card-art backdrop', async () => {
     const fetchMock = createFetchMock(createCard({ name: 'Atraxa, Praetors Voice' }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -970,10 +1146,7 @@ describe('Randomander', () => {
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
     await screen.findAllByText('Atraxa, Praetors Voice')
 
-    expect(screen.getByTestId('draw-backdrop')).toHaveAttribute(
-      'data-mode',
-      'simplified'
-    )
+    expect(screen.queryByTestId('draw-backdrop')).not.toBeInTheDocument()
   })
 
   it('defaults price data to Cardmarket and persists another marketplace', async () => {
@@ -1006,10 +1179,10 @@ describe('Randomander', () => {
     await user.selectOptions(providerSelect, 'tcgplayer')
 
     await vi.waitFor(() => {
-      const persisted = JSON.parse(
-        localStorage.getItem('randomander:state:v2') ?? '{}'
-      ) as { display?: { priceProvider?: string } }
-      expect(persisted.display?.priceProvider).toBe('tcgplayer')
+      expect(readPersistedPreferences()?.display.priceProvider).toBe(
+        'tcgplayer'
+      )
+      expect(localStorage.getItem('randomander:state:v2')).toBeNull()
     })
 
     firstRender.unmount()
@@ -1037,10 +1210,10 @@ describe('Randomander', () => {
       within(settingsDialog).getByRole('combobox', { name: /marketplace/i })
     ).toHaveValue('cardmarket')
     await vi.waitFor(() => {
-      const persisted = JSON.parse(
-        localStorage.getItem('randomander:state:v2') ?? '{}'
-      ) as { display?: { priceProvider?: string } }
-      expect(persisted.display?.priceProvider).toBe('cardmarket')
+      expect(readPersistedPreferences()?.display.priceProvider).toBe(
+        'cardmarket'
+      )
+      expect(localStorage.getItem('randomander:state:v2')).toBeNull()
     })
   })
 
@@ -1130,10 +1303,9 @@ describe('Randomander', () => {
     await user.click(revealToggle)
 
     await vi.waitFor(() => {
-      const persisted = JSON.parse(
-        localStorage.getItem('randomander:state:v2') ?? '{}'
-      ) as { display?: { enablePrestigeReveal?: boolean } }
-      expect(persisted.display?.enablePrestigeReveal).toBe(false)
+      expect(
+        readPersistedPreferences()?.display.enablePrestigeReveal
+      ).toBe(false)
     })
 
     firstRender.unmount()

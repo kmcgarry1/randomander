@@ -27,4 +27,4 @@
 
 ## Notes
 
-- Settings and history are persisted in local storage under `randomander:state:v2`.
+- Preferences, History, and Saved records use the independent `randomander:state:v3:*` local-storage envelopes. `randomander:state:v2` remains only as a guarded migration source, and the response cache uses a separate key.

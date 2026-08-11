@@ -21,7 +21,7 @@ Use this guide whenever collaborating on `randomander`, especially during multi-
 
 ## Verification notes
 - Automated tests and builds are preferred even for documentation-heavy branches when they also contain code; mention in the PR if a relevant check could not run.
-- If a requested change touches the store, history, or persistence layers, double-check `localStorage` keys (e.g., `randomander:state:v2`).
+- If a requested change touches the store, collections, or persistence layers, double-check all three `randomander:state:v3:*` envelopes, the guarded `randomander:state:v2` migration source, and the separate response-cache key.
 
 ## Onboarding the next collaborator
 - Point team members to `README.md` for the project overview, `CONTRIBUTING.md` for workflow, and `AGENTS.md` for agent-specific rules.

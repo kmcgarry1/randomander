@@ -37,7 +37,7 @@ describe('CardPriceBadge', () => {
 
     expect(
       screen.getByRole('link', {
-        name: /tcgplayer price for atraxa.*\$5\.50, etched, opens in a new tab/i,
+        name: /tcgplayer price for atraxa.*\$5\.50, etched \(opens in a new tab\)/i,
       })
     ).toHaveAttribute('href', 'https://www.tcgplayer.com/product/example')
     expect(screen.getByText('· etched')).toBeInTheDocument()
@@ -52,6 +52,21 @@ describe('CardPriceBadge', () => {
     })
 
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders an untrusted purchase URI as non-link price text', () => {
+    render(CardPriceBadge, {
+      props: {
+        card: createCard({
+          prices: { eur: '1.25' },
+          purchase_uris: { cardmarket: 'javascript:alert(1)' },
+        }),
+        provider: 'cardmarket',
+      },
+    })
+
+    expect(screen.getByText('€1.25')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
   it.each([

@@ -11,15 +11,15 @@ This file captures expectations for AI agents working in `randomander`. Treat it
 - Avoid undoing unrelated work. If you see unexpected modifications, pause and ask for clarification before proceeding.
 
 ## Repository specifics
-- `randomander` is a Vue 3 + TypeScript + Vite project powered by Pinia, Tailwind CSS, and integrations with Scryfall and EDHREC.
+- `randomander` is a Vue 3 + TypeScript + Vite project powered by Pinia and Tailwind CSS. Public builds automate Scryfall requests and provide validated, user-initiated EDHREC links; the internal EDHREC metadata adapter is test-only unless a future release is separately approved.
 - `src/features/draw`, `history`, `saved`, and `settings` each own a view, with shared helpers/composables and `src/stores/randomander.ts` managing randomness, history, saved pulls, and display/cache options.
 - Use relative imports within `src/`. Tailwind utilities and component-level styling should stay concise; avoid introducing global CSS unless justified.
 - Scripts defined in `package.json` (e.g., `npm run dev`, `npm run build`, `npm run test`, `npm run preview`) are the preferred way to verify behavior locally.
 
 ## Project overview
-- Randomander generates Commander-legal card suggestions, companion pairs, and three-card sparks by pulling from Scryfall and optionally querying EDHREC metadata.
-- Users can adjust draw modes, history length, saved pulls, tags, cache settings, and display preferences inside the available UI views.
-- The store persists settings/history via local storage (`randomander:state:v2`) while guarding caches and saved history counts (40 entries each, configurable limits).
+- Randomander generates Commander-legal card suggestions, companion pairs, and three-card sparks from Scryfall, with optional outbound EDHREC inspiration links.
+- Users can adjust draw modes, filters, cache/performance settings, and display preferences, and can review or clear bounded History and Saved collections.
+- The store persists preferences, History, and Saved records in the partitioned `randomander:state:v3:*` local-storage envelopes while retaining `randomander:state:v2` only as a guarded migration source. Response caches remain separate, and History/Saved collections are capped at 40 entries each.
 
 ## Workflow guidance
 - Start with `npm install` if dependencies are missing, then `npm run dev` for local UI work, `npm run test` (Vitest) for unit verification, and `npm run build` (Vue TSC + Vite) before major submissions.

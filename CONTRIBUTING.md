@@ -25,9 +25,11 @@ For a feature request, explain the user problem before proposing an implementati
 
 ## Development environment
 
-Installed Vite tooling requires Node.js `^20.19.0` or `>=22.12.0`. CI currently uses Node.js 20; for local development, prefer a maintained Vite-compatible release such as Node.js 22.12+ or 24. npm ships with Node.
+The supported runtimes are Node.js `^22.12.0` and `^24.0.0`. CI verifies both LTS lines, and `.nvmrc` selects Node.js 24 for local development. npm ships with Node; the repository pins the expected npm version in `package.json`.
 
-No API key, `.env` file, local database, or application server is required. The browser makes direct requests to Scryfall and EDHREC.
+The 1.0 browser baseline is Chrome/Edge 112+, Firefox 112+, and Safari/iOS Safari 16.4+. Vite emits ES2020 syntax. CI uses Playwright's bundled Chromium, Firefox, and WebKit engines on desktop plus Chromium/WebKit phone emulation; release sign-off still requires current physical iOS Safari and Android Chrome checks.
+
+No API key, `.env` file, local database, or application server is required. The public browser build makes automated requests only to Scryfall and its documented asset hosts. EDHREC is user-initiated outbound navigation; its internal JSON adapter is enabled only for tests or a future separately approved release.
 
 ### First setup
 
@@ -54,6 +56,15 @@ npm run dev -- --host
 # Complete test suite
 npm run test
 
+# Type-check test and browser-test sources
+npm run typecheck:test
+
+# Enforce risk-based coverage floors
+npm run test:coverage
+
+# Run mocked release journeys in desktop and phone browser projects
+npm run test:e2e
+
 # Watch tests
 npm run test:watch
 
@@ -70,7 +81,7 @@ npm run build
 npm run preview
 ```
 
-There are no standalone lint, format, typecheck, coverage, or deployment scripts at present. Do not report an unconfigured command as a completed check.
+There are no standalone lint or format scripts. Test-source type-checking, coverage, browser E2E, security, and deployment-smoke commands are configured; see [Testing and release evidence](docs/testing.md) for their scope and prerequisites.
 
 ## Branch and commit workflow
 
@@ -136,7 +147,7 @@ Preserve the request-policy guarantees:
 - starts are spaced by at least 150 ms;
 - abort signals can cancel queued and active work;
 - HTTP 429 respects a minimum one-minute cooldown or a longer `Retry-After`;
-- network/CORS failures start a one-minute cooldown;
+- ordinary network/CORS failures recover as soon as connectivity returns and do not start the 429 cooldown;
 - random/ranked draws are live, while exact-name lookups may use persistent cache.
 
 The service queue and cooldown live at module scope. Reset modules and fake timers between tests that exercise them.
@@ -149,15 +160,15 @@ Double-faced-card presentation uses `layout` plus two usable `card_faces[].image
 
 ### EDHREC
 
-Treat post-reveal deck inspiration as optional: parser and display-loader changes should cover every supported schema fixture and degrade to `null`/empty themes rather than invalidating an otherwise successful Scryfall result.
+The public build must remain link-only unless written permission or an owner-approved legal basis is recorded. `npm run build` scans `dist` and fails if the automated JSON endpoint is present. Keep outbound destinations HTTPS/host-allowlisted and never turn a card result failure into an automatic EDHREC fallback.
 
-Deck-threshold filtering is different. It queries EDHREC while selecting candidates and can fail the draw when a count or request is unavailable. Tests must distinguish this blocking filter path from optional display enrichment.
+Vitest enables the internal adapter so its parser, test-only deck-threshold path, and metadata state machine remain regression-covered. Display-loader changes must preserve distinct idle, loading, successful-data, successful-empty, and error states plus explicit retry. A failed optional metadata lookup must not invalidate an otherwise successful Scryfall result.
 
 Do not assume every card or pair has a page. Pair slugs and theme links need explicit tests because ordering and path normalization affect both navigation and cache keys.
 
 ## State and persistence changes
 
-The durable state key is `randomander:state:v2`; the separate response-cache key is `randomander:cache:v1`.
+Durable state uses the `randomander:state:v3:preferences`, `:history`, and `:saved` partitions; the separate response-cache key is `randomander:cache:v1`. The legacy `randomander:state:v2` decoder remains a migration boundary and must not be removed without a deliberate compatibility decision.
 
 When changing persisted state:
 
@@ -165,6 +176,8 @@ When changing persisted state:
 - decide whether the field belongs in state, cache, or only memory;
 - confirm History/Saved records still load;
 - preserve the 40-record caps unless changing them intentionally;
+- keep preferences coalesced and collection mutations immediately durable;
+- preserve deterministic partition-level storage-event reconciliation and suppress write loops while applying remote state;
 - verify that Clear cache, Reset filters, Clear History, and Clear Saved affect only their stated scope;
 - test storage-unavailable and malformed-data fallbacks when the boundary changes;
 - update the User guide and Architecture document.
@@ -184,14 +197,17 @@ Add the narrowest test that would have prevented the regression, then cover the 
 
 ### Required automated checks
 
-Run both before requesting review:
+Run the release gates before requesting review:
 
 ```bash
 npm run test
+npm run typecheck:test
+npm run test:coverage
+npm run test:e2e
 npm run build
 ```
 
-`npm run build` excludes test files from its TypeScript project, so a successful build does not imply tests compiled or passed.
+`npm run build` excludes test files from its TypeScript project, so a successful build does not imply tests compiled or passed. Install Playwright's browser engines as described in [Testing and release evidence](docs/testing.md) before the first E2E run.
 
 If a check cannot run, explain exactly why in the pull request. Do not mark it complete based only on expected behavior.
 
@@ -199,8 +215,7 @@ If a check cannot run, explain exactly why in the pull request. Do not mark it c
 
 For interface changes, verify the affected workflow at minimum in:
 
-- a narrow phone viewport around 375 px;
-- a wider phone viewport around 430 px;
+- exact phone widths at 320, 375, and 390 CSS px, including 200% root text size;
 - a desktop viewport at or above 1280 px;
 - light and dark themes when colors/surfaces changed;
 - keyboard-only navigation;
@@ -217,14 +232,14 @@ When draw logic or Deck inspiration changes, cover the relevant rows:
 | Commander, normal | One result, follow-up action only when eligible, one detail body. |
 | Commander, choice | Two independently rendered groups and two separate detail bodies. |
 | Partner pair, normal | Compatible two-card group within combined color rules. |
-| Partner pair, choice | Two independent compatible groups and metadata contexts. |
+| Partner pair, choice | Two independent compatible groups and detail/link contexts. |
 | Commander with Choose a Background | Commander plus Background. |
 | Legendary Background first | Eligible commander is found and canonical order is commander then Background. |
-| Spark | Three cards with best-effort duplicate avoidance; no choice/popularity metadata path. |
-| Reveal enabled | Metadata begins only after visible result. |
-| Reveal skipped/reduced | Result and metadata become available without decorative delay. |
+| Spark | Three cards with best-effort duplicate avoidance; no choice or ranked-popularity path. |
+| Reveal enabled | Supplemental details/links appear only after the result is visible; test-only metadata does not pre-empt the reveal. |
+| Reveal skipped/reduced | Result and supplemental details become available without decorative delay. |
 | Transforming/modal DFC | Front is shown first; each result card can turn independently after reveal. |
-| Metadata disabled | No post-reveal EDHREC metadata request or theme UI. |
+| Public metadata policy | No automated EDHREC request, deck-threshold control, endpoint in `dist`, or theme UI. |
 
 ## Accessibility review
 
@@ -261,6 +276,8 @@ Before opening or updating a pull request:
 - [ ] Unrelated work and formatting were left intact.
 - [ ] Behavior changes include appropriate tests.
 - [ ] `npm run test` passes.
+- [ ] `npm run typecheck:test` and `npm run test:coverage` pass.
+- [ ] `npm run test:e2e` passes when the change affects a release journey or browser behavior.
 - [ ] `npm run build` passes.
 - [ ] Relevant mobile and desktop layouts were checked.
 - [ ] Keyboard, focus, and reduced-motion behavior were checked when applicable.

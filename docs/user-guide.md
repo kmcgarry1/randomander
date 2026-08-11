@@ -1,6 +1,6 @@
 # Randomander user guide
 
-Randomander turns Commander discovery into a short loop: choose a kind of prompt, set any useful boundaries, reveal a live result, and follow the links or themes that make it interesting.
+Randomander turns Commander discovery into a short loop: choose a kind of prompt, set any useful boundaries, reveal a live result, and follow the details or links that make it interesting.
 
 This guide describes the current interface and its limits. For installation and development, return to the [README](../README.md#getting-started).
 
@@ -10,7 +10,7 @@ The Draw surface is always the center of the app. Its surrounding controls adapt
 
 - **Draw mode** selects Commander, Partner pair, or 3-card spark and summarizes active filters.
 - **Randomizer result** reveals card art and result actions.
-- **Deck inspiration** shows result details and available EDHREC context after reveal.
+- **Deck inspiration** shows result details plus Scryfall and validated outbound EDHREC links after reveal.
 - **Filters** opens all card-pool constraints in a modal sheet.
 - **History**, **Saved**, and **Settings** open as support panels over the Draw surface.
 
@@ -25,7 +25,7 @@ Randomander does not use URL routes. Closing a support panel returns to the same
 3. Press **Randomize**.
 4. Let the reveal finish, press **Skip reveal**, or press <kbd>Escape</kbd> during the reveal.
 5. Review the cards and Deck inspiration.
-6. Keep a single result directly, or save any recorded draw from History.
+6. Save a single result directly, or save any recorded draw from History.
 
 Randomize is disabled while a request is active. Internally, a newly initiated draw workflow aborts older request work, and filtered searches cap candidate attempts rather than running indefinitely.
 
@@ -64,7 +64,7 @@ The resulting pair must remain within the selected combined color count and colo
 
 The reverse Background workflow starts from a legendary Background drawn in **Commander** mode (including a Commander choice), where **Find commander** fetches the eligible commander. Successful Background pairs are normalized to commander first, then Background.
 
-Choice mode produces two independently resolved pair groups. After reveal, Deck inspiration gives Option 1 and Option 2 separate detail sections instead of combining their metadata.
+Choice mode produces two independently resolved pair groups. After reveal, Deck inspiration gives Option 1 and Option 2 separate detail sections instead of combining their links or card details.
 
 ### 3-card spark
 
@@ -72,7 +72,7 @@ Spark mode returns three Commander-legal cards as a loose creative constraint. I
 
 When a color count is selected, Spark can generate a palette within the allowed colors and use it across the three-card prompt. **Exclude Game Changers** removes cards in Scryfall's Game Changer category.
 
-Choice mode, EDHREC deck-count limits, ranked cutoff, and EDHREC result metadata are unavailable in Spark mode.
+Choice mode and ranked cutoff are unavailable in Spark mode. Automated EDHREC deck-count and result-metadata requests are disabled throughout the public build.
 
 ## Filters
 
@@ -97,22 +97,21 @@ Partner-pair validation currently treats the number as a maximum for the union o
 
 ### Deck popularity
 
-These controls are available in Commander and Partner-pair modes:
+The following popularity control is available in Commander and Partner-pair modes:
 
-- **Limit by EDHREC decks** accepts applicable candidates whose reported deck count is strictly below the configured value. A missing count or failed threshold lookup can fail the draw because this filter depends on EDHREC.
 - **Skip top 10% (EDHREC rank)** asks Scryfall for results ordered by EDHREC rank, skips the leading 10%, and samples from the remainder.
 
-The two popularity strategies are mutually exclusive in the interface. Neither represents a combined EDHREC pair-page popularity score. In Partner mode, ranked sampling applies to the initial partner-capable card and the other half follows its mechanic-specific query; Background cards bypass the individual commander deck threshold. Both strategies may take longer than an unconstrained random draw.
+Ranked sampling uses Scryfall's `order=edhrec` search and does not contact EDHREC. In Partner mode it applies to the initial partner-capable card; the other half follows its mechanic-specific query. It does not represent a combined pair-page popularity score and may take longer than an unconstrained random draw. The former direct EDHREC deck-count threshold is hidden and forced off in public builds.
 
 ### Choice mode
 
 Choice mode is available for Commander and Partner pair. It returns two result groups in a single draw so they can be compared without losing the first result.
 
-The result and metadata remain grouped throughout the interface:
+The result details remain grouped throughout the interface:
 
 - each option has its own card art, title, types, colors, and links;
 - follow-up pairing changes only the chosen option;
-- each Deck inspiration option renders its own card or pair profile, deck count, and themes;
+- each Deck inspiration option renders its own card or pair profile and validated external links;
 - History records the complete choice state together.
 
 To save a choice-mode pull, open History and save its record.
@@ -129,9 +128,9 @@ During the reveal:
 
 - use **Skip reveal** or <kbd>Escape</kbd> to finish immediately;
 - Draw-card mode buttons and pairing actions wait until the reveal is complete; Filters can still be opened;
-- post-reveal metadata requests are deferred so the reveal surface appears first.
+- supplemental details and links appear only after the reveal surface is ready.
 
-After a non-choice reveal, **Keep pull** saves the current result. Once saved, it changes to **Pull kept**. A commander with a supported pairing mechanic also shows the appropriate pairing action.
+After a non-choice reveal, **Save pull** saves the current result. Once saved, it changes to **Pull saved**. A commander with a supported pairing mechanic also shows the appropriate pairing action.
 
 Transforming and modal double-faced cards show a **Back face** control after the reveal. Use it to view the reverse image; the same control then becomes **Front face**. Each card in a pair or choice keeps its own temporary orientation, and a new result starts on the front. Split and Adventure cards use their single combined card image and do not show this control.
 
@@ -144,14 +143,12 @@ Deck inspiration is supplemental context, not part of card selection. It may con
 - a card or combined pair name;
 - card type lines and color identities;
 - one selected-marketplace price estimate per card when available;
-- a combined EDHREC deck count when available;
-- up to four EDHREC theme links;
 - Scryfall links for each card;
 - an EDHREC card, commander, or pair link.
 
-For single, non-choice results, use **Show details** and **Hide details** to control the panel. Choice results show one body section per option because each may have a different pair slug, count, and theme set.
+For single, non-choice results, use **Show details** and **Hide details** to control the panel. Choice results show one body section per option because each may have different cards, prices, and destinations.
 
-EDHREC's public page data changes independently of Randomander and is not guaranteed for every card or pair. “No themes available” can mean that a page has no recognized theme data or that the optional metadata request failed. The Scryfall result remains usable.
+The public build does not request EDHREC JSON data. An EDHREC link is shown only when Randomander can validate an `https://edhrec.com` destination, and the site opens only after you choose that link. EDHREC availability does not affect whether the Scryfall result is usable.
 
 Price estimates come from the existing Scryfall card response and correspond to the exact printing that was drawn. Partner prices stay attached to each card rather than being presented as a potentially misleading pair total. Choice options keep their own prices inside their separate bodies.
 
@@ -166,13 +163,13 @@ From History you can:
 - see the mode, time, a summary of selected filters, and recorded cards or choices;
 - clear all history.
 
-Loading a record restores its draw mode, filter snapshot, cards, and choice groups. It does not recreate old EDHREC metadata; current metadata is fetched when the loaded result becomes visible. Any stored card price is the snapshot included in that historical Scryfall payload and may no longer match the marketplace.
+Loading a record restores its draw mode, filter snapshot, cards, and choice groups. Any stored card price is the snapshot included in that historical Scryfall payload and may no longer match the marketplace. Loading a record does not make an automated EDHREC request.
 
 History is capped at 40 records. Once full, a new record removes the oldest one. Clearing History does not clear Saved pulls.
 
 ## Saved pulls
 
-Saved holds result records you want to keep beyond the rolling History list. From Saved you can:
+Saved holds result records you save beyond the rolling History list. From Saved you can:
 
 - load a pull;
 - remove one saved record;
@@ -193,13 +190,13 @@ Equivalent results are deduplicated using their mode and card/group identity. Sa
 | --- | --- |
 | Card reveal animation | Enables the staged card-back reveal. Turn it off for immediate results. |
 | External links | Shows or hides Scryfall, EDHREC, and marketplace actions; price text remains. |
-| EDHREC metadata | Enables deck counts and themes after reveal. |
-| Card-art backdrop | Uses result artwork to tint the result surface. |
+| Automated EDHREC metadata | Not a toggle in the public build; Settings explains that direct deck-count and theme requests are disabled. |
+| Ambient backdrop | Adds a decorative color glow behind results without using card art. |
 
 ### Performance
 
 - **Standard** clears Reduce motion, Simplify backdrop, and Reduce transparency without changing separate display preferences.
-- **Low power** enables those three reductions together and turns off Card-art backdrop.
+- **Low power** enables those three reductions together and turns off Ambient backdrop.
 - Changing one of those controls directly creates a **Custom** profile.
 
 The app also respects the operating system's `prefers-reduced-motion` setting for reveal behavior.
@@ -218,12 +215,13 @@ Randomander does not call those marketplaces for pricing. Scryfall supplies pric
 
 The response cache is enabled by default with a 24-hour lifetime and a 120-entry maximum. The interface accepts a minimum TTL of one hour and a minimum limit of 20 entries.
 
-Caching primarily helps repeat EDHREC metadata and exact-name card lookups. It does not turn live random draws into an offline feature.
+In the public build, caching primarily helps exact-name Scryfall card lookups. It does not turn live random draws into an offline feature.
 
-**Clear cache** removes persistent cached responses without touching Settings, History, or Saved. If metadata already loaded in the current session still looks stale, clear the cache and reload the page to clear the in-memory copy too.
+**Clear cache** removes persistent cached responses and in-memory metadata state without touching Settings, History, or Saved.
 
 ## Keyboard and accessibility behavior
 
+- Randomander exposes one page-level heading, **Find a deck worth building.**, at every viewport size; modal surfaces use their own labelled section headings.
 - Interactive controls use native buttons, links, inputs, and pressed/expanded state where applicable.
 - Filters and support panels trap focus while open and restore focus to the previous control when closed.
 - <kbd>Escape</kbd> closes the active modal/panel, or skips an active reveal.
@@ -240,21 +238,25 @@ Randomander stores its durable state in the current browser profile:
 
 | Key | Contents | Clearing it does |
 | --- | --- | --- |
-| `randomander:state:v2` | Mode, filters, display/cache/performance settings, theme, History, and Saved records | Resets preferences and permanently removes local History/Saved data. |
+| `randomander:state:v3:preferences` | Mode, filters, display/cache/performance settings, theme, and restorable support-panel state | Resets local preferences. |
+| `randomander:state:v3:history` | Up to 40 compact, validated History records | Permanently removes local History. |
+| `randomander:state:v3:saved` | Up to 40 compact, validated Saved records | Permanently removes local Saved pulls. |
 | `randomander:cache:v1` | Eligible HTTP response payloads and timestamps | Forces future eligible requests to fetch fresh data; personal collections remain. |
+
+The legacy `randomander:state:v2` key is read for migration and removed only after all three v3 partitions are written successfully. Preference changes are briefly coalesced, while History and Saved mutations flush immediately. Tabs on the same origin reconcile preferences, History, and Saved independently; simultaneous changes to the same partition use deterministic last-write-wins behavior. There is still no account or cross-device sync.
 
 The current unsaved result is represented through History rather than a separate reload-resume record. Private/incognito browsing, browser cleanup tools, storage quotas, or switching profiles can remove or isolate stored data.
 
-The app makes client-side requests to Scryfall, EDHREC, Scryfall's image/symbol hosts, Google Fonts, and Vercel Analytics. There is no account or cross-device sync.
+The public build makes client-side requests to Scryfall and Scryfall's image/symbol hosts. It uses system fonts, does not initialize analytics, and does not request EDHREC metadata. Activating an external link navigates a new tab to the selected Scryfall, EDHREC, or allowlisted marketplace destination. There is no account or cross-device sync.
 
 ## Errors and recovery
 
 Common recovery steps are deliberately simple:
 
 1. If no card matches, loosen color or popularity filters and try again.
-2. If Scryfall reports a cooldown or network failure, wait before retrying and check whether the API is reachable.
-3. If themes are missing, confirm EDHREC metadata is enabled and the reveal has completed.
-4. If metadata looks stale, clear Cache in Settings and reload.
+2. If Scryfall reports HTTP 429, respect the displayed cooldown before trying once more.
+3. For an ordinary offline or network failure, restore connectivity and retry; it does not start the rate-limit cooldown.
+4. If a cached exact-name result looks stale, clear Cache in Settings and retry.
 5. If the application cannot start or build locally, follow [Troubleshooting](troubleshooting.md).
 
-Avoid repeatedly pressing Randomize during an upstream cooldown. Randomander spaces Scryfall requests and temporarily blocks new calls after rate-limit or network failures to avoid making the condition worse.
+Avoid repeatedly pressing Randomize during an upstream rate-limit cooldown. Randomander spaces Scryfall requests and temporarily blocks new calls only after HTTP 429, using the longer of its minimum delay and a valid `Retry-After` value.

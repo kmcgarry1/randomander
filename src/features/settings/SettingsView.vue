@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { storeToRefs } from "pinia";
 import {
   ArrowRightIcon,
@@ -18,10 +18,15 @@ import {
   XMarkIcon,
 } from "@heroicons/vue/24/outline";
 import {
+  AUTOMATED_EDHREC_METADATA_ENABLED,
+  MAX_HISTORY,
+  MAX_SAVED,
   useRandomanderStore,
   type ThemeMode,
 } from "../../stores/randomander";
 import { PRICE_PROVIDERS } from "../../lib/scryfall";
+import ExternalLinkHint from "../../components/ExternalLinkHint.vue";
+import ConfirmationDialog from "../../components/layout/ConfirmationDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -33,8 +38,15 @@ const props = withDefaults(
 );
 
 const store = useRandomanderStore();
-const { display, theme, cacheSettings, history, performance } =
+const { display, theme, cacheSettings, history, saved, performance } =
   storeToRefs(store);
+const clearAllDialogOpen = ref(false);
+
+const clearAllDescription = computed(() => {
+  const historyLabel = `${history.value.length} History pull${history.value.length === 1 ? "" : "s"}`;
+  const savedLabel = `${saved.value.length} Saved pull${saved.value.length === 1 ? "" : "s"}`;
+  return `This permanently resets settings and removes ${historyLabel}, ${savedLabel}, cached responses, and the current result from this browser. It cannot be undone.`;
+});
 
 const themeOptions: Array<{
   value: ThemeMode;
@@ -69,15 +81,19 @@ const displayToggles = computed(() => [
     label: "External links",
     description: "Show Scryfall, EDHREC, and marketplace links.",
   },
-  {
-    key: "showTags" as const,
-    label: "EDHREC metadata",
-    description: "Show EDHREC deck counts and themes.",
-  },
+  ...(AUTOMATED_EDHREC_METADATA_ENABLED
+    ? [
+        {
+          key: "showTags" as const,
+          label: "EDHREC metadata",
+          description: "Show test-only EDHREC deck counts and themes.",
+        },
+      ]
+    : []),
   {
     key: "showAmbient" as const,
-    label: "Card-art backdrop",
-    description: "Tint the backdrop with card art.",
+    label: "Ambient backdrop",
+    description: "Add a decorative color glow behind results without using card art.",
   },
 ]);
 
@@ -119,7 +135,7 @@ const performanceToggles = computed(() => [
   {
     key: "simplifyBackdrop" as const,
     label: "Simplify backdrop",
-    description: "Use a simpler card-art backdrop.",
+    description: "Reduce decorative backdrop effects.",
   },
   {
     key: "reduceTransparency" as const,
@@ -138,6 +154,15 @@ const setPerformancePreset = (value: "standard" | "low-power") => {
 
 const clearCache = () => {
   store.clearNetworkCache();
+};
+
+const requestClearAll = () => {
+  clearAllDialogOpen.value = true;
+};
+
+const confirmClearAll = () => {
+  store.clearAllLocalData();
+  clearAllDialogOpen.value = false;
 };
 
 const openHistory = () => {
@@ -273,6 +298,18 @@ const closeSettings = () => {
               :aria-describedby="`display-${item.key}-description`"
             />
           </label>
+          <div
+            v-if="!AUTOMATED_EDHREC_METADATA_ENABLED"
+            class="border-t border-[var(--md-sys-color-outline-variant)] py-4 text-sm leading-6 text-[var(--md-sys-color-on-surface-variant)]"
+          >
+            <p class="font-semibold text-[var(--md-sys-color-on-surface)]">
+              Automated EDHREC metadata is disabled
+            </p>
+            <p class="mt-1">
+              This build does not request EDHREC deck counts or themes. Validated
+              EDHREC links remain available and open only when you choose them.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -441,7 +478,7 @@ const closeSettings = () => {
                 id="cache-enabled-description"
                 class="mt-1 block text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
               >
-                Cache eligible card and EDHREC data.
+                Cache eligible card responses used by repeat lookups.
               </span>
             </span>
             <input
@@ -497,7 +534,8 @@ const closeSettings = () => {
             <p
               class="mt-1 text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
             >
-              Remove cached responses. Settings are not affected.
+              Remove cached responses and loaded metadata. Settings, History,
+              and Saved pulls are not affected.
             </p>
           </div>
           <button
@@ -543,6 +581,94 @@ const closeSettings = () => {
           <ArrowRightIcon class="h-5 w-5" aria-hidden="true" />
         </button>
       </section>
+
+      <section
+        class="m3-card m3-card--filled p-4 sm:p-6 lg:col-span-2"
+        aria-labelledby="settings-privacy-title"
+      >
+        <div class="min-w-0">
+          <h3
+            id="settings-privacy-title"
+            class="text-lg font-semibold text-[var(--md-sys-color-on-surface)]"
+          >
+            Privacy and data
+          </h3>
+          <p
+            class="mt-1 max-w-2xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+          >
+            Randomander has no account or application database. Settings, the
+            {{ MAX_HISTORY }} most recent History pulls, up to {{ MAX_SAVED }}
+            Saved pulls, and a bounded response cache stay in this browser.
+            History rolls over automatically; Saved asks before replacing its
+            oldest pull. Cached entries expire after {{ cacheSettings.ttlHours }}
+            hours and are capped at {{ cacheSettings.maxEntries }} entries.
+          </p>
+          <p class="mt-3 max-w-2xl text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)]">
+            New draws send card queries to Scryfall. Price and EDHREC links contact
+            those services only after you select a link. Automated EDHREC metadata
+            is disabled in this build. Analytics is disabled for 1.0 by release
+            policy, as described in the privacy notice.
+          </p>
+          <p class="mt-3 max-w-2xl break-words text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)] [overflow-wrap:anywhere]">
+            Card data, images, price snapshots, and allowlisted marketplace
+            destinations are supplied through
+            <a
+              href="https://scryfall.com/docs/api"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex max-w-full flex-wrap items-center gap-1 font-semibold underline"
+            >
+              Scryfall
+              <ExternalLinkHint class="shrink-0" />
+            </a>. Randomander is not produced by or endorsed by Scryfall and does
+            not process purchases. EDHREC is an independent, user-selected
+            outbound destination in this build.
+          </p>
+          <p class="mt-3 max-w-2xl break-words text-sm leading-5 text-[var(--md-sys-color-on-surface-variant)] [overflow-wrap:anywhere]">
+            Randomander is unofficial fan content permitted under Wizards of
+            the Coast's
+            <a
+              href="https://company.wizards.com/en/legal/fancontentpolicy"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex max-w-full flex-wrap items-center gap-1 font-semibold underline"
+            >
+              Fan Content Policy
+              <ExternalLinkHint class="shrink-0" />
+            </a>. Wizards does not approve or endorse it. Some materials are
+            property of Wizards of the Coast LLC. © Wizards of the Coast LLC.
+          </p>
+        </div>
+        <div class="mt-5 flex flex-col gap-3 border-t border-[var(--md-sys-color-outline-variant)] pt-5 sm:flex-row sm:flex-wrap">
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noreferrer"
+            class="m3-button m3-button--outlined min-w-0 max-w-full flex-wrap"
+          >
+            <span class="min-w-0 break-words [overflow-wrap:anywhere]">Privacy notice</span>
+            <ExternalLinkHint class="shrink-0" />
+          </a>
+          <button
+            type="button"
+            class="m3-button m3-button--danger min-w-0 max-w-full flex-wrap"
+            @click="requestClearAll"
+          >
+            <TrashIcon class="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span class="min-w-0 break-words [overflow-wrap:anywhere]">Clear all local data</span>
+          </button>
+        </div>
+      </section>
     </div>
+
+    <ConfirmationDialog
+      v-if="clearAllDialogOpen"
+      title="Clear all local data?"
+      :description="clearAllDescription"
+      confirm-label="Clear all local data"
+      danger
+      @cancel="clearAllDialogOpen = false"
+      @confirm="confirmClearAll"
+    />
   </section>
 </template>

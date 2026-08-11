@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose a focused user outcome for Randomander.
+title: "[Feature]: "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who is blocked, and what are they trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope checks
+      options:
+        - label: I reviewed the current product boundaries in README and SUPPORT.md.
+          required: true
+        - label: I searched open and closed issues for duplicates.
+          required: true
