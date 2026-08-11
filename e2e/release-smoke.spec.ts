@@ -278,8 +278,9 @@ test('cancels an in-flight draw from the modal and remains usable', async ({
   page,
 }) => {
   const recovered = createCard('Commander After Cancellation')
+  const cancelled = deferredCardResponse(createCard('Cancelled Commander'))
   const upstream = await installMockedUpstream(page, [
-    cardResponse(createCard('Cancelled Commander'), 500),
+    cancelled.response,
     cardResponse(recovered),
   ])
 
@@ -291,9 +292,18 @@ test('cancels an in-flight draw from the modal and remains usable', async ({
   await randomizeButton.click()
   const loadingDialog = page.getByRole('dialog', { name: 'Shuffling cards...' })
   await expect(loadingDialog).toBeVisible()
-  await loadingDialog.getByRole('button', { name: 'Cancel draw' }).click()
+  await expect.poll(() => upstream.scryfallRequests.length).toBe(1)
+  try {
+    await loadingDialog.getByRole('button', { name: 'Cancel draw' }).click()
+  } finally {
+    cancelled.release()
+  }
+  await upstream.waitForScryfallIdle()
   await expect(loadingDialog).toBeHidden()
   await expect(randomizeButton).toBeFocused()
+  await expect(
+    page.getByRole('heading', { name: 'Cancelled Commander', exact: true }),
+  ).toHaveCount(0)
 
   const cancellation = page.getByRole('alert')
   await expect(cancellation).toContainText('Draw cancelled.')
@@ -457,13 +467,17 @@ test('[responsive evidence] contains long pair choices and a modal DFC at narrow
     { width: 375, rootTextPercent: 200 },
     { width: 390, rootTextPercent: 200 },
   ]
+  const webkitScreenshotPixelLimit = 32_767
   const measurements: Array<{
     width: number
     rootTextPercent: number
     innerWidth: number
     scrollWidth: number
+    documentHeight: number
+    devicePixelRatio: number
     scrollX: number
     settleAttempts: number
+    screenshotMode: 'full-page' | 'viewport'
     documentWidths: {
       htmlClient: number
       htmlOffset: number
@@ -645,6 +659,13 @@ test('[responsive evidence] contains long pair choices and a modal DFC at narrow
         return {
           innerWidth,
           scrollWidth: Math.max(documentWidths.htmlScroll, documentWidths.bodyScroll),
+          documentHeight: Math.max(
+            html.scrollHeight,
+            html.offsetHeight,
+            body.scrollHeight,
+            body.offsetHeight,
+          ),
+          devicePixelRatio: window.devicePixelRatio,
           scrollX: window.scrollX,
           documentWidths,
           overflowingElements,
@@ -778,11 +799,27 @@ test('[responsive evidence] contains long pair choices and a modal DFC at narrow
       'front',
     )
 
-    measurements.push({ ...scenario, ...documentSize, boxes })
+    const isWebKit = testInfo.project.name.includes('webkit')
+    const exceedsWebKitScreenshotLimit =
+      isWebKit &&
+      documentSize.documentHeight * documentSize.devicePixelRatio >
+        webkitScreenshotPixelLimit
+    const screenshotMode = exceedsWebKitScreenshotLimit
+      ? 'viewport'
+      : 'full-page'
+    measurements.push({
+      ...scenario,
+      ...documentSize,
+      boxes,
+      screenshotMode,
+    })
     await testInfo.attach(
-      `${testInfo.project.name}-${scenario.width}px-${scenario.rootTextPercent}pct-text`,
+      `${testInfo.project.name}-${scenario.width}px-${scenario.rootTextPercent}pct-text-${screenshotMode}`,
       {
-        body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+        body: await page.screenshot({
+          fullPage: screenshotMode === 'full-page',
+          animations: 'disabled',
+        }),
         contentType: 'image/png',
       },
     )
