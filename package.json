@@ -27,7 +27,7 @@
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
     "@vercel/analytics": "^2.0.1",
-    "pinia": "^4.0.2",
+    "pinia": "^4.0.3",
     "vue": "^3.5.41"
   },
   "devDependencies": {
