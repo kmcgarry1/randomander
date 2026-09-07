@@ -35,18 +35,18 @@
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.1.18",
     "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/user-event": "^14.6.6",
+    "@testing-library/user-event": "^14.6.7",
     "@testing-library/vue": "^8.1.0",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.1",
     "@vitejs/plugin-vue": "^6.0.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "@vue/tsconfig": "^0.9.1",
     "husky": "^9.0.3",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4.1.18",
     "typescript": "5.9.3",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.0",
     "vue-tsc": "^3.3.11"
   }
 }
