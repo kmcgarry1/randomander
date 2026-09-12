@@ -36,7 +36,7 @@ useModalFocus(dialogRef, cancel, {
         aria-labelledby="loading-title"
         aria-describedby="loading-description"
         tabindex="-1"
-        class="motion-modal flex w-full max-w-sm flex-col items-center gap-5 rounded-[var(--md-sys-shape-corner-large)] bg-[var(--md-sys-color-surface-container-high)] px-8 py-7 text-center text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)]"
+        class="motion-modal flex w-full max-w-sm flex-col items-center gap-5 border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] px-8 py-7 text-center text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)]"
       >
         <div
           class="motion-spin-slow h-12 w-12 rounded-[45%_55%_52%_48%] border-[5px] border-[var(--md-sys-color-primary-container)] border-t-[var(--md-sys-color-primary)]"

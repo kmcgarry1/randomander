@@ -26,7 +26,7 @@
     document.documentElement.classList.toggle('dark', Boolean(useDark))
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', useDark ? '#151218' : '#fff8fb')
+      ?.setAttribute('content', useDark ? '#110e19' : '#efedf6')
   } catch {
     // Storage can be blocked or corrupt; CSS and the mounted app apply defaults.
   }

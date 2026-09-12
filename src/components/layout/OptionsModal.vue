@@ -110,7 +110,7 @@ useModalFocus(dialogRef, close, {
       aria-modal="true"
       aria-labelledby="options-title"
       tabindex="-1"
-      class="motion-modal flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)] sm:max-h-[88dvh] sm:max-w-5xl sm:rounded-[var(--md-sys-shape-corner-extra-large)] sm:border sm:border-[var(--md-sys-color-outline-variant)]"
+      class="motion-modal flex max-h-[94dvh] w-full flex-col overflow-hidden border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)] sm:max-h-[88dvh] sm:max-w-5xl"
     >
       <div
         class="mx-auto mt-2 h-1 w-8 rounded-full bg-[var(--md-sys-color-outline)] sm:hidden"
@@ -125,7 +125,7 @@ useModalFocus(dialogRef, close, {
           <AdjustmentsHorizontalIcon class="h-6 w-6" />
         </span>
         <div class="min-w-0 flex-1">
-          <h2 id="options-title" class="font-heading text-2xl leading-tight sm:text-3xl">
+          <h2 id="options-title" class="text-2xl leading-tight sm:text-3xl">
             Randomizer options
           </h2>
         </div>

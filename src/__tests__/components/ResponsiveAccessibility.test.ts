@@ -1,10 +1,8 @@
 import { render, screen, within } from "@testing-library/vue";
-import { createPinia } from "pinia";
 import { describe, expect, it } from "vitest";
 import ChoiceOptionsSection from "../../features/draw/components/ChoiceOptionsSection.vue";
 import DrawBackdrop from "../../features/draw/components/DrawBackdrop.vue";
 import HeroStage from "../../features/draw/components/HeroStage.vue";
-import ResultDetailsSection from "../../features/draw/components/ResultDetailsSection.vue";
 import type { ScryfallCard } from "../../lib/scryfall";
 
 const createCard = (
@@ -128,41 +126,43 @@ describe("responsive and image-integrity contracts", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("contains long pair details, rules text, and links at narrow widths", () => {
+  it("contains long pair summaries, prices, and links at narrow widths", () => {
     const longName = "CommanderNameWithoutNaturalBreakOpportunities".repeat(5);
     const first = createCard("long-detail-one", `${longName}One`, {
-      oracle_text: "OracleTextWithoutNaturalBreakOpportunities".repeat(8),
+      prices: { eur: "0.35" },
+      purchase_uris: {
+        cardmarket: "https://www.cardmarket.com/en/Magic/Products/one",
+      },
     });
     const second = createCard("long-detail-two", `${longName}Two`, {
-      oracle_text: "SecondOracleTextWithoutNaturalBreakOpportunities".repeat(8),
-    });
-    const { container } = render(ResultDetailsSection, {
-      props: {
-        cards: [first, second],
-        group: [first, second],
-        pairLinkUrl: "https://edhrec.com/commanders/first-second",
-        showLinks: true,
-        showMetadata: false,
+      prices: { eur: "0.80" },
+      purchase_uris: {
+        cardmarket: "https://www.cardmarket.com/en/Magic/Products/two",
       },
-      global: { plugins: [createPinia()] },
+    });
+    const { container } = render(HeroStage, {
+      props: {
+        heroCardName: `${first.name} + ${second.name}`,
+        heroCards: [first, second],
+        heroScryfallUrl: "https://scryfall.com/card/test/long-detail-one",
+        heroEdhrecUrl: "https://edhrec.com/commanders/first-second",
+        showLinks: true,
+        revealComplete: true,
+        mode: "partner",
+      },
     });
 
-    expect(container.firstElementChild).toHaveClass("min-w-0", "max-w-full");
-    expect(screen.getByRole("heading", { level: 3 })).toHaveClass(
+    expect(container.firstElementChild).toHaveClass("mx-auto", "max-w-4xl");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveClass(
       "break-words",
       "[overflow-wrap:anywhere]",
     );
-    for (const link of screen.getAllByRole("link")) {
-      expect(link).toHaveClass(
-        "max-w-full",
-        "whitespace-normal",
-        "[overflow-wrap:anywhere]",
-      );
-    }
-    for (const rules of screen.getAllByRole("region", { name: /card text for/i })) {
-      expect(rules).toHaveClass("min-w-0", "max-w-full");
-      expect(rules).toHaveTextContent(/oracletextwithoutnaturalbreak/i);
-    }
+    expect(
+      screen.getByRole("link", { name: /cardmarket price for .*0\.35/i }),
+    ).toHaveAttribute("href", "https://www.cardmarket.com/en/Magic/Products/one");
+    expect(
+      screen.getByRole("link", { name: /cardmarket price for .*0\.80/i }),
+    ).toHaveAttribute("href", "https://www.cardmarket.com/en/Magic/Products/two");
   });
 
   it("renders the standard ambient treatment without card images or URL styles", () => {

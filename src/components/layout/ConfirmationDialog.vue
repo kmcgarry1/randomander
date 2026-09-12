@@ -41,7 +41,7 @@ useModalFocus(dialogRef, cancel);
         :aria-labelledby="titleId"
         :aria-describedby="descriptionId"
         tabindex="-1"
-        class="motion-modal w-full max-w-md rounded-[var(--md-sys-shape-corner-extra-large)] border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] p-5 text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)] sm:p-6"
+        class="motion-modal w-full max-w-md border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] p-5 text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)] sm:p-6"
       >
         <div class="flex items-start gap-4">
           <span

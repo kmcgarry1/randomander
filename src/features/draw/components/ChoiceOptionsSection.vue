@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type PropType } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/outline";
-import type { ScryfallCard } from "../../../lib/scryfall";
+import type { PriceProvider, ScryfallCard } from "../../../lib/scryfall";
 import {
   getEdhrecCardUrl,
   getEdhrecCommanderUrl,
@@ -12,12 +12,17 @@ import {
 import type { CommanderChoice } from "../../../stores/randomander";
 import ExternalLinkHint from "../../../components/ExternalLinkHint.vue";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
+import CardPriceBadge from "./CardPriceBadge.vue";
 import PrestigeCard from "./PrestigeCard.vue";
 
 const props = defineProps({
   choices: { type: Array as PropType<CommanderChoice[]>, required: true },
   isLoading: { type: Boolean, required: true },
   showLinks: { type: Boolean, default: true },
+  priceProvider: {
+    type: String as PropType<PriceProvider>,
+    default: "cardmarket",
+  },
   canRandomizeChoicePartner: {
     type: Function as PropType<(card: ScryfallCard) => boolean>,
     required: true,
@@ -29,6 +34,10 @@ const props = defineProps({
   getPartnerButtonLabel: {
     type: Function as PropType<(card: ScryfallCard | null) => string>,
     required: true,
+  },
+  getPairLinkUrl: {
+    type: Function as PropType<(cards: ScryfallCard[]) => string>,
+    default: () => "",
   },
   revealActive: { type: Boolean, default: false },
   revealComplete: { type: Boolean, default: false },
@@ -59,6 +68,9 @@ const getEdhrecUrl = (card: ScryfallCard) =>
   isBackgroundCard(card)
     ? getEdhrecCardUrl(card)
     : getEdhrecCommanderUrl(card);
+
+const getChoicePairUrl = (choice: CommanderChoice) =>
+  choice.cards.length === 2 ? props.getPairLinkUrl(choice.cards) : "";
 </script>
 
 <template>
@@ -136,12 +148,17 @@ const getEdhrecUrl = (card: ScryfallCard) =>
             <div
               v-for="card in choice.cards"
               :key="`${choice.id}-${card.id}-summary`"
-              class="flex items-start gap-2 text-xs text-[var(--md-sys-color-on-surface-variant)]"
+              class="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[var(--md-sys-color-on-surface-variant)]"
             >
               <ManaIdentity :colors="card.color_identity ?? []" compact />
               <span class="min-w-0 break-words [overflow-wrap:anywhere]">
                 {{ getTypeLine(card) }}
               </span>
+              <CardPriceBadge
+                :card="card"
+                :provider="priceProvider"
+                :show-link="showLinks"
+              />
             </div>
           </div>
 
@@ -188,6 +205,18 @@ const getEdhrecUrl = (card: ScryfallCard) =>
                 </span>
               </span>
             </template>
+            <a
+              v-if="getChoicePairUrl(choice)"
+              :href="getChoicePairUrl(choice)"
+              target="_blank"
+              rel="noreferrer"
+              class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
+            >
+              <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                EDHREC pair
+              </span>
+              <ExternalLinkHint class="shrink-0" />
+            </a>
           </div>
         </div>
       </article>

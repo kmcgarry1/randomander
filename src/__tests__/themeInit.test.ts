@@ -26,7 +26,7 @@ describe('prepaint theme bootstrap', () => {
   beforeEach(() => {
     localStorage.clear()
     document.documentElement.classList.remove('dark')
-    document.head.innerHTML = '<meta name="theme-color" content="#fff8fb">'
+    document.head.innerHTML = '<meta name="theme-color" content="#efedf6">'
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => ({ matches: false }))
@@ -49,7 +49,7 @@ describe('prepaint theme bootstrap', () => {
     expect(document.documentElement).toHaveClass('dark')
     expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute(
       'content',
-      '#151218'
+      '#110e19'
     )
   })
 
@@ -80,7 +80,7 @@ describe('prepaint theme bootstrap', () => {
     expect(document.documentElement).not.toHaveClass('dark')
     expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute(
       'content',
-      '#fff8fb'
+      '#efedf6'
     )
   })
 

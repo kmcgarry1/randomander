@@ -81,15 +81,6 @@ const displayToggles = computed(() => [
     label: "External links",
     description: "Show Scryfall, EDHREC, and marketplace links.",
   },
-  ...(AUTOMATED_EDHREC_METADATA_ENABLED
-    ? [
-        {
-          key: "showTags" as const,
-          label: "EDHREC metadata",
-          description: "Show test-only EDHREC deck counts and themes.",
-        },
-      ]
-    : []),
   {
     key: "showAmbient" as const,
     label: "Ambient backdrop",
@@ -306,7 +297,7 @@ const closeSettings = () => {
               Automated EDHREC metadata is disabled
             </p>
             <p class="mt-1">
-              This build does not request EDHREC deck counts or themes. Validated
+              This build does not request automated EDHREC deck counts. Validated
               EDHREC links remain available and open only when you choose them.
             </p>
           </div>
