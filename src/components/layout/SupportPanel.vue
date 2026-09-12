@@ -37,7 +37,7 @@ watch(
       aria-modal="true"
       :aria-label="label"
       tabindex="-1"
-      class="motion-modal support-panel-motion h-[min(92dvh,52rem)] w-full overflow-y-auto overscroll-contain rounded-t-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container-low)] px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3 shadow-[var(--md-sys-elevation-3)] sm:h-full sm:max-w-[46rem] sm:rounded-none sm:border-l sm:border-[var(--md-sys-color-outline-variant)] sm:px-8 sm:pb-8 sm:pt-7"
+      class="motion-modal support-panel-motion h-[min(92dvh,52rem)] w-full overflow-y-auto overscroll-contain border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3 shadow-[var(--md-sys-elevation-3)] sm:h-full sm:max-w-[46rem] sm:border-y-0 sm:border-r-0 sm:px-8 sm:pb-8 sm:pt-7"
     >
       <div
         class="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--md-sys-color-outline)] sm:hidden"

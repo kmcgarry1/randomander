@@ -135,7 +135,7 @@ const openOptions = (event: MouseEvent) => {
   <div
     data-testid="app-shell"
     :data-performance-mode="performanceMode"
-    class="min-h-screen bg-[var(--md-sys-color-surface)] text-[var(--md-sys-color-on-surface)] antialiased"
+    class="karsten-shell min-h-screen bg-[var(--md-sys-color-surface)] text-[var(--md-sys-color-on-surface)] antialiased"
     :class="{
       'app-reduced-motion': performance.reduceMotion,
       'app-simplified-backdrop': performance.simplifyBackdrop,
@@ -149,7 +149,7 @@ const openOptions = (event: MouseEvent) => {
     >
     <div
       v-if="persistenceError"
-      class="fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-2xl bg-[var(--md-sys-color-error-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-error-container)] shadow-[var(--md-sys-elevation-3)]"
+      class="fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-3 border-l-[3px] border-[var(--md-sys-color-error)] bg-[var(--md-sys-color-error-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-error-container)] shadow-[var(--md-sys-elevation-3)]"
       role="alert"
     >
       <span><strong>Changes are not saved.</strong> {{ persistenceError }}</span>
@@ -163,7 +163,7 @@ const openOptions = (event: MouseEvent) => {
     </div>
     <div
       v-else-if="persistenceNotice"
-      class="fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-2xl bg-[var(--md-sys-color-primary-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-primary-container)] shadow-[var(--md-sys-elevation-3)]"
+      class="fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-3 border-l-[3px] border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-low)] px-4 py-3 text-sm text-[var(--md-sys-color-on-surface)] shadow-[var(--md-sys-elevation-3)]"
       role="status"
     >
       <span>{{ persistenceNotice }}</span>
@@ -182,7 +182,7 @@ const openOptions = (event: MouseEvent) => {
       :aria-hidden="modalOpen ? 'true' : undefined"
     >
     <header
-      class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface)] px-4 sm:hidden"
+      class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--md-sys-color-outline-variant)] bg-[color-mix(in_srgb,var(--md-sys-color-surface)_96%,transparent)] px-4 sm:hidden"
     >
       <button
         type="button"
@@ -191,7 +191,7 @@ const openOptions = (event: MouseEvent) => {
         @click="openDestination('draw')"
       >
         <span
-          class="grid h-9 w-9 place-items-center rounded-[0.8rem_0.8rem_0.8rem_0.3rem] bg-[var(--md-sys-color-primary)] text-sm font-extrabold text-[var(--md-sys-color-on-primary)]"
+          class="grid h-9 w-9 place-items-center border border-[var(--md-sys-color-outline)] bg-transparent text-sm font-extrabold text-[var(--md-sys-color-primary)]"
           aria-hidden="true"
         >R</span>
         <span class="block min-w-0 truncate text-base font-bold leading-tight">Randomander</span>
@@ -207,12 +207,12 @@ const openOptions = (event: MouseEvent) => {
     </header>
 
     <aside
-      class="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] px-2 py-5 sm:flex"
+      class="fixed inset-y-0 left-0 z-30 hidden w-28 flex-col items-center border-r border-[var(--md-sys-color-outline-variant)] bg-[color-mix(in_srgb,var(--md-sys-color-surface)_96%,transparent)] px-3 py-5 sm:flex"
       aria-label="Primary navigation"
     >
       <button
         type="button"
-        class="grid h-12 w-12 place-items-center rounded-[1.1rem_1.1rem_1.1rem_0.4rem] bg-[var(--md-sys-color-primary)] text-lg font-extrabold text-[var(--md-sys-color-on-primary)] shadow-[var(--md-sys-elevation-1)]"
+        class="grid h-12 w-12 place-items-center border border-[var(--md-sys-color-outline)] bg-transparent text-lg font-extrabold text-[var(--md-sys-color-primary)]"
         aria-label="Randomander draw"
         @click="openDestination('draw')"
       >
@@ -224,20 +224,20 @@ const openOptions = (event: MouseEvent) => {
           v-for="destination in destinations"
           :key="destination.id"
           type="button"
-          class="group flex min-h-[4.25rem] w-full flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[0.7rem] font-semibold transition-colors"
+          class="group relative flex min-h-[4.25rem] w-full flex-col items-center justify-center gap-1 px-1 text-[0.68rem] font-bold uppercase tracking-[0.04em] transition-colors"
           :class="
             activeDestination === destination.id
               ? 'text-[var(--md-sys-color-on-primary-container)]'
-              : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
+              : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)]'
           "
           :aria-current="activeDestination === destination.id ? 'page' : undefined"
           @click="openDestination(destination.id, $event)"
         >
           <span
-            class="grid h-8 w-14 place-items-center rounded-full transition-colors"
+            class="grid h-8 w-14 place-items-center border-b-[3px] border-transparent transition-colors"
             :class="
               activeDestination === destination.id
-                ? 'bg-[var(--md-sys-color-primary-container)]'
+                ? 'border-[var(--md-sys-color-primary)] text-[var(--md-sys-color-primary)]'
                 : ''
             "
           >
@@ -256,31 +256,32 @@ const openOptions = (event: MouseEvent) => {
       </nav>
     </aside>
 
-    <main class="min-h-screen pb-44 sm:ml-24 sm:pb-0">
+    <main class="min-h-screen pb-44 sm:ml-28 sm:pb-0">
       <DrawView />
     </main>
 
     <nav
-      class="fixed inset-x-0 bottom-0 z-30 grid h-[calc(5rem+env(safe-area-inset-bottom))] grid-cols-4 border-t border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container)] px-2 pb-[env(safe-area-inset-bottom)] sm:hidden"
+      class="fixed inset-x-0 bottom-0 z-30 grid h-[calc(5rem+env(safe-area-inset-bottom))] grid-cols-4 border-t border-[var(--md-sys-color-outline-variant)] bg-[color-mix(in_srgb,var(--md-sys-color-surface)_96%,transparent)] px-2 pb-[env(safe-area-inset-bottom)] sm:hidden"
       aria-label="Primary navigation"
     >
       <button
         v-for="destination in destinations"
         :key="`mobile-${destination.id}`"
         type="button"
-        class="min-w-0 flex flex-col items-center justify-center gap-1 break-words rounded-2xl text-center text-[0.7rem] font-semibold leading-tight text-[var(--md-sys-color-on-surface-variant)] [overflow-wrap:anywhere]"
+        class="min-w-0 flex flex-col items-center justify-center gap-1 break-words border-t-[3px] border-transparent text-center text-[0.68rem] font-bold uppercase leading-tight tracking-[0.04em] text-[var(--md-sys-color-on-surface-variant)] [overflow-wrap:anywhere]"
         :class="{
           'text-[var(--md-sys-color-on-primary-container)]':
+            activeDestination === destination.id,
+          'border-[var(--md-sys-color-primary)]':
             activeDestination === destination.id,
         }"
         :aria-current="activeDestination === destination.id ? 'page' : undefined"
         @click="openDestination(destination.id, $event)"
       >
         <span
-          class="grid h-8 w-full max-w-14 place-items-center rounded-full"
+          class="grid h-8 w-full max-w-14 place-items-center"
           :class="{
-            'bg-[var(--md-sys-color-primary-container)]':
-              activeDestination === destination.id,
+            'text-[var(--md-sys-color-primary)]': activeDestination === destination.id,
           }"
         >
           <component

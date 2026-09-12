@@ -5,7 +5,6 @@ import { createPinia } from 'pinia'
 import App from '../App.vue'
 import type { ScryfallCard } from '../lib/scryfall'
 import { clearCache } from '../lib/cache'
-import { useRandomanderStore } from '../stores/randomander'
 import {
   PERSISTED_PARTITION_KEYS,
   decodePartitionEnvelope,
@@ -124,18 +123,6 @@ describe('Randomander', () => {
     expect(randomize).not.toHaveClass('sm:static')
   })
 
-  it('allows the Deck inspiration heading to reflow at narrow text sizes', () => {
-    renderApp()
-    const heading = screen.getByRole('heading', { name: /deck inspiration/i })
-
-    expect(heading).toHaveClass('break-words', '[overflow-wrap:anywhere]')
-    expect(heading.parentElement?.parentElement).toHaveClass(
-      'min-w-0',
-      'flex-col',
-      'sm:flex-row'
-    )
-  })
-
   it('keeps mobile draw controls compact until the user expands them', async () => {
     renderApp()
     const user = userEvent.setup()
@@ -212,100 +199,27 @@ describe('Randomander', () => {
             'https://edhrec.com/commanders/atraxa-praetors-voice'
         )
     ).toBe(true)
-    await user.click(screen.getByRole('button', { name: /show details/i }))
-    const inspiration = screen.getByRole('complementary', {
-      name: /deck inspiration/i,
-    })
-    const cardText = within(inspiration).getByRole('region', {
-      name: /card text for atraxa, praetors voice/i,
+    const result = screen.getByRole('region', {
+      name: /randomizer result/i,
     })
     expect(
-      within(inspiration).getByText('Legendary Creature — Phyrexian Angel Horror')
+      within(result).getByText('Legendary Creature — Phyrexian Angel Horror')
     ).toBeInTheDocument()
     expect(
-      within(cardText).getByText('Flying, vigilance, deathtouch, lifelink')
-    ).toBeInTheDocument()
-    expect(
-      within(inspiration).getByRole('link', {
+      within(result).getByRole('link', {
         name: /cardmarket price for atraxa.*€1\.25/i,
       })
     ).toHaveAttribute(
       'href',
       'https://www.cardmarket.com/en/Magic/Products/example'
     )
-    expect(within(inspiration).queryByText('$2.50')).not.toBeInTheDocument()
+    expect(within(result).queryByText('$2.50')).not.toBeInTheDocument()
     expect(
       fetchMock.mock.calls.some(([input]) => {
         const url = typeof input === 'string' ? input : input.toString()
         return url.includes('cardmarket.com')
       })
     ).toBe(false)
-    expect(await screen.findByText(/500 decks/i)).toBeInTheDocument()
-    expect(screen.getByText('DECK THEMES')).toBeInTheDocument()
-    expect(await screen.findByText('Infect')).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: 'Infect (opens in a new tab)' })
-    ).toHaveAttribute(
-      'href',
-      'https://edhrec.com/commanders/atraxa-praetors-voice/infect'
-    )
-  })
-
-  it('distinguishes metadata errors, retries them, and clears loaded metadata', async () => {
-    const card = createCard({
-      name: 'Atraxa, Praetors Voice',
-      type_line: 'Legendary Creature — Phyrexian Angel Horror',
-    })
-    let metadataAttempts = 0
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.toString()
-      if (url.includes('api.scryfall.com')) {
-        return Promise.resolve(mockResponse(card))
-      }
-      if (url.includes('json.edhrec.com')) {
-        metadataAttempts += 1
-        return Promise.resolve(
-          metadataAttempts === 1
-            ? ({
-                ok: false,
-                status: 500,
-                headers: new Headers(),
-              } as Response)
-            : mockEdhrecResponse()
-        )
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url}`))
-    })
-    vi.stubGlobal('fetch', fetchMock)
-    const pinia = createPinia()
-    renderApp(pinia)
-    const store = useRandomanderStore(pinia)
-    const user = userEvent.setup()
-
-    await user.click(screen.getByRole('button', { name: /^randomize$/i }))
-    await screen.findAllByText('Atraxa, Praetors Voice')
-    await user.click(screen.getByRole('button', { name: /show details/i }))
-
-    const retry = await screen.findByRole('button', { name: /retry metadata/i })
-    expect(retry.closest('[role="alert"]')).toHaveTextContent(
-      /could not load \(500\)/i
-    )
-
-    await user.click(retry)
-    expect(await screen.findByText('Infect')).toBeInTheDocument()
-    expect(metadataAttempts).toBe(2)
-    expect(store.getMetadataStateForCard(card, [card]).status).toBe(
-      'success-data'
-    )
-
-    expect(store.clearNetworkCache()).toBe(true)
-    expect(store.getMetadataStateForCard(card, [card]).status).toBe('idle')
-    expect(store.getTagsForCard(card, [card])).toEqual([])
-    expect(await screen.findByText(/themes are ready to load/i)).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /load metadata/i })
-    ).toBeInTheDocument()
-    expect(screen.queryByText(/could not load \(500\)/i)).not.toBeInTheDocument()
   })
 
   it('uses the alphabetical EDHREC pair page and combines partner details', async () => {
@@ -355,9 +269,6 @@ describe('Randomander', () => {
       ).toBe(true)
     })
 
-    await user.click(screen.getByRole('button', { name: /show details/i }))
-
-    expect(screen.getAllByText(/500 decks/i)).toHaveLength(1)
     expect(
       screen.getByRole('link', {
         name: /cardmarket price for prava.*€0\.35/i,
@@ -428,7 +339,7 @@ describe('Randomander', () => {
       typeof input === 'string' ? input : input.toString()
     )
     expect(requestedUrls.filter((url) => url.includes('api.scryfall.com'))).toHaveLength(2)
-    expect(requestedUrls.some((url) => url.includes('json.edhrec.com'))).toBe(true)
+    expect(requestedUrls.some((url) => url.includes('json.edhrec.com'))).toBe(false)
   })
 
   it('finds a commander after drawing a Background first', async () => {
@@ -643,17 +554,10 @@ describe('Randomander', () => {
     const revealedHeading = await screen.findByText('Atraxa, Praetors Voice')
     expect(revealedHeading).toBeInTheDocument()
     await vi.waitFor(() => expect(revealedHeading).toHaveFocus())
-    await vi.waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(([input]) => {
-          const url = typeof input === 'string' ? input : input.toString()
-          return url.includes('json.edhrec.com')
-        })
-      ).toBe(true)
-    })
+    expectNoEdhrecMetadataFetch(fetchMock)
   })
 
-  it('renders deck inspiration for both options in distinct sections', async () => {
+  it('renders command zone details for both options in distinct sections', async () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn((query: string) => ({
@@ -710,31 +614,12 @@ describe('Randomander', () => {
     expect(screen.getAllByText('Tymna the Weaver').length).toBeGreaterThan(0)
     expect(screen.getAllByText("Kraum, Ludevic's Opus").length).toBeGreaterThan(0)
 
-    await vi.waitFor(() => {
-      const requestedEdhrecUrls = fetchMock.mock.calls
-        .map(([input]) => (typeof input === 'string' ? input : input.toString()))
-        .filter((url) => url.includes('json.edhrec.com'))
+    expectNoEdhrecMetadataFetch(fetchMock)
 
-      expect(requestedEdhrecUrls).toHaveLength(2)
-      expect(requestedEdhrecUrls).toEqual(
-        expect.arrayContaining([
-          'https://json.edhrec.com/pages/commanders/tymna-the-weaver.json',
-          'https://json.edhrec.com/pages/commanders/kraum-ludevics-opus.json',
-        ])
-      )
-    })
-
-    const inspiration = screen.getByRole('complementary', {
-      name: /deck inspiration/i,
-    })
-    const optionRegions = within(inspiration).getAllByRole('region', {
-      name: /option [12]/i,
-    })
-    expect(optionRegions).toHaveLength(2)
-
-    const optionOne = within(inspiration).getByRole('region', {
-      name: /option 1/i,
-    })
+    const choicesSection = screen.getByRole('heading', {
+      name: /compare commanders/i,
+    }).closest('section')!
+    const optionOne = within(choicesSection).getByText(/^option 1$/i).closest('article')!
     expect(
       within(optionOne).getByRole('heading', {
         level: 3,
@@ -744,7 +629,6 @@ describe('Randomander', () => {
     expect(
       within(optionOne).getByText('Legendary Creature - Human Cleric')
     ).toBeInTheDocument()
-    expect(within(optionOne).getByText(/500 decks/i)).toBeInTheDocument()
     expect(
       within(optionOne).getByRole('link', {
         name: /cardmarket price for tymna.*€3\.10/i,
@@ -754,19 +638,7 @@ describe('Randomander', () => {
       'https://www.cardmarket.com/en/Magic/Products/tymna'
     )
     expect(within(optionOne).queryByText('€4.20')).not.toBeInTheDocument()
-    expect(within(optionOne).getByText('DECK THEMES')).toBeInTheDocument()
-    expect(
-      within(optionOne).getByRole('link', {
-        name: 'Infect (opens in a new tab)',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://edhrec.com/commanders/tymna-the-weaver/infect'
-    )
-
-    const optionTwo = within(inspiration).getByRole('region', {
-      name: /option 2/i,
-    })
+    const optionTwo = within(choicesSection).getByText(/^option 2$/i).closest('article')!
     expect(
       within(optionTwo).getByRole('heading', {
         level: 3,
@@ -776,7 +648,6 @@ describe('Randomander', () => {
     expect(
       within(optionTwo).getByText('Legendary Creature - Zombie Horror')
     ).toBeInTheDocument()
-    expect(within(optionTwo).getByText(/500 decks/i)).toBeInTheDocument()
     expect(
       within(optionTwo).getByRole('link', {
         name: /cardmarket price for kraum.*€4\.20/i,
@@ -786,15 +657,6 @@ describe('Randomander', () => {
       'https://www.cardmarket.com/en/Magic/Products/kraum'
     )
     expect(within(optionTwo).queryByText('€3.10')).not.toBeInTheDocument()
-    expect(within(optionTwo).getByText('DECK THEMES')).toBeInTheDocument()
-    expect(
-      within(optionTwo).getByRole('link', {
-        name: 'Infect (opens in a new tab)',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://edhrec.com/commanders/kraum-ludevics-opus/infect'
-    )
   })
 
   it('turns double-faced cards independently in choice mode', async () => {
@@ -963,7 +825,7 @@ describe('Randomander', () => {
     expect(requestedScryfallUrls).toHaveLength(3)
   })
 
-  it('renders pair-specific deck inspiration for both partner choices', async () => {
+  it('renders pair-specific command zone links for both partner choices', async () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn((query: string) => ({
@@ -1017,27 +879,15 @@ describe('Randomander', () => {
       'malcolm-keen-eyed-navigator-prava-of-the-steel-legion'
     const secondPairSlug = 'kraum-ludevics-opus-tymna-the-weaver'
 
-    await vi.waitFor(() => {
-      const requestedEdhrecUrls = fetchMock.mock.calls
-        .map(([input]) => (typeof input === 'string' ? input : input.toString()))
-        .filter((url) => url.includes('json.edhrec.com'))
+    expectNoEdhrecMetadataFetch(fetchMock)
 
-      expect(requestedEdhrecUrls).toHaveLength(2)
-      expect(requestedEdhrecUrls).toEqual(
-        expect.arrayContaining([
-          `https://json.edhrec.com/pages/commanders/${firstPairSlug}.json`,
-          `https://json.edhrec.com/pages/commanders/${secondPairSlug}.json`,
-        ])
-      )
-    })
-
-    const inspiration = screen.getByRole('complementary', {
-      name: /deck inspiration/i,
-    })
-    const optionRegions = within(inspiration).getAllByRole('region', {
-      name: /option [12]/i,
-    })
-    expect(optionRegions).toHaveLength(2)
+    const choicesSection = screen.getByRole('heading', {
+      name: /compare pairings/i,
+    }).closest('section')!
+    const optionRegions = [
+      within(choicesSection).getByText(/^option 1$/i).closest('article')!,
+      within(choicesSection).getByText(/^option 2$/i).closest('article')!,
+    ]
 
     const pairExpectations = [
       { region: optionRegions[0]!, name: firstPairName, slug: firstPairSlug },
@@ -1046,20 +896,11 @@ describe('Randomander', () => {
 
     pairExpectations.forEach(({ region, name, slug }) => {
       expect(within(region).getByRole('heading', { name })).toBeInTheDocument()
-      expect(within(region).getByText(/500 decks/i)).toBeInTheDocument()
-      expect(within(region).getByText('DECK THEMES')).toBeInTheDocument()
-      expect(within(region).getByRole('link', { name: /edhrec pair/i })).toHaveAttribute(
-        'href',
-        `https://edhrec.com/commanders/${slug}`
-      )
       expect(
-        within(region).getByRole('link', {
-          name: 'Infect (opens in a new tab)',
-        })
-      ).toHaveAttribute(
-        'href',
-        `https://edhrec.com/commanders/${slug}/infect`
-      )
+        within(region)
+          .getAllByRole('link', { name: /edhrec/i })
+          .some((link) => link.getAttribute('href') === `https://edhrec.com/commanders/${slug}`)
+      ).toBe(true)
     })
   })
 
@@ -1093,7 +934,7 @@ describe('Randomander', () => {
 
     expect(screen.queryByRole('button', { name: /save current/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /saved pulls/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /show details/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /show details/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /filters/i }).length).toBeGreaterThan(0)
   })
 
@@ -1234,13 +1075,11 @@ describe('Randomander', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /^randomize$/i }))
     await screen.findAllByText('Atraxa, Praetors Voice')
-    await user.click(screen.getByRole('button', { name: /show details/i }))
-
-    const inspiration = screen.getByRole('complementary', {
-      name: /deck inspiration/i,
+    const result = screen.getByRole('region', {
+      name: /randomizer result/i,
     })
     expect(
-      within(inspiration).getByRole('link', {
+      within(result).getByRole('link', {
         name: /cardmarket price for atraxa.*€1\.25/i,
       })
     ).toHaveAttribute(
@@ -1262,11 +1101,11 @@ describe('Randomander', () => {
     await user.click(within(settingsDialog).getByRole('button', { name: /^close$/i }))
 
     expect(
-      within(inspiration).getByRole('link', {
+      within(result).getByRole('link', {
         name: /tcgplayer price for atraxa.*\$2\.50/i,
       })
     ).toHaveAttribute('href', 'https://www.tcgplayer.com/product/example')
-    expect(within(inspiration).queryByText('€1.25')).not.toBeInTheDocument()
+    expect(within(result).queryByText('€1.25')).not.toBeInTheDocument()
     expect(
       fetchMock.mock.calls.filter(([input]) => {
         const url = typeof input === 'string' ? input : input.toString()
@@ -1284,9 +1123,9 @@ describe('Randomander', () => {
     )
 
     expect(
-      within(inspiration).queryByRole('link', { name: /tcgplayer price/i })
+      within(result).queryByRole('link', { name: /tcgplayer price/i })
     ).not.toBeInTheDocument()
-    expect(within(inspiration).getByText('$2.50')).toBeInTheDocument()
+    expect(within(result).getByText('$2.50')).toBeInTheDocument()
   })
 
   it('persists the choice to skip future card reveals', async () => {
@@ -1351,3 +1190,5 @@ describe('Randomander', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
+
+

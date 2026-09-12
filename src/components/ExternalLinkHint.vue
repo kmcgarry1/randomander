@@ -9,6 +9,6 @@ import { ArrowTopRightOnSquareIcon } from "@heroicons/vue/24/outline";
       aria-hidden="true"
       title="Opens in a new tab"
     />
-    <span class="sr-only"> (opens in a new tab)</span>
+    <span class="sr-only">&nbsp;(opens in a new tab)</span>
   </span>
 </template>

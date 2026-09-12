@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, type PropType } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/outline";
-import type { ScryfallCard } from "../../../lib/scryfall";
+import type { PriceProvider, ScryfallCard } from "../../../lib/scryfall";
 import { getTypeLine, isBackgroundCard } from "../../../lib/scryfall";
 import { modes, type Mode } from "../../../stores/randomander";
 import ExternalLinkHint from "../../../components/ExternalLinkHint.vue";
 import ManaIdentity from "../../../components/mtg/ManaIdentity.vue";
+import CardPriceBadge from "./CardPriceBadge.vue";
 import PrestigeCard from "./PrestigeCard.vue";
 
 const props = defineProps({
@@ -14,6 +15,10 @@ const props = defineProps({
   heroScryfallUrl: { type: String, default: "" },
   heroEdhrecUrl: { type: String, default: "" },
   showLinks: { type: Boolean, default: true },
+  priceProvider: {
+    type: String as PropType<PriceProvider>,
+    default: "cardmarket",
+  },
   mode: { type: String as PropType<Mode>, required: true },
   revealActive: { type: Boolean, default: false },
   revealComplete: { type: Boolean, default: false },
@@ -106,21 +111,26 @@ const edhrecLinkText = computed(() => {
           <h2
             data-result-heading
             tabindex="-1"
-            class="break-words text-[clamp(1.9rem,5vw,3.25rem)] font-[760] leading-[1.02] tracking-[-0.035em] [overflow-wrap:anywhere]"
+            class="break-words text-[clamp(1.9rem,5vw,3rem)] leading-[1.04] tracking-normal [overflow-wrap:anywhere]"
           >
             {{ heroCardName }}
           </h2>
 
-          <div class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <div class="mt-4 flex flex-wrap items-start justify-center gap-x-4 gap-y-3">
             <div
               v-for="card in displayCards"
               :key="`${card.id}-identity`"
-              class="flex items-center gap-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
+              class="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-2 text-sm text-[var(--md-sys-color-on-surface-variant)]"
             >
               <ManaIdentity :colors="card.color_identity ?? []" compact />
               <span class="max-w-xs break-words text-left [overflow-wrap:anywhere]">
                 {{ getTypeLine(card) }}
               </span>
+              <CardPriceBadge
+                :card="card"
+                :provider="priceProvider"
+                :show-link="showLinks"
+              />
             </div>
           </div>
 
@@ -162,9 +172,9 @@ const edhrecLinkText = computed(() => {
       </div>
     </div>
 
-    <div v-else class="mx-auto mt-4 max-w-3xl rounded-[var(--md-sys-shape-corner-extra-large)] bg-[var(--md-sys-color-surface-container)] px-4 py-8 sm:mt-6 sm:px-6 sm:py-12">
+    <div v-else class="mx-auto mt-4 max-w-3xl border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-low)] px-4 py-8 sm:mt-6 sm:px-6 sm:py-12">
       <span
-        class="mx-auto grid h-20 w-16 place-items-center rounded-[1rem] border-2 border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-primary)] shadow-[var(--md-sys-elevation-1)]"
+        class="mx-auto grid h-20 w-16 place-items-center border-2 border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-primary)]"
         aria-hidden="true"
       >
         <SparklesIcon class="h-8 w-8" />

@@ -37,7 +37,7 @@ describe('CardPriceBadge', () => {
 
     expect(
       screen.getByRole('link', {
-        name: /tcgplayer price for atraxa.*\$5\.50, etched \(opens in a new tab\)/i,
+        name: /tcgplayer price for atraxa.*\$5\.50, etched\s*\(opens in a new tab\)/i,
       })
     ).toHaveAttribute('href', 'https://www.tcgplayer.com/product/example')
     expect(screen.getByText('· etched')).toBeInTheDocument()
