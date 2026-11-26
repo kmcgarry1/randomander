@@ -5,6 +5,7 @@ import {
   type StorageResult,
 } from './storage'
 import { RuntimeDataError, isRecord } from './runtimeValidation'
+import { CacheError } from './appError'
 
 export type CacheEntry = {
   value: unknown
@@ -50,7 +51,7 @@ export type CacheStateDecodeResult =
   | {
       ok: false
       value: CacheState
-      error: RuntimeDataError
+      error: RuntimeDataError | CacheError
       migrated: false
       repaired: true
     }
@@ -64,7 +65,7 @@ export const decodeCacheState = (stored: unknown): CacheStateDecodeResult => {
     return {
       ok: false,
       value: fallback,
-      error: new RuntimeDataError('cache', 'root', 'expected a versioned object'),
+      error: new CacheError('corrupted', 'cache state is not a valid object'),
       migrated: false,
       repaired: true,
     }
@@ -74,10 +75,9 @@ export const decodeCacheState = (stored: unknown): CacheStateDecodeResult => {
     return {
       ok: false,
       value: fallback,
-      error: new RuntimeDataError(
-        'cache',
-        'version',
-        `unsupported version ${String(stored.version)}`
+      error: new CacheError(
+        'corrupted',
+        `unsupported cache version ${String(stored.version)}`
       ),
       migrated: false,
       repaired: true,

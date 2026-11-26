@@ -253,7 +253,7 @@ describe('Scryfall request policy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('returns a typed recoverable data error for a malformed card response', async () => {
+  it('throws validation error when cache is empty and response is malformed', async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,

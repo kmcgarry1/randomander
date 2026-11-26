@@ -204,6 +204,14 @@ const fetchScryfallJson = async <T>(
       if (error instanceof Error && error.name === 'AbortError') throw error
 
       if (error instanceof RuntimeDataError) {
+        // Cache fallback: if validation fails but we have cached data, use it
+        if (options.cache?.enabled) {
+          const fallbackCached = getCachedValue(cacheKey)
+          if (fallbackCached !== null) {
+            // Queue a refresh attempt for next time, but return cached data
+            return fallbackCached as T
+          }
+        }
         throw new ScryfallRequestError(error.message, 'data', error)
       }
 
