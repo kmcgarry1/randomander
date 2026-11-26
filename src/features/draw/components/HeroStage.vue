@@ -196,7 +196,7 @@ const edhrecLinkText = computed(() => {
             {{ option.label }}
           </span>
           <span
-            class="mt-1 block break-words text-xs leading-5 text-[var(--md-sys-color-on-surface-variant)]"
+            class="mt-1 block break-words text-xs leading-5 text-[var(--md-sys-color-on-surface)]"
           >
             {{ option.description }}
           </span>

@@ -520,7 +520,7 @@ watch(revealEnabled, (enabled) => {
           </div>
           <button
             type="button"
-            class="m3-button m3-button--text min-h-11 shrink-0 px-3 py-2 lg:hidden"
+            class="m3-button m3-button--text min-h-11 shrink-0 px-3 py-2 lg:hidden !text-[var(--md-sys-color-on-surface)]"
             :aria-expanded="drawControlsOpen"
             aria-controls="draw-controls-panel"
             :aria-label="drawControlsOpen ? 'Hide draw controls' : 'Show draw controls'"
@@ -561,7 +561,7 @@ watch(revealEnabled, (enabled) => {
               </span>
               <span
                 :id="`draw-mode-${option.id}-description`"
-                class="mt-1 block break-words text-xs leading-5 opacity-80"
+                class="mt-1 block break-words text-xs leading-5"
               >
                 {{ option.description }}
               </span>
@@ -573,7 +573,7 @@ watch(revealEnabled, (enabled) => {
               <p class="m3-label">ACTIVE FILTERS</p>
               <button
                 type="button"
-                class="m3-button m3-button--text min-h-8 px-2 py-1 text-xs"
+                class="m3-button m3-button--text min-h-8 px-2 py-1 text-xs !text-[var(--md-sys-color-on-surface)]"
                 @click="openOptions"
               >
                 Edit
