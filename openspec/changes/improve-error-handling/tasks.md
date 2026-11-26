@@ -33,7 +33,7 @@
 
 ## 7. User-Facing Error Messages
 
-- [ ] 7.1 Create `src/lib/errorMessages.ts` with mapping from error type/code to user-friendly message template; include recovery action descriptions; verify message coverage for network, validation, storage, and cache errors
+- [x] 7.1 Create `src/lib/errorMessages.ts` with mapping from error type/code to user-friendly message template; include recovery action descriptions; verify message coverage for network, validation, storage, and cache errors
 - [ ] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show error message banner with recovery buttons ([Retry], [Clear Cache], [Reset State]) based on `store.lastError`; verify error UI appears when error is set and disappears when cleared
 
 ## 8. Recovery Actions UI Integration
