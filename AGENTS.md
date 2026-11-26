@@ -1,33 +1,97 @@
 # AGENTS instructions for randomander
 
-## Purpose
-This file captures expectations for AI agents working in `randomander`. Treat it as the single source for repository-specific reminders after honoring the system/developer guidance.
+### Do
+- use Vue 3 with TypeScript + Vite
+- use Pinia for state management with composable patterns
+- use Tailwind CSS utilities for styling; avoid hard-coded values
+- use relative imports within `src/`
+- keep component and style definitions concise
+- run automated checks with `npm run dev`, `npm run test`, `npm run build`
+- default to small components and focused diffs
 
-## Core principles
-- Honor the system/developer directions first. They define tone, safety, citation, browsing, and verification expectations.
-- Respect the skill guidance listed in `skill-creator` and `skill-installer`. If any skill is mentioned (plain text or `$SkillName`), read its `SKILL.md`, follow the workflow, and mention which skill(s) you used and why.
-- Prioritize automated verification (e.g., `npm run test`, `npm run build`, `npm run dev` smoke runs) after making code changes, and clearly state when a required check cannot run.
-- Prefer `rg`/`rg --files` when searching for text or listing files; fall back only if `rg` is unavailable.
-- Avoid undoing unrelated work. If you see unexpected modifications, pause and ask for clarification before proceeding.
+### Don't
+- do not introduce global CSS without justification
+- do not hard-code colors or spacing values
+- do not add new heavy dependencies without approval
+- do not undo unrelated work without asking
 
-## Repository specifics
-- `randomander` is a Vue 3 + TypeScript + Vite project powered by Pinia and Tailwind CSS. Public builds automate Scryfall requests and provide validated, user-initiated EDHREC links; the internal EDHREC metadata adapter is test-only unless a future release is separately approved.
-- `src/features/draw`, `history`, `saved`, and `settings` each own a view, with shared helpers/composables and `src/stores/randomander.ts` managing randomness, history, saved pulls, and display/cache options.
-- Use relative imports within `src/`. Tailwind utilities and component-level styling should stay concise; avoid introducing global CSS unless justified.
-- Scripts defined in `package.json` (e.g., `npm run dev`, `npm run build`, `npm run test`, `npm run preview`) are the preferred way to verify behavior locally.
+### Commands
+# file scoped checks preferred
+npm run dev - local development
+npm run test - unit tests (Vitest)
+npm run build - production build (Vue TSC + Vite)
+npm run preview - preview production build
 
-## Project overview
-- Randomander generates Commander-legal card suggestions, companion pairs, and three-card sparks from Scryfall, with optional outbound EDHREC inspiration links.
-- Users can adjust draw modes, filters, cache/performance settings, and display preferences, and can review or clear bounded History and Saved collections.
-- The store persists preferences, History, and Saved records in the partitioned `randomander:state:v3:*` local-storage envelopes while retaining `randomander:state:v2` only as a guarded migration source. Response caches remain separate, and History/Saved collections are capped at 40 entries each.
+### Safety and permissions
 
-## Workflow guidance
-- Start with `npm install` if dependencies are missing, then `npm run dev` for local UI work, `npm run test` (Vitest) for unit verification, and `npm run build` (Vue TSC + Vite) before major submissions.
-- After code changes, highlight touched areas when summarizing (e.g., mention `src/features/draw/DrawView.vue` or `src/stores/randomander.ts` line references).
-- When adding or modifying features, consider their impact on `HeroStage`, `HistoryView`, `SettingsView`, and the Pinia store to keep UI/state layers consistent.
+Allowed without prompt:
+- read files, list files
+- run npm run dev, npm run test locally
+- run npm run build
 
-## Final responses
-- Lead with a concise overview of what changed or what was discovered.
-- Summaries discussing code must reference files with `path:line` notation.
-- Suggest natural next steps (tests to run, follow-up items, etc.) when appropriate.
-- Keep tone collaborative, action-oriented, and free of unnecessary fluff.
+Ask first: 
+- npm install (new dependencies)
+- git push
+- deleting files
+- major refactors
+
+### Project structure
+- src/features/ - feature views (draw, history, saved, settings)
+- src/stores/ - Pinia stores and state management
+- src/components/ - shared Vue components
+- src/composables/ - shared composables and hooks
+- src/lib/ - utilities and helpers
+- src/services/ - API services (Scryfall, EDHREC)
+
+### Good and bad examples
+- reference src/stores/randomander.ts for Pinia patterns
+- consider impact on HeroStage, HistoryView, SettingsView when modifying state
+- use Pinia composables for state access, not direct store imports
+- keep imports relative and within src/
+- use component-scoped styles with Tailwind
+
+### Project overview
+- Magic: The Gathering card suggestion tool using Scryfall API
+- Generates Commander-legal suggestions, companion pairs, and sparks
+- Pinia store manages randomness, draw history, saved cards, and cache options
+- Local storage persists state in `randomander:state:v3:*` envelopes
+- History/Saved collections capped at 40 entries; v2 migration supported only
+
+### PR checklist
+- npm run test passes
+- npm run build succeeds
+- code uses Pinia patterns correctly
+- styling uses Tailwind utilities
+- diff is focused and well-summarized
+
+### When stuck
+- ask a clarifying question
+- propose a short plan
+- open a draft PR with notes
+
+### Test first mode
+- write or update tests first on new features
+- code to green
+
+## Git Workflow & Branching
+- **Never commit directly to `main` (or `master`).**
+- **Start every new task on a fresh branch off `main`:**
+  1. Run `git status` to ensure the working tree is clean. If uncommitted changes exist, ask before proceeding.
+  2. Switch to `main` and pull the latest changes (`git checkout main && git pull origin main`).
+  3. Create and switch to a descriptive task branch (`git checkout -b ai/<short-kebab-case-description>`).
+  4. *Exception:* If explicitly instructed to continue work on an existing branch or PR, check out that branch instead of creating a new one.
+
+## Committing Rules
+- **Commit frequently at logical checkpoints:** Make small, atomic commits after completing each self-contained sub-step (e.g., adding a model, implementing a function, fixing a test) so progress can be easily reverted if needed.
+- **Verify before committing:** Ensure relevant linters, type checks, and unit tests pass before creating a commit. Do not commit broken or half-finished code.
+- **Keep commits scoped:** Stage only files relevant to the current logical step (`git add <files>` rather than `git add -A` if unrelated files exist).
+- **Write clear commit messages:** Use concise, imperative commit messages describing *what* changed and *why* (e.g., `feat: add rate limiter middleware to auth routes`).
+
+## Safety & Remote Guardrails
+- **Do not push or open PRs automatically** unless explicitly asked. Keep frequent checkpoint commits local so the branch can be squashed or cleaned up before review.
+- **Never run destructive Git commands** without explicit approval, including:
+  - `git push --force` / `--force-with-lease`
+  - `git reset --hard`
+  - `git clean -fd`
+  - `git rebase` on shared branches
+- **Never commit secrets:** Double-check `git diff --staged` to ensure `.env` file

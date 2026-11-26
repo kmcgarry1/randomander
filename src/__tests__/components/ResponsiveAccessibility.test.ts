@@ -62,8 +62,7 @@ describe("responsive and image-integrity contracts", () => {
     });
 
     const cardList = screen.getByRole("list", { name: "Cards in option 1" });
-    expect(cardList).toHaveClass("flex-col", "sm:flex-row", "min-w-0");
-    expect(cardList.className).not.toContain("min-[360px]:flex-row");
+    expect(cardList).toHaveClass("flex-col", "min-w-0");
     for (const item of within(cardList).getAllByRole("listitem")) {
       expect(item).toHaveClass("w-full", "min-w-0");
     }

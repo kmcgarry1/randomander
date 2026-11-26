@@ -86,12 +86,13 @@ const getChoicePairUrl = (choice: CommanderChoice) =>
       </h2>
     </header>
 
-    <div class="mt-5 grid gap-4 lg:grid-cols-2">
+    <div class="mt-5 grid gap-4 lg:grid-cols-2 lg:auto-rows-max">
       <article
         v-for="(choice, choiceIndex) in choices"
         :key="choice.id"
-        class="min-w-0 rounded-[var(--md-sys-shape-corner-large)] bg-[var(--md-sys-color-surface-container)] p-3 sm:p-4"
+        class="min-w-0 rounded-[var(--md-sys-shape-corner-large)] border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container)] p-3 sm:p-4"
       >
+        <!-- Band 1: Heading with option label and partner action -->
         <div class="flex min-h-11 flex-wrap items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
             <p class="m3-label">Option {{ choiceIndex + 1 }}</p>
@@ -113,19 +114,19 @@ const getChoicePairUrl = (choice: CommanderChoice) =>
           </button>
         </div>
 
+        <!-- Band 2: Card stage (images) -->
         <div
-          class="mt-4 flex min-h-[17rem] w-full min-w-0 flex-col items-center justify-end gap-5 px-1 sm:min-h-[21rem] sm:flex-row sm:items-end sm:gap-3 sm:px-2"
+          class="mt-4 flex min-h-[14rem] w-full min-w-0 flex-col items-center justify-center gap-4 px-1 sm:min-h-[16rem] sm:gap-3 sm:px-2"
           role="list"
           :aria-label="`Cards in option ${choiceIndex + 1}`"
         >
           <div
             v-for="(card, cardIndex) in choice.cards"
             :key="card.id"
-            class="w-full max-w-[11rem] min-w-0 sm:flex-1 sm:max-w-[12.5rem]"
+            class="w-full min-w-0"
             :class="{
-              'sm:-rotate-2 sm:translate-y-2':
-                choice.cards.length > 1 && cardIndex === 0,
-              'sm:rotate-2': choice.cards.length > 1 && cardIndex === 1,
+              'max-w-sm': choice.cards.length === 1,
+              'max-w-xs': choice.cards.length > 1,
             }"
             role="listitem"
           >
@@ -140,6 +141,7 @@ const getChoicePairUrl = (choice: CommanderChoice) =>
           </div>
         </div>
 
+        <!-- Band 3: Facts (title, mana, type, price) -->
         <div v-if="revealComplete" class="mt-5 border-t border-[var(--md-sys-color-outline-variant)] pt-4">
           <h3 class="break-words text-lg font-bold leading-tight [overflow-wrap:anywhere]">
             {{ getChoiceTitle(choice) }}
@@ -161,63 +163,64 @@ const getChoicePairUrl = (choice: CommanderChoice) =>
               />
             </div>
           </div>
+        </div>
 
-          <div v-if="showLinks" class="mt-4 flex flex-wrap gap-1">
-            <template v-for="card in choice.cards" :key="`${choice.id}-${card.id}-links`">
-              <a
-                v-if="getSafeScryfallUrl(card)"
-                :href="getSafeScryfallUrl(card) ?? undefined"
-                target="_blank"
-                rel="noreferrer"
-                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
-              >
-                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
-                  {{ card.name }} Scryfall
-                </span>
-                <ExternalLinkHint class="shrink-0" />
-              </a>
-              <span
-                v-else
-                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs opacity-70 [overflow-wrap:anywhere]"
-              >
-                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
-                  {{ card.name }} Scryfall unavailable
-                </span>
-              </span>
-              <a
-                v-if="getEdhrecUrl(card)"
-                :href="getEdhrecUrl(card) ?? undefined"
-                target="_blank"
-                rel="noreferrer"
-                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
-              >
-                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
-                  {{ card.name }} EDHREC
-                </span>
-                <ExternalLinkHint class="shrink-0" />
-              </a>
-              <span
-                v-else
-                class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs opacity-70 [overflow-wrap:anywhere]"
-              >
-                <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
-                  {{ card.name }} EDHREC unavailable
-                </span>
-              </span>
-            </template>
+        <!-- Band 4: Actions (links) -->
+        <div v-if="revealComplete && showLinks" class="mt-4 flex flex-wrap gap-1">
+          <template v-for="card in choice.cards" :key="`${choice.id}-${card.id}-links`">
             <a
-              v-if="getChoicePairUrl(choice)"
-              :href="getChoicePairUrl(choice)"
+              v-if="getSafeScryfallUrl(card)"
+              :href="getSafeScryfallUrl(card) ?? undefined"
               target="_blank"
               rel="noreferrer"
               class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
             >
               <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
-                EDHREC pair
+                {{ card.name }} Scryfall
               </span>
               <ExternalLinkHint class="shrink-0" />
             </a>
-          </div>
+            <span
+              v-else
+              class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs opacity-70 [overflow-wrap:anywhere]"
+            >
+              <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                {{ card.name }} Scryfall unavailable
+              </span>
+            </span>
+            <a
+              v-if="getEdhrecUrl(card)"
+              :href="getEdhrecUrl(card) ?? undefined"
+              target="_blank"
+              rel="noreferrer"
+              class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
+            >
+              <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                {{ card.name }} EDHREC
+              </span>
+              <ExternalLinkHint class="shrink-0" />
+            </a>
+            <span
+              v-else
+              class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs opacity-70 [overflow-wrap:anywhere]"
+            >
+              <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+                {{ card.name }} EDHREC unavailable
+              </span>
+            </span>
+          </template>
+          <a
+            v-if="getChoicePairUrl(choice)"
+            :href="getChoicePairUrl(choice)"
+            target="_blank"
+            rel="noreferrer"
+            class="m3-button m3-button--text min-h-9 min-w-0 max-w-full flex-wrap whitespace-normal px-2.5 py-1.5 text-center text-xs [overflow-wrap:anywhere]"
+          >
+            <span class="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]">
+              EDHREC pair
+            </span>
+            <ExternalLinkHint class="shrink-0" />
+          </a>
         </div>
       </article>
     </div>
