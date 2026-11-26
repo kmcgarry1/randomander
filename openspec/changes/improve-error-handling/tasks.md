@@ -27,8 +27,8 @@
 
 ## 6. Structured Logging
 
-- [ ] 6.1 Create `src/lib/errorLogger.ts` with `ErrorLogger` class that emits structured logs to console (JSON format) and in-memory buffer (max 50 entries); include timestamp, error type, source, metadata, breadcrumbs; verify tests confirm logging, buffer management, and export functionality
-- [ ] 6.2 Add request ID generation to `src/services/http.ts`: generate UUID for each request and include it in log entries; verify tests confirm all logs from same request share same request ID
+- [x] 6.1 Create `src/lib/errorLogger.ts` with `ErrorLogger` class that emits structured logs to console (JSON format) and in-memory buffer (max 50 entries); include timestamp, error type, source, metadata, breadcrumbs; verify tests confirm logging, buffer management, and export functionality
+- [x] 6.2 Add request ID generation to `src/services/http.ts`: generate UUID for each request and include it in log entries; verify tests confirm all logs from same request share same request ID
 - [ ] 6.3 Integrate `ErrorLogger` into HTTP service, cache, and storage to emit logs on all errors; verify unit tests confirm logs are emitted with correct structure
 
 ## 7. User-Facing Error Messages

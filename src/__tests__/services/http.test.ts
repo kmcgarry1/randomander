@@ -452,6 +452,50 @@ describe('RequestTimeoutError', () => {
   })
 })
 
+describe('fetchJson - Request ID tracking', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('includes request ID in network errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(response(() => Promise.resolve({}), false, 500)))
+    )
+
+    try {
+      await fetchJson('https://example.test/500')
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: 'NetworkError',
+        type: 'network',
+        code: 'http-error',
+      })
+      expect((error as any).requestId).toBeDefined()
+      expect((error as any).requestId).toMatch(/^\d+-[a-z0-9]+$/)
+    }
+  })
+
+  it('includes request ID in connection failure errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
+    )
+
+    try {
+      await fetchJson('https://example.test/connection-failed')
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: 'NetworkError',
+        type: 'network',
+        code: 'connection-failed',
+      })
+      expect((error as any).requestId).toBeDefined()
+      expect((error as any).requestId).toMatch(/^\d+-[a-z0-9]+$/)
+    }
+  })
+})
+
 describe('HTTP retry logic', () => {
   beforeEach(() => {
     vi.useFakeTimers()
