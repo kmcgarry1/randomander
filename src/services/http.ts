@@ -17,6 +17,95 @@ type FetchJsonOptions = {
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
+/**
+ * Retry configuration for HTTP requests.
+ * Exponential backoff: 100ms, 200ms, 400ms (max 3 attempts)
+ * Skip retry on 4xx errors (except 408 Timeout Request)
+ */
+export const RETRY_CONFIG = {
+  maxAttempts: 3,
+  backoffMs: [100, 200, 400],
+  retryableStatusCodes: new Set([408, 429, 500, 502, 503, 504]),
+}
+
+/**
+ * Determines if an error is retryable based on HTTP status code.
+ * Retries on: 408 (Request Timeout), 429 (Rate Limit), and 5xx errors
+ * Skips retry on 4xx errors (except 408)
+ * @internal
+ */
+function isRetryableStatusCode(status: number): boolean {
+  return RETRY_CONFIG.retryableStatusCodes.has(status)
+}
+
+/**
+ * Determines if an error is retryable (timeout or specific HTTP status codes).
+ * Does NOT retry DOMException (AbortError) since those are user-initiated cancellations.
+ * @internal
+ */
+function isRetryable(error: Error): boolean {
+  // DOMException (AbortError) should never be retried - it's a user cancellation
+  if (error instanceof DOMException || error.name === 'AbortError') {
+    return false
+  }
+  // Timeouts should not be retried - the client has already waited
+  if (error instanceof RequestTimeoutError) {
+    return false
+  }
+  if (error instanceof HttpError) {
+    return isRetryableStatusCode(error.status)
+  }
+  // NetworkError might have been converted from an HttpError - check if it was retryable
+  if (error instanceof NetworkError) {
+    if (error.code === 'timeout') {
+      return false // Don't retry timeouts
+    }
+    if (error.code === 'http-error' && error.metadata?.status) {
+      return isRetryableStatusCode(error.metadata.status as number)
+    }
+  }
+  return false
+}
+
+/**
+ * Retry async function with exponential backoff.
+ * Attempts the operation up to maxAttempts times, applying exponential backoff between attempts.
+ * Does NOT retry if the error is a DOMException (user cancellation via AbortSignal).
+ * @internal
+ */
+async function retryAsync<T>(
+  operation: () => Promise<T>,
+  signal?: AbortSignal,
+  maxAttempts: number = RETRY_CONFIG.maxAttempts,
+  backoffMs: number[] = RETRY_CONFIG.backoffMs
+): Promise<T> {
+  let lastError: Error | undefined
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation()
+    } catch (err) {
+      // Preserve the original error object
+      lastError =
+        err instanceof Error ? err : new Error(String(err))
+
+      // Never retry DOMException (user cancellation via AbortSignal)
+      if (lastError instanceof DOMException || lastError.name === 'AbortError') {
+        throw lastError
+      }
+
+      if (attempt === maxAttempts || !isRetryable(lastError)) {
+        throw lastError
+      }
+
+      const delay = backoffMs[attempt - 1] ?? backoffMs[backoffMs.length - 1]
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError || new Error('Retry failed without error')
+}
+
 const parseRetryAfter = (value: string | null) => {
   if (!value) return null
   const seconds = Number(value)
@@ -88,84 +177,87 @@ export const fetchJson = async <T>(
     if (cached !== null) return cached
   }
 
-  const requestController = new AbortController()
-  let didTimeout = false
-  const onCallerAbort = () => requestController.abort()
-  if (signal?.aborted) onCallerAbort()
-  else signal?.addEventListener('abort', onCallerAbort, { once: true })
+  // Wrap the entire request (including retries) in a retry wrapper
+  return retryAsync(async () => {
+    const requestController = new AbortController()
+    let didTimeout = false
+    const onCallerAbort = () => requestController.abort()
+    if (signal?.aborted) onCallerAbort()
+    else signal?.addEventListener('abort', onCallerAbort, { once: true })
 
-  const safeTimeoutMs = Number.isFinite(timeoutMs)
-    ? Math.max(1, timeoutMs)
-    : DEFAULT_REQUEST_TIMEOUT_MS
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-  const abortPromise = new Promise<never>((_, reject) => {
-    const rejectForAbort = () => {
-      try {
-        const error = didTimeout
-          ? new RequestTimeoutError(safeTimeoutMs)
-          : new DOMException('The request was cancelled.', 'AbortError')
-        reject(error)
-      } catch (err) {
-        reject(err)
+    const safeTimeoutMs = Number.isFinite(timeoutMs)
+      ? Math.max(1, timeoutMs)
+      : DEFAULT_REQUEST_TIMEOUT_MS
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const abortPromise = new Promise<never>((_, reject) => {
+      const rejectForAbort = () => {
+        try {
+          const error = didTimeout
+            ? new RequestTimeoutError(safeTimeoutMs)
+            : new DOMException('The request was cancelled.', 'AbortError')
+          reject(error)
+        } catch (err) {
+          reject(err)
+        }
       }
-    }
-    if (requestController.signal.aborted) {
-      rejectForAbort()
-      return
-    }
-    requestController.signal.addEventListener('abort', rejectForAbort, {
-      once: true,
+      if (requestController.signal.aborted) {
+        rejectForAbort()
+        return
+      }
+      requestController.signal.addEventListener('abort', rejectForAbort, {
+        once: true,
+      })
+      timeoutId = setTimeout(() => {
+        didTimeout = true
+        requestController.abort()
+      }, safeTimeoutMs)
     })
-    timeoutId = setTimeout(() => {
-      didTimeout = true
-      requestController.abort()
-    }, safeTimeoutMs)
-  })
 
-  const requestPromise = (async () => {
+    const requestPromise = (async () => {
+      try {
+        const response = await fetch(url, {
+          signal: requestController.signal,
+          headers: {
+            Accept: 'application/json',
+            ...headers,
+          },
+        })
+
+        if (!response.ok) {
+          throw new HttpError(
+            response.status,
+            response.headers?.get?.('Retry-After') ?? null
+          )
+        }
+
+        return (await response.json()) as T
+      } catch (err) {
+        if (err instanceof HttpError || err instanceof RequestTimeoutError) {
+          throw toNetworkError(err, url, requestId)
+        }
+        // Network error (e.g., fetch failed due to no connection)
+        throw new NetworkError('connection-failed', String(err), {
+          sourceId: url,
+          requestId,
+          metadata: { originalError: err },
+        })
+      }
+    })()
+
+    let data: T
     try {
-      const response = await fetch(url, {
-        signal: requestController.signal,
-        headers: {
-          Accept: 'application/json',
-          ...headers,
-        },
-      })
-
-      if (!response.ok) {
-        throw new HttpError(
-          response.status,
-          response.headers?.get?.('Retry-After') ?? null
-        )
-      }
-
-      return (await response.json()) as T
-    } catch (err) {
-      if (err instanceof HttpError || err instanceof RequestTimeoutError) {
-        throw toNetworkError(err, url, requestId)
-      }
-      // Network error (e.g., fetch failed due to no connection)
-      throw new NetworkError('connection-failed', String(err), {
-        sourceId: url,
-        requestId,
-        metadata: { originalError: err },
-      })
+      data = await Promise.race([requestPromise, abortPromise])
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      signal?.removeEventListener('abort', onCallerAbort)
     }
-  })()
 
-  let data: T
-  try {
-    data = await Promise.race([requestPromise, abortPromise])
-  } finally {
-    if (timeoutId !== undefined) clearTimeout(timeoutId)
-    signal?.removeEventListener('abort', onCallerAbort)
-  }
+    if (cache?.enabled) {
+      setCachedValue(cache.key ?? url, data, cache.ttlMs, cache.maxEntries)
+    }
 
-  if (cache?.enabled) {
-    setCachedValue(cache.key ?? url, data, cache.ttlMs, cache.maxEntries)
-  }
-
-  return data
+    return data
+  })
 }
 
 /**
