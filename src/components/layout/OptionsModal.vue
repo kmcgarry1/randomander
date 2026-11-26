@@ -379,7 +379,7 @@ useModalFocus(dialogRef, close, {
       >
         <button
           type="button"
-          class="m3-button m3-button--text w-full sm:w-auto"
+          class="m3-button m3-button--text w-full sm:w-auto !text-[var(--md-sys-color-on-surface)]"
           @click="resetFilters"
         >
           <ArrowPathIcon class="h-5 w-5" aria-hidden="true" />
