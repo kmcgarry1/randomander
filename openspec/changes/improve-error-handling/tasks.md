@@ -2,9 +2,9 @@
 
 ## 1. Error Class Hierarchy
 
-- [ ] 1.1 Create `src/lib/appError.ts` with `AppError` base class and subclasses (`NetworkError`, `ValidationError`, `StorageError`, `CacheError`) with `type`, `code`, `message`, `metadata`, `recoveryHints`, `timestamp`, `sourceId`, `requestId` properties; verify unit tests cover all error types and serialization to JSON
-- [ ] 1.2 Create `src/lib/errorContext.ts` with `ErrorContext` interface and `createErrorContext()` function that builds structured error objects; verify functions handle undefined/partial metadata gracefully
-- [ ] 1.3 Update `src/services/http.ts` to throw `NetworkError` (instead of `HttpError`/`RequestTimeoutError`) with appropriate code (`timeout`, `http-error`, `connection-failed`) and recovery hints; verify existing http tests still pass and new error types are thrown correctly
+- [x] 1.1 Create `src/lib/appError.ts` with `AppError` base class and subclasses (`NetworkError`, `ValidationError`, `StorageError`, `CacheError`) with `type`, `code`, `message`, `metadata`, `recoveryHints`, `timestamp`, `sourceId`, `requestId` properties; verify unit tests cover all error types and serialization to JSON
+- [x] 1.2 Create `src/lib/errorContext.ts` with `ErrorContext` interface and `createErrorContext()` function that builds structured error objects; verify functions handle undefined/partial metadata gracefully
+- [x] 1.3 Update `src/services/http.ts` to throw `NetworkError` (instead of `HttpError`/`RequestTimeoutError`) with appropriate code (`timeout`, `http-error`, `connection-failed`) and recovery hints; verify existing http tests still pass and new error types are thrown correctly
 
 ## 2. HTTP Retry Logic
 

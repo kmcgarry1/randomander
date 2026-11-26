@@ -1,4 +1,5 @@
 import { getCachedValue, setCachedValue } from '../lib/cache'
+import { NetworkError } from '../lib/appError'
 
 export type CacheOptions = {
   enabled: boolean
@@ -46,6 +47,30 @@ export class RequestTimeoutError extends Error {
   }
 }
 
+/**
+ * Convert HttpError/RequestTimeoutError to NetworkError for unified handling.
+ * @internal
+ */
+function toNetworkError(
+  error: HttpError | RequestTimeoutError,
+  url: string,
+  requestId: string
+): NetworkError {
+  if (error instanceof RequestTimeoutError) {
+    return new NetworkError('timeout', error.message, {
+      sourceId: url,
+      requestId,
+      metadata: { timeoutMs: error.timeoutMs },
+    })
+  } else {
+    return new NetworkError('http-error', error.message, {
+      sourceId: url,
+      requestId,
+      metadata: { status: error.status, retryAfterMs: error.retryAfterMs },
+    })
+  }
+}
+
 export const fetchJson = async <T>(
   url: string,
   {
@@ -55,6 +80,9 @@ export const fetchJson = async <T>(
     timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   }: FetchJsonOptions = {}
 ): Promise<T> => {
+  // Generate unique request ID for correlation
+  const requestId = generateRequestId()
+
   if (cache?.enabled) {
     const cached = getCachedValue<T>(cache.key ?? url)
     if (cached !== null) return cached
@@ -72,11 +100,14 @@ export const fetchJson = async <T>(
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   const abortPromise = new Promise<never>((_, reject) => {
     const rejectForAbort = () => {
-      reject(
-        didTimeout
+      try {
+        const error = didTimeout
           ? new RequestTimeoutError(safeTimeoutMs)
           : new DOMException('The request was cancelled.', 'AbortError')
-      )
+        reject(error)
+      } catch (err) {
+        reject(err)
+      }
     }
     if (requestController.signal.aborted) {
       rejectForAbort()
@@ -92,22 +123,34 @@ export const fetchJson = async <T>(
   })
 
   const requestPromise = (async () => {
-    const response = await fetch(url, {
-      signal: requestController.signal,
-      headers: {
-        Accept: 'application/json',
-        ...headers,
-      },
-    })
+    try {
+      const response = await fetch(url, {
+        signal: requestController.signal,
+        headers: {
+          Accept: 'application/json',
+          ...headers,
+        },
+      })
 
-    if (!response.ok) {
-      throw new HttpError(
-        response.status,
-        response.headers?.get?.('Retry-After') ?? null
-      )
+      if (!response.ok) {
+        throw new HttpError(
+          response.status,
+          response.headers?.get?.('Retry-After') ?? null
+        )
+      }
+
+      return (await response.json()) as T
+    } catch (err) {
+      if (err instanceof HttpError || err instanceof RequestTimeoutError) {
+        throw toNetworkError(err, url, requestId)
+      }
+      // Network error (e.g., fetch failed due to no connection)
+      throw new NetworkError('connection-failed', String(err), {
+        sourceId: url,
+        requestId,
+        metadata: { originalError: err },
+      })
     }
-
-    return (await response.json()) as T
   })()
 
   let data: T
@@ -123,4 +166,12 @@ export const fetchJson = async <T>(
   }
 
   return data
+}
+
+/**
+ * Generate a unique request ID for correlation and logging.
+ * @internal
+ */
+function generateRequestId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }

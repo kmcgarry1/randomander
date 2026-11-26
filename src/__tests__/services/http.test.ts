@@ -5,6 +5,7 @@ import {
   HttpError,
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../../services/http'
+import { isNetworkError } from '../../lib/appError'
 
 const response = (json: () => Promise<unknown>, ok = true, status = 200) =>
   ({
@@ -94,8 +95,12 @@ describe('HTTP error handling', () => {
     )
 
     await expect(fetchJson('https://example.test/500')).rejects.toMatchObject({
-      name: 'HttpError',
-      status: 500,
+      name: 'NetworkError',
+      type: 'network',
+      code: 'http-error',
+      metadata: {
+        status: 500,
+      },
     })
   })
 
@@ -106,7 +111,12 @@ describe('HTTP error handling', () => {
     )
 
     await expect(fetchJson('https://example.test/404')).rejects.toMatchObject({
-      status: 404,
+      name: 'NetworkError',
+      type: 'network',
+      code: 'http-error',
+      metadata: {
+        status: 404,
+      },
     })
   })
 
@@ -126,8 +136,13 @@ describe('HTTP error handling', () => {
     )
 
     await expect(fetchJson('https://example.test/429')).rejects.toMatchObject({
-      status: 429,
-      retryAfterMs: 60_000,
+      name: 'NetworkError',
+      type: 'network',
+      code: 'http-error',
+      metadata: {
+        status: 429,
+        retryAfterMs: 60_000,
+      },
     })
   })
 
