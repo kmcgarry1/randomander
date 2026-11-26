@@ -76,7 +76,7 @@ function isRetryable(error: Error): boolean {
  */
 async function retryAsync<T>(
   operation: () => Promise<T>,
-  signal?: AbortSignal,
+  _signal?: AbortSignal,
   maxAttempts: number = RETRY_CONFIG.maxAttempts,
   backoffMs: number[] = RETRY_CONFIG.backoffMs,
   requestId?: string

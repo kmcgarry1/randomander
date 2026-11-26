@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'malformed-data'
   | 'schema-mismatch'
   | 'quota-exceeded'
+  | 'write-failed'
   | 'corrupted'
   | 'repair-failed'
 
@@ -26,6 +27,14 @@ export type RecoveryHint =
   | 'clear-cache-retry'
   | 'export-then-clear'
   | 'reset-state'
+
+export interface AppErrorOptions {
+  metadata?: Record<string, unknown>
+  recoveryHints?: RecoveryHint[]
+  sourceId?: string
+  requestId?: string
+  originalError?: unknown
+}
 
 /**
  * Base error class for all application errors.
@@ -53,13 +62,7 @@ export abstract class AppError extends Error {
     type: ErrorType,
     code: ErrorCode,
     message: string,
-    options: {
-      metadata?: Record<string, unknown>
-      recoveryHints?: RecoveryHint[]
-      sourceId?: string
-      requestId?: string
-      originalError?: unknown
-    } = {}
+    options: AppErrorOptions = {}
   ) {
     super(message)
     this.name = this.constructor.name
@@ -102,11 +105,11 @@ export class NetworkError extends AppError {
   constructor(
     code: 'timeout' | 'http-error' | 'connection-failed',
     message: string,
-    options?: Parameters<typeof AppError.prototype.constructor>[3]
+    options?: AppErrorOptions
   ) {
     super('network', code, message, {
-      recoveryHints: ['retry'],
       ...options,
+      recoveryHints: options?.recoveryHints ?? ['retry'],
     })
     Object.setPrototypeOf(this, NetworkError.prototype)
   }
@@ -119,11 +122,11 @@ export class ValidationError extends AppError {
   constructor(
     code: 'malformed-data' | 'schema-mismatch',
     message: string,
-    options?: Parameters<typeof AppError.prototype.constructor>[3]
+    options?: AppErrorOptions
   ) {
     super('validation', code, message, {
-      recoveryHints: ['clear-cache-retry'],
       ...options,
+      recoveryHints: options?.recoveryHints ?? ['clear-cache-retry'],
     })
     Object.setPrototypeOf(this, ValidationError.prototype)
   }
@@ -136,14 +139,16 @@ export class StorageError extends AppError {
   constructor(
     code: 'quota-exceeded' | 'write-failed',
     message: string,
-    options?: Parameters<typeof AppError.prototype.constructor>[3]
+    options?: AppErrorOptions
   ) {
+    const defaultHints: RecoveryHint[] =
+      code === 'quota-exceeded'
+        ? ['clear-cache', 'export-then-clear']
+        : ['retry']
+
     super('storage', code, message, {
-      recoveryHints:
-        code === 'quota-exceeded'
-          ? ['clear-cache', 'export-then-clear']
-          : ['retry'],
       ...options,
+      recoveryHints: options?.recoveryHints ?? defaultHints,
     })
     Object.setPrototypeOf(this, StorageError.prototype)
   }
@@ -156,11 +161,13 @@ export class CacheError extends AppError {
   constructor(
     code: 'corrupted' | 'repair-failed',
     message: string,
-    options?: Parameters<typeof AppError.prototype.constructor>[3]
+    options?: AppErrorOptions
   ) {
+    const defaultHints: RecoveryHint[] = code === 'corrupted' ? ['clear-cache'] : ['retry']
+
     super('cache', code, message, {
-      recoveryHints: code === 'corrupted' ? ['clear-cache'] : ['retry'],
       ...options,
+      recoveryHints: options?.recoveryHints ?? defaultHints,
     })
     Object.setPrototypeOf(this, CacheError.prototype)
   }

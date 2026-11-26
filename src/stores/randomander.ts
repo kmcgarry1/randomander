@@ -901,6 +901,25 @@ export const useRandomanderStore = defineStore('randomander', () => {
     await randomize()
   }
 
+  const clearCacheAndRetry = async () => {
+    clearError()
+    // Clear the response cache for Scryfall data
+    clearCache()
+    // Retry the last draw operation
+    await randomize()
+  }
+
+  const resetState = async () => {
+    clearError()
+    // Clear error state and reset to initial conditions
+    errorMessage.value = ''
+    cards.value = []
+    choices.value = []
+    sparkPalette.value = null
+    resultProvenance.value = null
+    // Don't clear history/saved - those are user data
+  }
+
   const cancelActiveRequest = () => {
     if (!activeWorkflow) return false
     const workflow = activeWorkflow
@@ -2069,6 +2088,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
     setError,
     clearError,
     retryLastOperation,
+    clearCacheAndRetry,
+    resetState,
     randomizePartnerForPrimary,
     randomizePartnerForChoice,
     addHistory,

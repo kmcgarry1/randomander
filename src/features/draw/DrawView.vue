@@ -36,6 +36,7 @@ import {
 import HeroStage from "./components/HeroStage.vue";
 import ChoiceOptionsSection from "./components/ChoiceOptionsSection.vue";
 import DrawBackdrop from "./components/DrawBackdrop.vue";
+import ErrorBanner from "./components/ErrorBanner.vue";
 import { useHeroSummary } from "./composables/useHeroSummary";
 import SavedCapacityDialog from "../saved/components/SavedCapacityDialog.vue";
 
@@ -52,6 +53,7 @@ const {
   history,
   isChoiceMode,
   isLoading,
+  lastError,
   options,
   performance,
   saved,
@@ -155,6 +157,8 @@ const revealComplete = ref(false);
 const saveCapacityDialogOpen = ref(false);
 const actionAnnouncement = ref("");
 const randomizeButtonRef = ref<HTMLButtonElement | null>(null);
+const isRecoveringFromError = ref(false);
+const recoverySuccessMessage = ref("");
 let revealTimer: number | undefined;
 let revealStartTimer: number | undefined;
 let revealPreloadController: AbortController | undefined;
@@ -467,6 +471,43 @@ watch(revealEnabled, (enabled) => {
   if (!enabled && hasResults.value && !revealComplete.value) finishReveal();
 });
 
+const handleErrorRecoveryAction = async (hint: string) => {
+  isRecoveringFromError.value = true;
+  recoverySuccessMessage.value = "";
+
+  try {
+    switch (hint) {
+      case "retry":
+        await store.retryLastOperation();
+        recoverySuccessMessage.value = "Retrying...";
+        break;
+      case "clear-cache":
+        await store.clearCacheAndRetry();
+        recoverySuccessMessage.value = "Cache cleared. Retrying...";
+        break;
+      case "clear-cache-retry":
+        await store.clearCacheAndRetry();
+        recoverySuccessMessage.value = "Cache cleared. Retrying...";
+        break;
+      case "reset-state":
+        await store.resetState();
+        recoverySuccessMessage.value = "State reset. Ready for new draw.";
+        break;
+      case "export-then-clear":
+        // Export functionality - would need separate implementation
+        recoverySuccessMessage.value = "Export feature coming soon.";
+        break;
+    }
+  } finally {
+    isRecoveringFromError.value = false;
+  }
+};
+
+const handleErrorDismiss = () => {
+  store.clearError();
+  recoverySuccessMessage.value = "";
+};
+
 </script>
 
 <template>
@@ -474,6 +515,15 @@ watch(revealEnabled, (enabled) => {
     <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ actionAnnouncement }}
     </p>
+    
+    <ErrorBanner
+      :error="lastError"
+      :is-recovering="isRecoveringFromError"
+      :success-message="recoverySuccessMessage"
+      @recovery-action="handleErrorRecoveryAction"
+      @dismiss="handleErrorDismiss"
+    />
+    
     <header class="mb-4 flex items-end justify-between gap-4 sm:mb-6 sm:gap-8">
       <div class="max-w-2xl">
         <h1 class="text-[clamp(1.65rem,7vw,3.15rem)] leading-[1.04] tracking-normal sm:leading-[1.02]">
