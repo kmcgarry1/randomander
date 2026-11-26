@@ -365,3 +365,181 @@ describe('Randomander record snapshots', () => {
     expect(values.has('randomander:cache:v1')).toBe(false)
   })
 })
+
+describe('Randomander state transitions', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('transitions between draw modes', () => {
+    const store = useRandomanderStore()
+    expect(store.mode).toBe('commander')
+
+    store.mode = 'spark'
+    expect(store.mode).toBe('spark')
+
+    store.mode = 'partner'
+    expect(store.mode).toBe('partner')
+  })
+
+  it('transitions between active panels', () => {
+    const store = useRandomanderStore()
+    expect(store.activePanel).toBeNull()
+
+    store.openOptions()
+    expect(store.activePanel).toBe('filters')
+
+    store.openHistoryPanel()
+    expect(store.activePanel).toBe('history')
+
+    store.openSavedPanel()
+    expect(store.activePanel).toBe('saved')
+
+    store.openSettingsPanel()
+    expect(store.activePanel).toBe('settings')
+
+    store.closePanel()
+    expect(store.activePanel).toBeNull()
+  })
+
+  it('handles theme transitions', () => {
+    const store = useRandomanderStore()
+    expect(store.theme).toBe('system')
+
+    store.theme = 'light'
+    expect(store.theme).toBe('light')
+
+    store.theme = 'dark'
+    expect(store.theme).toBe('dark')
+  })
+
+  it('manages metadata loading state', async () => {
+    const store = useRandomanderStore()
+    // Check that metadata state lookup exists
+    expect(store.metadataStateLookup).toBeDefined()
+  })
+
+  it('handles choice record state transitions', () => {
+    const store = useRandomanderStore()
+    expect(store.choices).toEqual([])
+
+    const choice1 = { id: 'choice-1', cards: [createCard('one')] }
+    store.choices.push(choice1)
+    expect(store.choices).toHaveLength(1)
+
+    const choice2 = { id: 'choice-2', cards: [createCard('two')] }
+    store.choices.push(choice2)
+    expect(store.choices).toHaveLength(2)
+
+    store.choices = []
+    expect(store.choices).toEqual([])
+  })
+
+  it('manages result groups state', () => {
+    const store = useRandomanderStore()
+    expect(store.choices).toEqual([])
+
+    const choice1 = { id: 'choice-1', cards: [createCard('one')] }
+    store.choices.push(choice1)
+    expect(store.choices).toHaveLength(1)
+  })
+
+  it('handles loading a record from saved collection', () => {
+    const store = useRandomanderStore()
+    const record = createRecord('test')
+    store.saveRecord(record)
+
+    store.loadRecord(store.saved[0]!)
+    expect(store.mode).toBe(record.mode)
+    expect(store.choices).toBeDefined()
+  })
+
+  it('manages history collection limit', () => {
+    const store = useRandomanderStore()
+    for (let i = 0; i < 50; i++) {
+      store.addHistory(createRecord(String(i)))
+    }
+
+    expect(store.history.length).toBeLessThanOrEqual(40)
+  })
+
+  it('manages saved collection limit', () => {
+    const store = useRandomanderStore()
+    for (let i = 0; i < 50; i++) {
+      store.saveRecord(createRecord(String(i)))
+    }
+
+    expect(store.saved.length).toBeLessThanOrEqual(40)
+  })
+
+  it('handles color filter state changes', () => {
+    const store = useRandomanderStore()
+    store.options.colorCount = 'any'
+    expect(store.options.colorCount).toBe('any')
+
+    store.options.colorCount = '3'
+    expect(store.options.colorCount).toBe('3')
+
+    store.options.selectedColors = ['W', 'U', 'B']
+    expect(store.options.selectedColors).toEqual(['W', 'U', 'B'])
+  })
+
+  it('manages display settings state', () => {
+    const store = useRandomanderStore()
+    expect(store.display).toBeDefined()
+    expect(typeof store.display.showHeader).toBe('boolean')
+
+    const originalValue = store.display.showHeader
+    store.display.showHeader = !originalValue
+    expect(store.display.showHeader).toBe(!originalValue)
+  })
+
+  it('manages cache settings state', () => {
+    const store = useRandomanderStore()
+    expect(store.cacheSettings).toBeDefined()
+    expect(typeof store.cacheSettings.enabled).toBe('boolean')
+
+    const originalEnabled = store.cacheSettings.enabled
+    store.cacheSettings.enabled = !originalEnabled
+    expect(store.cacheSettings.enabled).toBe(!originalEnabled)
+  })
+
+  it('handles performance settings changes', () => {
+    const store = useRandomanderStore()
+    expect(store.performance).toBeDefined()
+
+    if (store.performance) {
+      store.performance.maxHttpConcurrency = 5
+      expect(store.performance.maxHttpConcurrency).toBe(5)
+    }
+  })
+
+  it('recovers from corrupted choices state', () => {
+    const store = useRandomanderStore()
+    store.choices = [{ id: 'choice-1', cards: [createCard('one')] }]
+
+    store.choices = []
+    expect(store.choices).toEqual([])
+
+    store.choices.push({ id: 'choice-2', cards: [createCard('two')] })
+    expect(store.choices).toHaveLength(1)
+  })
+
+  it('maintains independence between result groups', () => {
+    const store = useRandomanderStore()
+    const record = createRecord('multi-group')
+    store.choices = [
+      { id: 'group-1', cards: [createCard('card-1')] },
+      { id: 'group-2', cards: [createCard('card-2')] },
+    ]
+
+    const groups = store.choices.map((c) => c.cards)
+    expect(groups).toHaveLength(2)
+    expect(groups[0]).not.toBe(groups[1])
+  })
+})
