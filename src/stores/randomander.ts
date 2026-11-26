@@ -37,6 +37,7 @@ import {
   RequestTimeoutError,
   type CacheOptions,
 } from '../services/http'
+import { type AppError } from '../lib/appError'
 import {
   createDrawWorkflowContext,
   DRAW_WORKFLOW_DEADLINE_MS,
@@ -325,6 +326,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const sparkPalette = ref<string[] | null>(null)
   const isLoading = ref(false)
   const errorMessage = ref('')
+  const lastError = ref<AppError | null>(null)
+  const errorHistory = ref<AppError[]>([])
   const initialPersistenceFailure: StorageFailureKind | null =
     loadedPersistence.failures[0] ?? null
   const persistenceError = ref(
@@ -864,6 +867,38 @@ export const useRandomanderStore = defineStore('randomander', () => {
     workflowMetricErrors.set(workflow.id, error)
     const message = getWorkflowErrorMessage(error, workflow, fallback)
     if (message !== null) errorMessage.value = message
+  }
+
+  const setError = (error: AppError) => {
+    lastError.value = error
+    // Keep last 10 errors in history
+    errorHistory.value.unshift(error)
+    if (errorHistory.value.length > 10) {
+      errorHistory.value.pop()
+    }
+    // Persist error to localStorage
+    try {
+      localStorage.setItem('randomander:state:v3:error', JSON.stringify(error))
+    } catch (e) {
+      // Silently fail if localStorage is unavailable
+    }
+  }
+
+  const clearError = () => {
+    lastError.value = null
+    // Clear persisted error
+    try {
+      localStorage.removeItem('randomander:state:v3:error')
+    } catch (e) {
+      // Silently fail if localStorage is unavailable
+    }
+  }
+
+  const retryLastOperation = async () => {
+    if (!lastError.value) return
+    clearError()
+    // Retry the last draw operation
+    await randomize()
   }
 
   const cancelActiveRequest = () => {
@@ -1982,6 +2017,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
     sparkPalette,
     isLoading,
     errorMessage,
+    lastError,
+    errorHistory,
     persistenceError,
     persistenceNotice,
     metadataStateLookup,
@@ -2029,6 +2066,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     isRecordSaved,
     randomize,
     cancelActiveRequest,
+    setError,
+    clearError,
+    retryLastOperation,
     randomizePartnerForPrimary,
     randomizePartnerForChoice,
     addHistory,

@@ -11,6 +11,7 @@ import {
   PERSISTED_PARTITION_KEYS,
   decodePartitionEnvelope,
 } from '../../stores/persistenceCoordinator'
+import { ValidationError } from '../../lib/appError'
 
 const options: OptionsState = {
   colorCount: 'any',
@@ -540,5 +541,118 @@ describe('Randomander state transitions', () => {
     const groups = store.choices.map((c) => c.cards)
     expect(groups).toHaveLength(2)
     expect(groups[0]).not.toBe(groups[1])
+  })
+
+  describe('error state management', () => {
+    it('stores error in lastError and errorHistory on setError', () => {
+      localStorage.clear()
+      const store = useRandomanderStore()
+      const error = new ValidationError(
+        'schema-mismatch',
+        'Test validation error'
+      )
+
+      store.setError(error)
+
+      expect(store.lastError).toBe(error)
+      expect(store.errorHistory.length).toBe(1)
+      expect(store.errorHistory[0]).toBe(error)
+    })
+
+    it('persists error to localStorage on setError', () => {
+      localStorage.clear()
+      const store = useRandomanderStore()
+      const error = new ValidationError(
+        'schema-mismatch',
+        'Test validation error'
+      )
+
+      store.setError(error)
+
+      const persisted = localStorage.getItem('randomander:state:v3:error')
+      expect(persisted).toBeTruthy()
+      const parsed = JSON.parse(persisted!)
+      expect(parsed.type).toBe('validation')
+      expect(parsed.code).toBe('schema-mismatch')
+    })
+
+    it('maintains error history limit of 10 entries', () => {
+      localStorage.clear()
+      const store = useRandomanderStore()
+
+      for (let i = 0; i < 15; i++) {
+        const error = new ValidationError(
+          'schema-mismatch',
+          `Error ${i}`
+        )
+        store.setError(error)
+      }
+
+      expect(store.errorHistory.length).toBe(10)
+      // Most recent error should be at index 0
+      expect(store.errorHistory[0]?.message).toBe('Error 14')
+      // Oldest error should be at index 9
+      expect(store.errorHistory[9]?.message).toBe('Error 5')
+    })
+
+    it('clears error on clearError', () => {
+      localStorage.clear()
+      const store = useRandomanderStore()
+      const error = new ValidationError(
+        'schema-mismatch',
+        'Test error'
+      )
+
+      store.setError(error)
+      expect(store.lastError).not.toBeNull()
+
+      store.clearError()
+
+      expect(store.lastError).toBeNull()
+      expect(localStorage.getItem('randomander:state:v3:error')).toBeNull()
+    })
+
+    it('removes persisted error from localStorage on clearError', () => {
+      localStorage.clear()
+      const store = useRandomanderStore()
+      const error = new ValidationError(
+        'schema-mismatch',
+        'Test error'
+      )
+
+      store.setError(error)
+      expect(localStorage.getItem('randomander:state:v3:error')).toBeTruthy()
+
+      store.clearError()
+
+      expect(localStorage.getItem('randomander:state:v3:error')).toBeNull()
+    })
+
+    it('handles retryLastOperation when no error exists', async () => {
+      const store = useRandomanderStore()
+      // Mock randomize to avoid actual network calls
+      vi.spyOn(store, 'randomize').mockResolvedValue(undefined)
+
+      store.lastError = null
+      await store.retryLastOperation()
+
+      expect(store.randomize).not.toHaveBeenCalled()
+    })
+
+    it('clears error on successful retryLastOperation', async () => {
+      const store = useRandomanderStore()
+      const error = new ValidationError(
+        'schema-mismatch',
+        'Test error'
+      )
+
+      store.setError(error)
+      expect(store.lastError).not.toBeNull()
+
+      vi.spyOn(store, 'randomize').mockResolvedValue(undefined)
+      await store.retryLastOperation()
+
+      expect(store.lastError).toBeNull()
+    })
   })
 })

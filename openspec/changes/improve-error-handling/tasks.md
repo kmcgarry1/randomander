@@ -22,8 +22,8 @@
 
 ## 5. Error State Management in Pinia Store
 
-- [ ] 5.1 Add `lastError` and `errorHistory` properties to `src/stores/randomander.ts`; add `setError()`, `clearError()`, `retryLastOperation()` actions; persist `lastError` to `randomander:state:v3:error` localStorage key; verify store tests confirm state is set, persisted, and cleared correctly
-- [ ] 5.2 Update error handling in drawing workflow (`src/stores/drawWorkflow.ts`) to call store's `setError()` on failures; verify workflow tests confirm errors are captured and stored
+- [x] 5.1 Add `lastError` and `errorHistory` properties to `src/stores/randomander.ts`; add `setError()`, `clearError()`, `retryLastOperation()` actions; persist `lastError` to `randomander:state:v3:error` localStorage key; verify store tests confirm state is set, persisted, and cleared correctly
+- [x] 5.2 Update error handling in drawing workflow (`src/stores/drawWorkflow.ts`) to call store's `setError()` on failures; verify workflow tests confirm errors are captured and stored
 
 ## 6. Structured Logging
 
