@@ -143,7 +143,8 @@ describe("ChoiceOptionsSection reveal gating", () => {
 
   it("renders partner discovery button when available and revealed", () => {
     const commander = createCard("cmd", "Commander", {
-      partner_with: ["partner-name"],
+      oracle_text: "Partner with Other Card",
+      keywords: ["partner"],
     });
 
     render(ChoiceOptionsSection, {
@@ -235,7 +236,7 @@ describe("ChoiceOptionsSection reveal gating", () => {
 
   it("renders price badge with correct provider", () => {
     const commander = createCard("cmd", "Commander", {
-      prices: { cardmarket: "5.00" },
+      prices: { usd: "5.00" },
     });
 
     render(ChoiceOptionsSection, {
