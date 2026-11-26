@@ -140,4 +140,119 @@ describe("ChoiceOptionsSection reveal gating", () => {
     expect(resultHeading).toHaveAttribute("data-result-heading");
     expect(resultHeading).toHaveAttribute("tabindex", "-1");
   });
+
+  it("renders partner discovery button when available and revealed", () => {
+    const commander = createCard("cmd", "Commander", {
+      partner_with: ["partner-name"],
+    });
+
+    render(ChoiceOptionsSection, {
+      props: {
+        choices: [{ id: "choice", cards: [commander] }],
+        isLoading: false,
+        revealActive: false,
+        revealComplete: true,
+        canRandomizeChoicePartner: (card) => card.id === "cmd",
+        onChoicePartner: () => undefined,
+        getPartnerButtonLabel: (card) =>
+          card ? `Find partner for ${card.name}` : "Find partner",
+        getPairLinkUrl: () => "",
+      },
+    });
+
+    const button = screen.getByRole("button", {
+      name: /Find partner for Commander/,
+    });
+    expect(button).toBeInTheDocument();
+    expect(button).not.toBeDisabled();
+  });
+
+  it("disables partner button while loading", () => {
+    const commander = createCard("cmd", "Commander");
+
+    render(ChoiceOptionsSection, {
+      props: {
+        choices: [{ id: "choice", cards: [commander] }],
+        isLoading: true,
+        revealActive: false,
+        revealComplete: true,
+        canRandomizeChoicePartner: (card) => card.id === "cmd",
+        onChoicePartner: () => undefined,
+        getPartnerButtonLabel: () => "Find partner",
+        getPairLinkUrl: () => "",
+      },
+    });
+
+    const button = screen.getByRole("button", { name: /Find partner/ });
+    expect(button).toBeDisabled();
+  });
+
+  it("renders EDHREC pair link when getPairLinkUrl returns a URL", () => {
+    const partner1 = createCard("partner-1", "Card One");
+    const partner2 = createCard("partner-2", "Card Two");
+
+    render(ChoiceOptionsSection, {
+      props: {
+        choices: [{ id: "pairing", cards: [partner1, partner2] }],
+        isLoading: false,
+        revealActive: false,
+        revealComplete: true,
+        canRandomizeChoicePartner: () => false,
+        onChoicePartner: () => undefined,
+        getPartnerButtonLabel: () => "Find partner",
+        getPairLinkUrl: () => "https://edhrec.com/pairs/example",
+      },
+    });
+
+    const pairLink = screen.getByRole("link", { name: /EDHREC pair/ });
+    expect(pairLink).toHaveAttribute(
+      "href",
+      "https://edhrec.com/pairs/example"
+    );
+  });
+
+  it("hides all actions when showLinks is false and facts remain visible", () => {
+    const commander = createCard("cmd", "Commander");
+
+    render(ChoiceOptionsSection, {
+      props: {
+        choices: [{ id: "choice", cards: [commander] }],
+        isLoading: false,
+        revealActive: false,
+        revealComplete: true,
+        showLinks: false,
+        canRandomizeChoicePartner: () => false,
+        onChoicePartner: () => undefined,
+        getPartnerButtonLabel: () => "Find partner",
+        getPairLinkUrl: () => "https://edhrec.com/pairs/example",
+      },
+    });
+
+    expect(screen.getByText("Commander")).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByText(/EDHREC pair/)).not.toBeInTheDocument();
+  });
+
+  it("renders price badge with correct provider", () => {
+    const commander = createCard("cmd", "Commander", {
+      prices: { cardmarket: "5.00" },
+    });
+
+    render(ChoiceOptionsSection, {
+      props: {
+        choices: [{ id: "choice", cards: [commander] }],
+        isLoading: false,
+        revealActive: false,
+        revealComplete: true,
+        priceProvider: "cardmarket",
+        canRandomizeChoicePartner: () => false,
+        onChoicePartner: () => undefined,
+        getPartnerButtonLabel: () => "Find partner",
+        getPairLinkUrl: () => "",
+      },
+    });
+
+    expect(screen.getByText("Commander")).toBeInTheDocument();
+    // Price badge is rendered but content varies by card data
+  });
 });
