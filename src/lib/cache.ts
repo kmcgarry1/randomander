@@ -6,6 +6,7 @@ import {
 } from './storage'
 import { RuntimeDataError, isRecord } from './runtimeValidation'
 import { CacheError } from './appError'
+import { getGlobalErrorLogger } from './errorLogger'
 
 export type CacheEntry = {
   value: unknown
@@ -58,32 +59,39 @@ export type CacheStateDecodeResult =
 
 export const decodeCacheState = (stored: unknown): CacheStateDecodeResult => {
   const fallback = emptyCache()
+  const logger = getGlobalErrorLogger()
+
   if (stored === null || stored === undefined) {
     return { ok: true, value: fallback, migrated: false, repaired: false }
   }
   if (!isRecord(stored)) {
+    const error = new CacheError('corrupted', 'cache state is not a valid object')
+    logger.logError(error, 'cache-service', { severity: 'warn' })
     return {
       ok: false,
       value: fallback,
-      error: new CacheError('corrupted', 'cache state is not a valid object'),
+      error,
       migrated: false,
       repaired: true,
     }
   }
   const migrated = stored.version === undefined
   if (!migrated && stored.version !== CACHE_STATE_VERSION) {
+    const error = new CacheError(
+      'corrupted',
+      `unsupported cache version ${String(stored.version)}`
+    )
+    logger.logError(error, 'cache-service', { severity: 'warn', version: stored.version })
     return {
       ok: false,
       value: fallback,
-      error: new CacheError(
-        'corrupted',
-        `unsupported cache version ${String(stored.version)}`
-      ),
+      error,
       migrated: false,
       repaired: true,
     }
   }
   if (!isRecord(stored.entries)) {
+    logger.addBreadcrumb('cache entries repaired (not a valid object)')
     return {
       ok: true,
       value: fallback,

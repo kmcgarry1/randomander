@@ -2,6 +2,8 @@ import {
   recordStorageMetric,
   type StorageOutcome,
 } from './operationalMetrics'
+import { getGlobalErrorLogger } from './errorLogger'
+import { StorageError } from './appError'
 
 export type StorageFailureKind =
   | 'unavailable'
@@ -98,8 +100,15 @@ export const readStorage = <T>(key: string, fallback: T): T =>
 
 export const writeStorage = <T>(key: string, value: T): StorageResult => {
   const access = resolveStorage('setItem')
+  const logger = getGlobalErrorLogger()
+
   if (!access.ok) {
     recordOutcome(access.kind)
+    const error = new StorageError(
+      access.kind === 'quota' ? 'quota-exceeded' : 'write-failed',
+      `Failed to write to storage: ${access.kind}`
+    )
+    logger.logError(error, 'storage-service', { key, kind: access.kind })
     return access
   }
 
@@ -108,6 +117,11 @@ export const writeStorage = <T>(key: string, value: T): StorageResult => {
     const output = JSON.stringify(value)
     if (typeof output !== 'string') {
       recordOutcome('serialization')
+      const error = new StorageError(
+        'write-failed',
+        'Value cannot be serialized for Web Storage.'
+      )
+      logger.logError(error, 'storage-service', { key })
       return {
         ok: false,
         kind: 'serialization',
@@ -117,6 +131,11 @@ export const writeStorage = <T>(key: string, value: T): StorageResult => {
     serialized = output
   } catch (error) {
     recordOutcome('serialization')
+    const storageError = new StorageError(
+      'write-failed',
+      'Serialization error'
+    )
+    logger.logError(storageError, 'storage-service', { key })
     return { ok: false, kind: 'serialization', error }
   }
 
@@ -127,6 +146,11 @@ export const writeStorage = <T>(key: string, value: T): StorageResult => {
   } catch (error) {
     const kind = failureKind(error)
     recordOutcome(kind)
+    const storageError = new StorageError(
+      kind === 'quota' ? 'quota-exceeded' : 'write-failed',
+      `Write failed: ${kind}`
+    )
+    logger.logError(storageError, 'storage-service', { key, kind })
     return { ok: false, kind, error }
   }
 }

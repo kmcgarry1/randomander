@@ -1,5 +1,6 @@
 import { getCachedValue, setCachedValue } from '../lib/cache'
 import { NetworkError } from '../lib/appError'
+import { getGlobalErrorLogger } from '../lib/errorLogger'
 
 export type CacheOptions = {
   enabled: boolean
@@ -77,9 +78,11 @@ async function retryAsync<T>(
   operation: () => Promise<T>,
   signal?: AbortSignal,
   maxAttempts: number = RETRY_CONFIG.maxAttempts,
-  backoffMs: number[] = RETRY_CONFIG.backoffMs
+  backoffMs: number[] = RETRY_CONFIG.backoffMs,
+  requestId?: string
 ): Promise<T> {
   let lastError: Error | undefined
+  const logger = getGlobalErrorLogger()
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -95,10 +98,19 @@ async function retryAsync<T>(
       }
 
       if (attempt === maxAttempts || !isRetryable(lastError)) {
+        // Log error before throwing
+        if (lastError instanceof NetworkError) {
+          logger.logError(lastError, 'http-service', {
+            attempt,
+            maxAttempts,
+            requestId,
+          })
+        }
         throw lastError
       }
 
       const delay = backoffMs[attempt - 1] ?? backoffMs[backoffMs.length - 1]
+      logger.addBreadcrumb(`HTTP retry attempt ${attempt}/${maxAttempts} with ${delay}ms delay`)
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
@@ -178,9 +190,10 @@ export const fetchJson = async <T>(
   }
 
   // Wrap the entire request (including retries) in a retry wrapper
-  return retryAsync(async () => {
-    const requestController = new AbortController()
-    let didTimeout = false
+  return retryAsync(
+    async () => {
+      const requestController = new AbortController()
+      let didTimeout = false
     const onCallerAbort = () => requestController.abort()
     if (signal?.aborted) onCallerAbort()
     else signal?.addEventListener('abort', onCallerAbort, { once: true })
@@ -257,7 +270,12 @@ export const fetchJson = async <T>(
     }
 
     return data
-  })
+  },
+    signal,
+    RETRY_CONFIG.maxAttempts,
+    RETRY_CONFIG.backoffMs,
+    requestId
+  )
 }
 
 /**
