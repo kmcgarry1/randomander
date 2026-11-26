@@ -38,7 +38,7 @@
 
 ## 8. Recovery Actions UI Integration
 
-- [ ] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify tests confirm each action clears error state and triggers appropriate recovery logic
+- [x] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify tests confirm each action clears error state and triggers appropriate recovery logic
 - [ ] 8.2 Connect error UI recovery buttons to store actions; verify clicking each button invokes the correct action and updates UI state (loading → success/error)
 
 ## 9. Persistence and Cross-Session Recovery
