@@ -514,8 +514,8 @@ describe('Randomander state transitions', () => {
     expect(store.performance).toBeDefined()
 
     if (store.performance) {
-      store.performance.maxHttpConcurrency = 5
-      expect(store.performance.maxHttpConcurrency).toBe(5)
+      store.performance.reduceMotion = true
+      expect(store.performance.reduceMotion).toBe(true)
     }
   })
 
@@ -532,7 +532,6 @@ describe('Randomander state transitions', () => {
 
   it('maintains independence between result groups', () => {
     const store = useRandomanderStore()
-    const record = createRecord('multi-group')
     store.choices = [
       { id: 'group-1', cards: [createCard('card-1')] },
       { id: 'group-2', cards: [createCard('card-2')] },

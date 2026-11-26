@@ -181,7 +181,7 @@ describe('requireLegalPartnerPair', () => {
     const bg = createBackgroundCard()
     const chooseCard = createChooseBackgroundCard()
     // Should not throw if properly paired
-    if (bg.type_line.includes('Background')) {
+    if (bg.type_line?.includes('Background')) {
       // This would normally pass validation if implemented correctly
       const result = requireLegalPartnerPair(bg, chooseCard)
       expect(result).toBeDefined()

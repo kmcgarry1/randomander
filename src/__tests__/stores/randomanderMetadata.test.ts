@@ -198,7 +198,7 @@ describe('getMetadataFailureMessage', () => {
   })
 
   it('includes message in RuntimeDataError', () => {
-    const error = new RuntimeDataError('metadata', 'field', 'invalid structure')
+    const error = new RuntimeDataError('scryfall', 'field', 'invalid structure')
     const message = getMetadataFailureMessage(error)
     expect(message).toMatch(/invalid structure/)
   })

@@ -211,19 +211,29 @@ describe('fetchJson - Custom headers', () => {
   })
 
   it('includes Accept header in requests', async () => {
-    const fetchMock = vi.fn(() =>
+    const fetchMock = vi.fn((
+      _url: string | URL | Request,
+      _init?: RequestInit
+    ): Promise<Response> =>
       Promise.resolve(response(() => Promise.resolve({ ok: true })))
     )
     vi.stubGlobal('fetch', fetchMock)
 
     await fetchJson('https://example.test/headers')
 
-    const [, options] = fetchMock.mock.calls[0]!
-    expect(options.headers).toHaveProperty('Accept', 'application/json')
+    const call = fetchMock.mock.calls[0]
+    expect(call).toBeDefined()
+    if (call) {
+      const options = call[1] as RequestInit | undefined
+      expect(options?.headers).toHaveProperty('Accept', 'application/json')
+    }
   })
 
   it('merges custom headers with defaults', async () => {
-    const fetchMock = vi.fn(() =>
+    const fetchMock = vi.fn((
+      _url: string | URL | Request,
+      _init?: RequestInit
+    ): Promise<Response> =>
       Promise.resolve(response(() => Promise.resolve({ ok: true })))
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -232,9 +242,13 @@ describe('fetchJson - Custom headers', () => {
       headers: { 'X-Custom': 'header-value' },
     })
 
-    const [, options] = fetchMock.mock.calls[0]!
-    expect(options.headers).toHaveProperty('Accept', 'application/json')
-    expect(options.headers).toHaveProperty('X-Custom', 'header-value')
+    const call = fetchMock.mock.calls[0]
+    expect(call).toBeDefined()
+    if (call) {
+      const options = call[1] as RequestInit | undefined
+      expect(options?.headers).toHaveProperty('Accept', 'application/json')
+      expect(options?.headers).toHaveProperty('X-Custom', 'header-value')
+    }
   })
 })
 

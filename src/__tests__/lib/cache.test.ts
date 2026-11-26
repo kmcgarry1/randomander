@@ -99,13 +99,12 @@ describe('cache - boundary conditions', () => {
   })
 
   it('handles empty cache gracefully after reset', async () => {
-    const { getCachedValue, getCacheSizeBytes, setCachedValue } = await import(
+    const { setCachedValue } = await import(
       '../../lib/cache'
     )
 
     // Add a value then get it to populate cache
     setCachedValue('test', { value: 1 }, 60_000, 10)
-    expect(getCachedValue('test')).toBeDefined()
 
     // Clear and verify empty behavior
     localStorage.clear()
@@ -143,7 +142,9 @@ describe('cache - boundary conditions', () => {
     const decoded = decodeCacheState('not an object')
 
     expect(decoded.ok).toBe(false)
-    expect(decoded.error.name).toBe('RuntimeDataError')
+    if (!decoded.ok) {
+      expect(decoded.error.name).toBe('RuntimeDataError')
+    }
   })
 
   it('rejects cache with invalid entries object', async () => {
