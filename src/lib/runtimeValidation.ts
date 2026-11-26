@@ -1,19 +1,30 @@
+import { ValidationError } from './appError'
+
 export type RuntimeDataSource =
   | 'cache'
   | 'edhrec'
   | 'persisted-state'
   | 'scryfall'
 
-export class RuntimeDataError extends Error {
+/**
+ * Error thrown when runtime data validation fails.
+ * Extends ValidationError to integrate with unified error handling.
+ */
+export class RuntimeDataError extends ValidationError {
   readonly source: RuntimeDataSource
-  readonly path: string
-  readonly recoverable = true
 
   constructor(source: RuntimeDataSource, path: string, message: string) {
-    super(`${source} data is invalid at ${path}: ${message}`)
-    this.name = 'RuntimeDataError'
+    super('schema-mismatch', `${source} data is invalid at ${path}: ${message}`, {
+      sourceId: source,
+      requestId: '', // Will be populated if part of an HTTP flow
+      metadata: {
+        source,
+        fieldPath: path,
+        schema: '', // Can be populated with expected schema info
+      },
+    })
     this.source = source
-    this.path = path
+    Object.setPrototypeOf(this, RuntimeDataError.prototype)
   }
 }
 

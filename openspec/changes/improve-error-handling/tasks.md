@@ -8,8 +8,8 @@
 
 ## 2. HTTP Retry Logic
 
-- [ ] 2.1 Add retry configuration to `src/services/http.ts`: exponential backoff (100ms, 200ms, 400ms), max 3 attempts, skip retry on 4xx errors (except 408); verify unit tests confirm retry happens on timeout and 503, skips on 404
-- [ ] 2.2 Implement `retryAsync()` helper function in `src/services/http.ts` and use it in `fetchJson()`; verify tests cover all retry scenarios and final failure after max attempts
+- [x] 2.1 Add retry configuration to `src/services/http.ts`: exponential backoff (100ms, 200ms, 400ms), max 3 attempts, skip retry on 4xx errors (except 408); verify unit tests confirm retry happens on timeout and 503, skips on 404
+- [x] 2.2 Implement `retryAsync()` helper function in `src/services/http.ts` and use it in `fetchJson()`; verify tests cover all retry scenarios and final failure after max attempts
 
 ## 3. Runtime Validation Error Handling
 

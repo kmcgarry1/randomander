@@ -178,7 +178,8 @@ describe('EDHREC commander metadata', () => {
     await expect(fetchCommanderMeta('invalid-fixture')).rejects.toMatchObject({
       name: 'RuntimeDataError',
       source: 'edhrec',
-      recoverable: true,
+      type: 'validation',
+      code: 'schema-mismatch',
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -256,8 +257,8 @@ describe('EDHREC commander metadata', () => {
       await expect(fetchCommanderMeta(identifier)).rejects.toMatchObject({
         name: 'RuntimeDataError',
         source: 'edhrec',
-        path: 'identifier',
-        recoverable: true,
+        type: 'validation',
+        code: 'schema-mismatch',
       })
       expect(fetchMock).not.toHaveBeenCalled()
     }

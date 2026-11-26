@@ -73,7 +73,8 @@ describe('response cache budget', () => {
       error: {
         name: 'RuntimeDataError',
         source: 'cache',
-        recoverable: true,
+        type: 'validation',
+        code: 'schema-mismatch',
       },
       value: { entries: {} },
     })
