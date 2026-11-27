@@ -113,6 +113,10 @@ Before replaying a failed storage operation, the system SHALL verify affected ta
 - **WHEN** a tab cannot safely coordinate writes to storage recovery targets
 - **THEN** it blocks those persistent writes and warns the user, while allowing in-memory use
 
+#### Scenario: Preference changes await coordination
+- **WHEN** preferences change
+- **THEN** the system promptly queues a coordinated write and warns while it remains pending, without claiming it was saved before it completes
+
 #### Scenario: Failure left known partial effects
 - **WHEN** the failed operation already completed some storage changes before failing
 - **THEN** its recovery baseline accounts for those known effects before deciding whether replay is safe

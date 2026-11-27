@@ -65,6 +65,8 @@ For storage operations, the descriptor also records a validated baseline for eac
 
 All app-tab writes to recovery targets must participate in the same coordination. When coordination is unavailable, block those persistent writes and warn the user; otherwise an uncoordinated tab could race a recovery in another tab. In-memory use may continue. Recovery-record persistence remains separate and can still use its IndexedDB fallback.
 
+Preferences should be queued for coordinated persistence immediately rather than waiting for the former debounce, with a warning while writes are pending. A page may still terminate before an asynchronous lock is acquired; no successful save should be reported until the write completes.
+
 **Rationale:** UI needs access to current error state for display; persistence allows recovery across reloads. Centralizing in Pinia keeps state consistent.
 
 **Alternatives considered:**
