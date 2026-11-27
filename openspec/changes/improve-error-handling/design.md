@@ -63,6 +63,8 @@ Write the recovery record to localStorage under `randomander:state:v3:error` fir
 
 For storage operations, the descriptor also records a validated baseline for each affected target, including any known partial effects of the failed operation. Before replay, verify that the current targets still match that baseline. Coordinate the check and replay with other app-tab writes so a concurrent change cannot be overwritten between them. If a target has changed, its baseline cannot be verified, or safe coordination is unavailable, stop without applying the retry, preserve the current data and recovery state, and explain the conflict. The user may initiate a fresh operation against the current data.
 
+All app-tab writes to recovery targets must participate in the same coordination. When coordination is unavailable, block those persistent writes and warn the user; otherwise an uncoordinated tab could race a recovery in another tab. In-memory use may continue. Recovery-record persistence remains separate and can still use its IndexedDB fallback.
+
 **Rationale:** UI needs access to current error state for display; persistence allows recovery across reloads. Centralizing in Pinia keeps state consistent.
 
 **Alternatives considered:**

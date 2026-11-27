@@ -109,6 +109,10 @@ Before replaying a failed storage operation, the system SHALL verify affected ta
 - **WHEN** another app tab attempts to change an affected target during a storage retry
 - **THEN** the check and replay do not overwrite that intervening change
 
+#### Scenario: An app tab cannot coordinate its writes
+- **WHEN** a tab cannot safely coordinate writes to storage recovery targets
+- **THEN** it blocks those persistent writes and warns the user, while allowing in-memory use
+
 #### Scenario: Failure left known partial effects
 - **WHEN** the failed operation already completed some storage changes before failing
 - **THEN** its recovery baseline accounts for those known effects before deciding whether replay is safe
