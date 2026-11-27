@@ -10,23 +10,23 @@ Randomander currently handles errors inconsistently across network requests, dat
 - **User Feedback**: Display clear, actionable error messages to users instead of silent failures or generic alerts
 - **Developer Diagnostics**: Add structured logging and error context (error type, source, metadata) for debugging
 - **Graceful Degradation**: Implement fallback strategies (retry, cache fallback, partial results) for recoverable errors
-- **Error Recovery**: Persist error state and provide recovery options (clear cache, reload, try again)
+- **Error Recovery**: Persist error state and validated operation inputs for recovery after reload, using IndexedDB when localStorage fails; provide recovery options (clear cache, reload, try again) and report persistence failures
 - **Consistency**: Extend error handling across all data sources (Scryfall, EDHREC, local storage, cache)
 
 ## Capabilities
 
 ### New Capabilities
 
-- `error-handling/classification`: System-wide error type definitions (network, validation, storage, cache) with structured metadata
-- `error-handling/recovery`: Automatic and user-initiated recovery strategies for different error classes (retry, cache fallback, state reset)
-- `error-handling/user-feedback`: Error messages and UI indicators that communicate failures to users clearly and actionably
-- `error-handling/diagnostics`: Structured logging and error context for developer debugging and observability
+- `error-handling-classification`: System-wide error type definitions (network, validation, storage, cache) with structured metadata
+- `error-handling-recovery`: Automatic and user-initiated recovery strategies for different error classes (retry, cache fallback, state reset)
+- `error-handling-user-feedback`: Error messages and UI indicators that communicate failures to users clearly and actionably
+- `error-handling-diagnostics`: Structured logging and error context for developer debugging and observability
 
-### Modified Capabilities
+### Impacted Areas
 
-- `cache-management`: Error handling and recovery for cache read/write failures, corruption detection, and fallback to fresh API responses
-- `data-validation`: Validation errors that surface to users with context about what failed and why (not just silent rejection)
-- `api-requests`: Network error handling with timeout detection, partial failure recovery, and automatic retries for transient failures
+- Cache management: Error handling and recovery for cache read/write failures, corruption detection, and fallback to fresh API responses
+- Data validation: Validation errors that surface to users with context about what failed and why (not just silent rejection)
+- API requests: Network error handling with timeout detection, partial failure recovery, and automatic retries for transient failures
 
 ## Impact
 

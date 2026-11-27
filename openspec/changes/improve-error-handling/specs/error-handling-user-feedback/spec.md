@@ -26,19 +26,34 @@ When an error occurs, the system SHALL display a message that (1) describes what
 - **THEN** the UI displays: "Cached data is damaged. [Refresh] to get fresh data"
 
 ### Requirement: Error UI includes recovery buttons or links
-When an error occurs, the UI SHALL present recovery actions as buttons or interactive elements matching the error's recovery hints (e.g., [Retry], [Clear Cache], [Reset State]). Each button/link SHALL trigger the corresponding recovery action.
+When an error occurs, the UI SHALL present only applicable and working recovery actions as buttons or interactive elements matching the error's recovery hints (e.g., [Retry], [Clear Cache], [Reset State]). Each button/link SHALL trigger the corresponding recovery action. Retry SHALL NOT be offered when the failed operation cannot be restored and replayed.
 
 #### Scenario: Retry button appears for network error
 - **WHEN** a network error occurs with recovery hint `retry`
 - **THEN** a [Retry] button is displayed; clicking it reattempts the operation
 
 #### Scenario: Multiple recovery options for cache error
-- **WHEN** a cache-related error occurs
-- **THEN** buttons [Retry], [Clear Cache], and [Reset State] are displayed in order of likelihood to help
+- **WHEN** a cache-related error has several supported recovery options
+- **THEN** the applicable options are displayed in order of likelihood to help
 
 #### Scenario: Recovery action feedback updates UI
 - **WHEN** user clicks [Retry] or [Clear Cache and Retry]
 - **THEN** the UI shows a loading state; on success, the previous operation resumes; on failure, a new error message appears
+
+### Requirement: Recovery and stale-data warnings are visible
+The system SHALL clearly warn users when it displays stale cached data or cannot persist or clear recovery state.
+
+#### Scenario: Stale data is displayed
+- **WHEN** validation of fresh data fails and the system falls back to cached data
+- **THEN** the UI displays a "Showing cached data" warning alongside the result
+
+#### Scenario: Recovery cannot be saved
+- **WHEN** both recovery persistence backends fail
+- **THEN** the UI warns that the error and recovery action cannot be restored after reload
+
+#### Scenario: Persisted recovery state cannot be cleared
+- **WHEN** clearing a persisted recovery record fails
+- **THEN** the UI reports that the old recovery state may reappear after reload
 
 ### Requirement: Error state does not hide previous data
 When an error occurs, the system SHALL retain previously displayed data (e.g., last successful card suggestion, History list) while prominently displaying the error. If no previous data exists, an empty or placeholder state is shown with the error overlay.

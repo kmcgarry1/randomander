@@ -44,12 +44,16 @@ Each error log entry SHALL reference the previous 5 operations (breadcrumbs): op
 - **THEN** the error log includes breadcrumbs: "fetch scryfall card → cache write → fetch edhrec → validation error ← current"
 
 ### Requirement: Errors are tagged with request/trace IDs for correlation
-Each HTTP request SHALL receive a unique request ID (UUID or sequence). Errors from that request (validation, timeout, etc.) SHALL reference the request ID, enabling end-to-end tracing across logs.
+Each user operation SHALL receive an operation ID shared by its requests and retries. Each HTTP attempt SHALL receive a distinct request ID. Related logs and error context SHALL include the operation ID and, when associated with an HTTP attempt, its request ID.
 
 #### Scenario: Multiple errors from same request are correlated
-- **WHEN** an HTTP request fails and generates network, validation, and cache errors
-- **THEN** all three errors share the same request ID, linkable in logs
+- **WHEN** an HTTP attempt generates related network, validation, and cache errors
+- **THEN** those errors share its request ID and the operation ID, linkable in logs
 
 #### Scenario: Retry attempt has new request ID
 - **WHEN** a request is retried
-- **THEN** the retry generates a new request ID distinct from the original
+- **THEN** the retry has a new request ID distinct from the original and retains the same operation ID
+
+#### Scenario: An operation makes multiple HTTP requests
+- **WHEN** one user operation makes multiple HTTP requests
+- **THEN** their logs share the operation ID while each attempt has its own request ID

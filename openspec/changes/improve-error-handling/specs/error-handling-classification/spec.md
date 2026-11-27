@@ -19,7 +19,7 @@ The system SHALL classify all errors into predefined categories: `network` (conn
 
 #### Scenario: Storage quota exceeded is classified as storage error
 - **WHEN** localStorage.setItem throws a QuotaExceededError
-- **THEN** the system catches it, classifies it as type `storage`, code `quota-exceeded`, and suggests recovery action `clear-cache` or `export-and-clear`
+- **THEN** the system catches it, classifies it as type `storage`, code `quota-exceeded`, and suggests recovery hint `clear-cache` or `export-then-clear`
 
 #### Scenario: Cache corruption is detected and classified
 - **WHEN** cache decode returns an invalid or corrupted state

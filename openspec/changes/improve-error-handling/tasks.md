@@ -8,8 +8,8 @@
 
 ## 2. HTTP Retry Logic
 
-- [x] 2.1 Add retry configuration to `src/services/http.ts`: exponential backoff (100ms, 200ms, 400ms), max 3 attempts, skip retry on 4xx errors (except 408); verify unit tests confirm retry happens on timeout and 503, skips on 404
-- [x] 2.2 Implement `retryAsync()` helper function in `src/services/http.ts` and use it in `fetchJson()`; verify tests cover all retry scenarios and final failure after max attempts
+- [ ] 2.1 Configure `src/services/http.ts` for at most 3 total attempts with 100ms and 200ms delays; retry timeouts, connection failures, 408 and 5xx, but not other 4xx including 429; verify each case and cancellable backoff
+- [ ] 2.2 Update `retryAsync()` and `fetchJson()` to preserve the final classified network error code and record retry exhaustion in context; test exhaustion and successful retries
 
 ## 3. Runtime Validation Error Handling
 
@@ -22,33 +22,34 @@
 
 ## 5. Error State Management in Pinia Store
 
-- [x] 5.1 Add `lastError` and `errorHistory` properties to `src/stores/randomander.ts`; add `setError()`, `clearError()`, `retryLastOperation()` actions; persist `lastError` to `randomander:state:v3:error` localStorage key; verify store tests confirm state is set, persisted, and cleared correctly
+- [ ] 5.1 Update `lastError`, `errorHistory`, `setError()`, `clearError()`, and `retryLastOperation()` in `src/stores/randomander.ts` to retain recovery state on failure and explicitly report persistence and cleanup failures; verify state changes and failure paths in store tests
 - [ ] 5.2 Update error handling in drawing workflow (`src/stores/drawWorkflow.ts`) to call store's `setError()` on failures; verify workflow tests confirm errors are captured and stored
 
 ## 6. Structured Logging
 
 - [x] 6.1 Create `src/lib/errorLogger.ts` with `ErrorLogger` class that emits structured logs to console (JSON format) and in-memory buffer (max 50 entries); include timestamp, error type, source, metadata, breadcrumbs; verify tests confirm logging, buffer management, and export functionality
-- [ ] 6.2 Add request ID generation to `src/services/http.ts`: generate UUID for each request and include it in log entries; verify tests confirm all logs from same request share same request ID
-- [x] 6.3 Integrate `ErrorLogger` into HTTP service, cache, and storage to emit logs on all errors; verify unit tests confirm logs are emitted with correct structure
+- [ ] 6.2 Generate one operation ID per user operation and a distinct request ID per HTTP attempt; propagate IDs across retries and multiple requests, and test correlation
+- [ ] 6.3 Integrate `ErrorLogger` into HTTP service, cache, and storage to emit logs on errors with the applicable operation and attempt IDs; verify logs and context correlate correctly
 
 ## 7. User-Facing Error Messages
 
 - [x] 7.1 Create `src/lib/errorMessages.ts` with mapping from error type/code to user-friendly message template; include recovery action descriptions; verify message coverage for network, validation, storage, and cache errors
-- [ ] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show error message banner with recovery buttons ([Retry], [Clear Cache], [Reset State]) based on `store.lastError`; verify error UI appears when error is set and disappears when cleared
+- [ ] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show the error and only applicable, working recovery actions; verify error display, stale-cache warning, and persistence or cleanup failure warnings
 
 ## 8. Recovery Actions UI Integration
 
-- [ ] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify tests confirm each action clears error state and triggers appropriate recovery logic
+- [ ] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify they perform the correct operation, clear errors only on success or dismissal, and preserve recovery state on failure
 - [ ] 8.2 Connect error UI recovery buttons to store actions; verify clicking each button invokes the correct action and updates UI state (loading → success/error)
 
 ## 9. Persistence and Cross-Session Recovery
 
-- [ ] 9.1 Persist `lastError` to localStorage on every error; load persisted error on app init and display recovery message if error state exists; verify tests confirm persistence, reload, and display of persisted errors
-- [ ] 9.2 Verify that successful recovery (retry succeeds) clears persisted error; verify tests confirm persisted error is removed after successful operation
+- [ ] 9.1 Persist and restore the last error and a validated, serializable operation descriptor with inputs for draw, partner/choice, and storage operations; test reload and replay of each operation and reject invalid descriptors without offering a broken retry
+- [ ] 9.2 Clear persisted recovery records from both backends after successful recovery or dismissal; verify reload cannot resurrect old records and cleanup failures are reported
+- [ ] 9.3 Use localStorage first and IndexedDB when localStorage fails; test fallback, reload, and explicit warning with in-memory recovery when both backends fail
 
 ## 10. Test Coverage and Verification
 
-- [ ] 10.1 Add integration tests in `src/__tests__/stores/errorHandling.integration.test.ts` covering full error flow: API error → store error state → UI display → user retry → recovery; verify tests pass and coverage meets thresholds (>85% statements, >80% branches)
+- [ ] 10.1 Add integration tests in `src/__tests__/stores/errorHandling.integration.test.ts` covering error → store state → UI → retry → success or failure, including recovery after reload and persistence fallback; verify tests pass and coverage meets thresholds (>85% statements, >80% branches)
 - [ ] 10.2 Update existing tests in `src/__tests__/services/` and `src/__tests__/lib/` to verify error types are thrown correctly and error metadata is complete; verify all existing tests still pass
 
 ## 11. Documentation

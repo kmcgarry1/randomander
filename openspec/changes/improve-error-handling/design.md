@@ -19,7 +19,7 @@ See proposal.md for motivation and business drivers.
 - Track last error state in Pinia store for UI access and recovery
 - Implement automatic retry logic with exponential backoff for network errors
 - Provide cache fallback when validation fails on fresh data
-- Persist error state to localStorage for recovery across reloads
+- Persist error state and operation inputs for recovery across reloads, with an IndexedDB fallback
 - Emit structured logs (console, in-memory buffer) with full context for developer diagnostics
 - Extend HTTP service with retry logic and timeout standardization
 - Update cache decode/encode to classify cache errors explicitly
@@ -29,7 +29,7 @@ See proposal.md for motivation and business drivers.
 - Implement browser-side error reporting to external services (e.g., Sentry) — logging stays local
 - Build a UI for error history or error analytics — only last error is tracked
 - Add HTTP circuit breaker or complex fallback policies — simple retry/cache-fallback only
-- Modify persisted state storage beyond persisting last error state
+- Modify persisted application state beyond the recovery record
 - Change Scryfall or EDHREC API contract or add caching layers beyond existing cache
 
 ## Decisions
@@ -44,7 +44,7 @@ Create an `AppError` base class (extends `Error`) with subclasses for each error
 - Extend each built-in error type (TypeError, etc.): pollutes Error semantics; harder to track metadata
 
 ### Decision: Retry at HTTP Service Layer
-Implement automatic retry in `src/services/http.ts` `fetchJson()` for network errors (timeout, non-5xx errors like 503, connection refused). Retry logic: 3 attempts, exponential backoff (100ms, 200ms, 400ms). Do NOT retry on 4xx (client errors) except 408 (timeout).
+Implement automatic retry in `src/services/http.ts` `fetchJson()` for timeouts, connection failures, 5xx responses and HTTP 408. Use at most 3 total attempts with 100ms and 200ms backoff between attempts. Do not retry other 4xx responses, including 429; preserve the service's rate-limit handling. Cancellation interrupts backoff. When attempts are exhausted, preserve the final classified network error code and record retry exhaustion in its context.
 
 **Rationale:** Network errors are transient; retrying at the HTTP layer is transparent to callers. Backoff avoids overwhelming the server.
 
@@ -53,7 +53,9 @@ Implement automatic retry in `src/services/http.ts` `fetchJson()` for network er
 - Caller-driven retry: requires each call site to implement retry; verbose
 
 ### Decision: Error State in Pinia Store
-Add an `lastError` property to `randomanderStore` (Pinia) to track the last error and recovery hints. Include a `clearError()` and `retryLastOperation()` action. Persist last error to localStorage under `randomander:state:v3:error`.
+Add a `lastError` property to `randomanderStore` (Pinia) to track the last error and recovery hints. Include `clearError()` and `retryLastOperation()` actions. Persist the error and a validated, serializable descriptor containing the operation type and inputs needed to retry draw, partner/choice, and storage operations. Restore and validate the descriptor before offering retry after reload; do not offer a retry that cannot reproduce the failed operation.
+
+Write the recovery record to localStorage under `randomander:state:v3:error` first; if that fails, use IndexedDB. If both fail, retain the record in memory and notify the user that recovery across reloads is unavailable. On successful recovery or dismissal, clear persisted copies from both backends so an older error cannot reappear; report cleanup failures rather than silently claiming durable clearance. A failed recovery retains the error or replaces it with the new failure and its retryable operation.
 
 **Rationale:** UI needs access to current error state for display; persistence allows recovery across reloads. Centralizing in Pinia keeps state consistent.
 
@@ -62,7 +64,7 @@ Add an `lastError` property to `randomanderStore` (Pinia) to track the last erro
 - Emit error events: harder to query current error state; event-driven recovery is complex
 
 ### Decision: Cache Fallback on Validation Error
-When JSON validation fails on fresh API data, check cache for valid data from previous fetch. If cache hit, return cached data and queue a background refresh; if cache miss, surface validation error.
+When JSON validation fails on fresh API data, check the previously successful cache entry, including an expired entry, and validate it before use. If valid cached data exists, return it with provenance, log the validation failure, show a stale-data warning, and queue one background refresh; if no valid entry exists, surface the validation error. Clearing the cache must prevent an outstanding refresh from restoring cleared data.
 
 **Rationale:** Users tolerate slightly stale data better than a broken app; background refresh keeps data fresh.
 
@@ -76,14 +78,14 @@ Emit error logs (JSON format) to both console and an in-memory buffer. Buffer ho
 **Rationale:** Console logs are visible during development; in-memory buffer persists across page content changes (useful for diagnosing issues that happen during navigation).
 
 **Alternatives considered:**
-- IndexedDB storage: overkill for 50 errors; adds complexity
+- IndexedDB log storage: overkill for 50 errors; IndexedDB is used only as a fallback for the recovery record
 - Cloud logging: out of scope; privacy concern
 - Console only: not persisted; lost on page navigation
 
-### Decision: Request ID Correlation
-Generate a UUID for each HTTP request. Store it in request headers and include it in all related error logs. This enables tracing a single user request through multiple API calls and error events.
+### Decision: Operation and Request ID Correlation
+Generate an operation ID for each user operation and a distinct request ID for each HTTP attempt. Propagate the operation ID across its requests and retries, and include both identifiers in related logs and error context. Send request identifiers in headers where supported.
 
-**Rationale:** Developers can grep logs by request ID to understand what happened to a specific API call.
+**Rationale:** Developers can trace a complete operation across attempts while distinguishing individual HTTP requests.
 
 **Alternatives considered:**
 - Use timestamp + URL as ID: not unique; two simultaneous requests to same URL collide
@@ -103,10 +105,10 @@ Implement recovery actions (`retry`, `clearCache`, `resetState`, etc.) as Pinia 
 → **Mitigation:** Always queue a background refresh and surface a warning badge to users ("Showing cached data"). Log validation error for diagnostics.
 
 **[Risk]** In-memory error buffer is lost on page reload (design intent, but means no persistent error history).
-→ **Mitigation:** Persist last error to localStorage; app can display it on next load. Full history is not needed for recovery.
+→ **Mitigation:** Persist the last error and recovery descriptor using localStorage or the IndexedDB fallback; app can display it on next load. Full history is not needed for recovery.
 
-**[Risk]** Request ID correlation only works for single-request operations; multi-request workflows (e.g., fetch card then fetch EDHREC data) need separate IDs.
-→ **Mitigation:** Accept this limitation for initial release. Future work can add operation/session IDs if needed.
+**[Risk]** Both recovery persistence backends can be unavailable or full.
+→ **Mitigation:** Retain the current recovery state in memory and explicitly warn that it cannot be restored after reload.
 
 ## Open Questions
 
