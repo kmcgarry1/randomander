@@ -35,4 +35,14 @@ describe("Draw recovery messaging", () => {
     expect(randomize).toHaveTextContent("Shuffling...");
     store.cancelActiveRequest();
   });
+
+  it("warns when the current result includes stale cached data", () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = useRandomanderStore();
+    store.showingCachedData = true;
+    render(DrawView, { global: { plugins: [pinia] } });
+
+    expect(screen.getByText(/showing cached data/i)).toBeVisible();
+  });
 });

@@ -71,9 +71,9 @@ describe('response cache budget', () => {
     expect(decoded).toMatchObject({
       ok: false,
       error: {
-        name: 'RuntimeDataError',
-        source: 'cache',
-        recoverable: true,
+        name: 'CacheError',
+        type: 'cache',
+        code: 'corrupted',
       },
       value: { entries: {} },
     })
@@ -143,7 +143,9 @@ describe('cache - boundary conditions', () => {
 
     expect(decoded.ok).toBe(false)
     if (!decoded.ok) {
-      expect(decoded.error.name).toBe('RuntimeDataError')
+      expect(decoded.error.name).toBe('CacheError')
+      expect(decoded.error.type).toBe('cache')
+      expect(decoded.error.code).toBe('corrupted')
     }
   })
 

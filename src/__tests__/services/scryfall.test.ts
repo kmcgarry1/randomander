@@ -65,12 +65,14 @@ describe('Scryfall request policy', () => {
       vi.stubGlobal('fetch', fetchMock)
       vi.spyOn(Math, 'random').mockReturnValue(randomValue as number)
       const { fetchRankedRandomCard } = await import('../../services/scryfall')
+      const onAttempt = vi.fn()
 
-      const result = fetchRankedRandomCard('is:commander')
+      const result = fetchRankedRandomCard('is:commander', undefined, onAttempt)
       await vi.runAllTimersAsync()
 
       await expect(result).resolves.toMatchObject({ id: expectedId })
       expect(fetchMock).toHaveBeenCalledTimes(expectedPage === 1 ? 1 : 2)
+      expect(onAttempt).toHaveBeenCalledTimes(fetchMock.mock.calls.length)
       if (expectedPage > 1) {
         expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
           `&page=${expectedPage}`
@@ -101,6 +103,42 @@ describe('Scryfall request policy', () => {
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       headers: { Accept: 'application/json;q=0.9,*/*;q=0.8' },
     })
+  })
+
+  it('paces retries alongside concurrent Scryfall requests', async () => {
+    const starts: number[] = []
+    const fetchMock = vi.fn(() => {
+      starts.push(Date.now())
+      return Promise.resolve(starts.length === 1
+        ? new Response('', { status: 503 })
+        : createCardResponse(String(starts.length)))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchRandomCard } = await import('../../services/scryfall')
+
+    const first = fetchRandomCard('first')
+    const second = fetchRandomCard('second')
+    await vi.advanceTimersByTimeAsync(500)
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+    expect(starts).toHaveLength(3)
+    expect(starts[1]! - starts[0]!).toBeGreaterThanOrEqual(150)
+    expect(starts[2]! - starts[1]!).toBeGreaterThanOrEqual(150)
+  })
+
+  it('blocks a pending retry when another request starts a 429 cooldown', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response('', { status: 429 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchRandomCard } = await import('../../services/scryfall')
+
+    const first = fetchRandomCard('first')
+    const firstRejection = expect(first).rejects.toMatchObject({ kind: 'rate-limit' })
+    const second = fetchRandomCard('second')
+    const secondRejection = expect(second).rejects.toMatchObject({ kind: 'rate-limit' })
+    await vi.advanceTimersByTimeAsync(1_000)
+    await Promise.all([firstRejection, secondRejection])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('does not retry a 429 and blocks follow-up traffic during cooldown', async () => {
@@ -151,6 +189,8 @@ describe('Scryfall request policy', () => {
       .mockRejectedValueOnce(
         new TypeError('NetworkError when attempting to fetch resource.')
       )
+      .mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource.'))
+      .mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource.'))
       .mockResolvedValueOnce(createCardResponse('online'))
     vi.stubGlobal('fetch', fetchMock)
     const { fetchRandomCard } = await import('../../services/scryfall')
@@ -160,29 +200,28 @@ describe('Scryfall request policy', () => {
       kind: 'network',
       recoverable: true,
     })
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(350)
     await firstRejection
 
     const recovered = fetchRandomCard('is:commander')
-    await vi.advanceTimersByTimeAsync(149)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(150)
 
     await expect(recovered).resolves.toMatchObject({ id: 'online' })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
   })
 
   it('cancels a queued request without sending it', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(createCardResponse('one')))
     vi.stubGlobal('fetch', fetchMock)
     const { fetchRandomCard } = await import('../../services/scryfall')
+    const onAttempt = vi.fn()
 
-    const first = fetchRandomCard('is:commander')
+    const first = fetchRandomCard('is:commander', undefined, onAttempt)
     await vi.advanceTimersByTimeAsync(0)
     await first
 
     const controller = new AbortController()
-    const queued = fetchRandomCard('is:commander', controller.signal)
+    const queued = fetchRandomCard('is:commander', controller.signal, onAttempt)
     const queuedRejection = expect(queued).rejects.toMatchObject({
       name: 'AbortError',
     })
@@ -191,6 +230,30 @@ describe('Scryfall request policy', () => {
 
     await queuedRejection
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onAttempt).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not start or charge an attempt when the draw deadline expires during pacing', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(createCardResponse('one')))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchRandomCard } = await import('../../services/scryfall')
+    const { createDrawWorkflowContext, DRAW_WORKFLOW_DEADLINE_MS } =
+      await import('../../stores/drawWorkflow')
+    const workflow = createDrawWorkflowContext('deadline', {})
+
+    await vi.advanceTimersByTimeAsync(DRAW_WORKFLOW_DEADLINE_MS - 149)
+    const first = fetchRandomCard('first')
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    const queued = fetchRandomCard('second', workflow.signal, workflow.consumeCalls)
+    const rejection = expect(queued).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(149)
+    await rejection
+
+    expect(workflow.stopReason).toBe('timeout')
+    expect(workflow.callsUsed).toBe(0)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    workflow.finish()
   })
 
   it('rejects an aborted request immediately while an earlier request is in flight', async () => {
@@ -253,7 +316,7 @@ describe('Scryfall request policy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('returns a typed recoverable data error for a malformed card response', async () => {
+  it('throws validation error when cache is empty and response is malformed', async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -267,17 +330,202 @@ describe('Scryfall request policy', () => {
 
     const draw = fetchRandomCard('is:commander')
     const rejection = expect(draw).rejects.toMatchObject({
-      name: 'ScryfallRequestError',
-      kind: 'data',
-      recoverable: true,
-      cause: {
-        name: 'RuntimeDataError',
-        source: 'scryfall',
-      },
+      name: 'RuntimeDataError',
+      type: 'validation',
+      source: 'scryfall',
     })
     await vi.advanceTimersByTimeAsync(0)
     await rejection
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses a validated stale card after a malformed response and refreshes it', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createCardResponse('stale'))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ id: 'invalid' }),
+      } as Response)
+      .mockResolvedValueOnce(createCardResponse('refreshed'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10 }
+    const onAttempt = vi.fn()
+
+    const first = fetchCardByExactName('Card', undefined, cache, undefined, onAttempt)
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(first).resolves.toMatchObject({ id: 'stale' })
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    const fallback = fetchCardByExactName('Card', undefined, cache, undefined, onAttempt)
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(fallback).resolves.toMatchObject({ id: 'stale' })
+    await vi.advanceTimersByTimeAsync(150)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    await expect(fetchCardByExactName('Card', undefined, cache, undefined, onAttempt))
+      .resolves.toMatchObject({ id: 'refreshed' })
+    expect(onAttempt).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not use a malformed stale card as fallback', async () => {
+    const { setCachedValue } = await import('../../lib/cache')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10, key: 'stale-invalid' }
+    setCachedValue(cache.key, { id: 'invalid' }, cache.ttlMs, cache.maxEntries)
+    await vi.advanceTimersByTimeAsync(1_000)
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ id: 'invalid' }),
+    } as Response)))
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const pending = fetchCardByExactName('Card', undefined, cache)
+    const rejection = expect(pending).rejects.toMatchObject({ type: 'validation' })
+    await vi.advanceTimersByTimeAsync(0)
+    await rejection
+  })
+
+  it('uses validated stale data when fresh JSON cannot be parsed', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createCardResponse('stale'))
+      .mockResolvedValueOnce(new Response('invalid JSON', { status: 200 }))
+      .mockResolvedValueOnce(createCardResponse('refreshed'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10 }
+
+    const first = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    await vi.advanceTimersByTimeAsync(1_000)
+    const fallback = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(fallback).resolves.toMatchObject({ id: 'stale' })
+    await vi.advanceTimersByTimeAsync(150)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('paces background refresh retries without charging the originating operation', async () => {
+    const starts: number[] = []
+    const fetchMock = vi.fn(() => {
+      starts.push(Date.now())
+      if (starts.length === 2) {
+        return Promise.resolve(new Response('invalid JSON', { status: 200 }))
+      }
+      if (starts.length === 3) {
+        return Promise.resolve(new Response('', { status: 503 }))
+      }
+      return Promise.resolve(createCardResponse(starts.length === 1 ? 'stale' : 'refreshed'))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10 }
+    const onAttempt = vi.fn()
+
+    const first = fetchCardByExactName('Card', undefined, cache, undefined, onAttempt)
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    await vi.advanceTimersByTimeAsync(1_000)
+    const fallback = fetchCardByExactName('Card', undefined, cache, undefined, onAttempt)
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(fallback).resolves.toMatchObject({ id: 'stale' })
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(starts).toHaveLength(4)
+    expect(starts[3]! - starts[2]!).toBeGreaterThanOrEqual(150)
+    expect(onAttempt).toHaveBeenCalledTimes(2)
+    await expect(fetchCardByExactName('Card', undefined, cache, undefined, onAttempt))
+      .resolves.toMatchObject({ id: 'refreshed' })
+    expect(onAttempt).toHaveBeenCalledTimes(2)
+  })
+
+  it('logs a failed background refresh without scheduling another refresh', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createCardResponse('stale'))
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ id: 'invalid' }),
+      } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const { getGlobalErrorLogger } = await import('../../lib/errorLogger')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10 }
+
+    const first = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    await vi.advanceTimersByTimeAsync(1_000)
+    const fallback = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(fallback).resolves.toMatchObject({ id: 'stale' })
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(getGlobalErrorLogger().getBuffer()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: 'scryfall-cache-refresh' })])
+    )
+  })
+
+  it('does not repopulate the cache after it is cleared during a refresh', async () => {
+    let finishRefresh: ((value: Response) => void) | undefined
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createCardResponse('stale'))
+      .mockResolvedValueOnce({
+        ok: true, status: 200, headers: new Headers(),
+        json: async () => ({ id: 'invalid' }),
+      } as Response)
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => {
+        finishRefresh = resolve
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const { clearCache, getCachedValue } = await import('../../lib/cache')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10, key: 'named-card' }
+    const first = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    await vi.advanceTimersByTimeAsync(1_000)
+    const fallback = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await fallback
+    await vi.advanceTimersByTimeAsync(150)
+    expect(finishRefresh).toBeDefined()
+
+    clearCache()
+    finishRefresh?.(createCardResponse('refreshed'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(getCachedValue(cache.key)).toBeNull()
+  })
+
+  it('does not return stale data if the cache is cleared while fetching', async () => {
+    let finishFetch: ((value: Response) => void) | undefined
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createCardResponse('stale'))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => {
+        finishFetch = resolve
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const { clearCache } = await import('../../lib/cache')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10 }
+    const first = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    await vi.advanceTimersByTimeAsync(1_000)
+    const pending = fetchCardByExactName('Card', undefined, cache)
+    const rejection = expect(pending).rejects.toMatchObject({ type: 'validation' })
+    await vi.advanceTimersByTimeAsync(0)
+    clearCache()
+    finishFetch?.({
+      ok: true, status: 200, headers: new Headers(),
+      json: async () => ({ id: 'invalid' }),
+    } as Response)
+    await rejection
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('rejects malformed ranked search envelopes without a follow-up request', async () => {
@@ -293,7 +541,7 @@ describe('Scryfall request policy', () => {
     const { fetchRankedRandomCard } = await import('../../services/scryfall')
 
     const draw = fetchRankedRandomCard('is:commander')
-    const rejection = expect(draw).rejects.toMatchObject({ kind: 'data' })
+    const rejection = expect(draw).rejects.toMatchObject({ type: 'validation' })
     await vi.advanceTimersByTimeAsync(0)
     await rejection
     expect(fetchMock).toHaveBeenCalledTimes(1)

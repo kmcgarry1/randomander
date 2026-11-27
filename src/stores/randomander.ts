@@ -37,6 +37,7 @@ import {
   RequestTimeoutError,
   type CacheOptions,
 } from '../services/http'
+import { type AppError } from '../lib/appError'
 import {
   createDrawWorkflowContext,
   DRAW_WORKFLOW_DEADLINE_MS,
@@ -325,6 +326,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const sparkPalette = ref<string[] | null>(null)
   const isLoading = ref(false)
   const errorMessage = ref('')
+  const showingCachedData = ref(false)
+  const lastError = ref<AppError | null>(null)
+  const errorHistory = ref<AppError[]>([])
   const initialPersistenceFailure: StorageFailureKind | null =
     loadedPersistence.failures[0] ?? null
   const persistenceError = ref(
@@ -337,6 +341,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const resultProvenance = shallowRef<ResultProvenance | null>(null)
 
   let activeWorkflow: ActiveDrawWorkflow | null = null
+  const workflowsUsingStaleCache = new WeakSet<ActiveDrawWorkflow>()
   let suppressQueryInvalidation = false
   let suppressPersistenceWatch = false
   let persistenceCoordinator: ReturnType<
@@ -866,6 +871,58 @@ export const useRandomanderStore = defineStore('randomander', () => {
     if (message !== null) errorMessage.value = message
   }
 
+  const setError = (error: AppError) => {
+    lastError.value = error
+    // Keep last 10 errors in history
+    errorHistory.value.unshift(error)
+    if (errorHistory.value.length > 10) {
+      errorHistory.value.pop()
+    }
+    // Persist error to localStorage
+    try {
+      localStorage.setItem('randomander:state:v3:error', JSON.stringify(error))
+    } catch (e) {
+      // Silently fail if localStorage is unavailable
+    }
+  }
+
+  const clearError = () => {
+    lastError.value = null
+    // Clear persisted error
+    try {
+      localStorage.removeItem('randomander:state:v3:error')
+    } catch (e) {
+      // Silently fail if localStorage is unavailable
+    }
+  }
+
+  const retryLastOperation = async () => {
+    if (!lastError.value) return
+    clearError()
+    // Retry the last draw operation
+    await randomize()
+  }
+
+  const clearCacheAndRetry = async () => {
+    clearError()
+    // Clear the response cache for Scryfall data
+    clearCache()
+    // Retry the last draw operation
+    await randomize()
+  }
+
+  const resetState = async () => {
+    clearError()
+    // Clear error state and reset to initial conditions
+    errorMessage.value = ''
+    showingCachedData.value = false
+    cards.value = []
+    choices.value = []
+    sparkPalette.value = null
+    resultProvenance.value = null
+    // Don't clear history/saved - those are user data
+  }
+
   const cancelActiveRequest = () => {
     if (!activeWorkflow) return false
     const workflow = activeWorkflow
@@ -880,6 +937,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     choices.value = []
     sparkPalette.value = null
     resultProvenance.value = null
+    showingCachedData.value = false
     errorMessage.value = ''
   }
 
@@ -897,7 +955,6 @@ export const useRandomanderStore = defineStore('randomander', () => {
     }
     const cached = metaCache.get(slug)
     if (cached) return cached
-    workflow?.consumeCalls()
     if (!AUTOMATED_EDHREC_METADATA_ENABLED) {
       throw new Error('Automated EDHREC metadata is disabled in this build.')
     }
@@ -905,7 +962,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
     const meta = await fetchCommanderMeta(
       slug,
       signal,
-      workflow?.config.cacheOptions ?? cacheOptions.value
+      workflow?.config.cacheOptions ?? cacheOptions.value,
+      workflow?.consumeCalls
     )
     metaCache.set(slug, meta)
     return meta
@@ -961,10 +1019,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     )
 
     while (true) {
-      workflow.consumeCalls(useRankedRandom ? 2 : 1)
       const card = useRankedRandom
-        ? await fetchRankedRandomCard(constrainedQuery, workflow.signal)
-        : await fetchRandomCard(constrainedQuery, workflow.signal)
+        ? await fetchRankedRandomCard(constrainedQuery, workflow.signal, workflow.consumeCalls)
+        : await fetchRandomCard(constrainedQuery, workflow.signal, workflow.consumeCalls)
       if (
         !colorFilter.matchesCandidate(card, palette) ||
         !extraFilter(card)
@@ -993,11 +1050,13 @@ export const useRandomanderStore = defineStore('randomander', () => {
           'Unable to find a named partner for this commander.'
         )
       }
-      workflow.consumeCalls()
+      let usedStaleCache = false
       const partner = await fetchCardByExactName(
         partnerName,
         workflow.signal,
-        config.cacheOptions
+        config.cacheOptions,
+        () => { usedStaleCache = true },
+        workflow.consumeCalls
       )
       if (!(await passesDeckLimit(partner, workflow))) {
         throw new CandidateMismatchError(
@@ -1016,6 +1075,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
           `That partner pair does not match ${pairColorFilter.ui.summary}.`
         )
       }
+      if (usedStaleCache) workflowsUsingStaleCache.add(workflow)
       return partner
     }
     if (partnerKind === 'choose_background') {
@@ -1326,6 +1386,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
         }),
       })
       errorMessage.value = ''
+      showingCachedData.value = false
       isLoading.value = false
     } finally {
       suppressQueryInvalidation = false
@@ -1398,6 +1459,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     assertCurrentWorkflow(workflow)
     const provenance = provenanceFromConfig(workflow.config)
     resultProvenance.value = provenance
+    showingCachedData.value = workflowsUsingStaleCache.has(workflow)
     cards.value = result.choices ? [] : result.cards
     choices.value = result.choices ?? []
     sparkPalette.value = result.sparkPalette ?? null
@@ -1509,6 +1571,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       choices.value = []
       sparkPalette.value = null
       resultProvenance.value = provenance
+      showingCachedData.value = workflowsUsingStaleCache.has(workflow)
       addHistory(buildRecord(cards.value, undefined, provenance))
     } catch (error) {
       handleWorkflowError(error, workflow, 'Unable to fetch a partner.')
@@ -1548,6 +1611,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       }
       const provenance = provenanceFromConfig(workflow.config)
       resultProvenance.value = provenance
+      showingCachedData.value = showingCachedData.value || workflowsUsingStaleCache.has(workflow)
       addHistory(buildRecord([], choices.value, provenance))
     } catch (error) {
       handleWorkflowError(error, workflow, 'Unable to fetch a partner.')
@@ -1569,6 +1633,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       choices.value = []
       sparkPalette.value = null
       resultProvenance.value = provenance
+      showingCachedData.value = false
       addHistory(buildRecord(cards.value, undefined, provenance))
     } catch (error) {
       handleWorkflowError(error, workflow, 'Unable to fetch a commander.')
@@ -1982,6 +2047,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     sparkPalette,
     isLoading,
     errorMessage,
+    showingCachedData,
+    lastError,
+    errorHistory,
     persistenceError,
     persistenceNotice,
     metadataStateLookup,
@@ -2029,6 +2097,11 @@ export const useRandomanderStore = defineStore('randomander', () => {
     isRecordSaved,
     randomize,
     cancelActiveRequest,
+    setError,
+    clearError,
+    retryLastOperation,
+    clearCacheAndRetry,
+    resetState,
     randomizePartnerForPrimary,
     randomizePartnerForChoice,
     addHistory,

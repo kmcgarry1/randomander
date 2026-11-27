@@ -5,6 +5,8 @@ import {
   type StorageResult,
 } from './storage'
 import { RuntimeDataError, isRecord } from './runtimeValidation'
+import { CacheError } from './appError'
+import { getGlobalErrorLogger } from './errorLogger'
 
 export type CacheEntry = {
   value: unknown
@@ -20,7 +22,7 @@ export type CacheState = {
   entries: Record<string, CacheEntry>
 }
 
-const CACHE_KEY = 'randomander:cache:v1'
+export const CACHE_KEY = 'randomander:cache:v1'
 export const DEFAULT_CACHE_MAX_BYTES = 1_500_000
 
 const emptyCache = (): CacheState => ({
@@ -50,40 +52,46 @@ export type CacheStateDecodeResult =
   | {
       ok: false
       value: CacheState
-      error: RuntimeDataError
+      error: RuntimeDataError | CacheError
       migrated: false
       repaired: true
     }
 
 export const decodeCacheState = (stored: unknown): CacheStateDecodeResult => {
   const fallback = emptyCache()
+  const logger = getGlobalErrorLogger()
+
   if (stored === null || stored === undefined) {
     return { ok: true, value: fallback, migrated: false, repaired: false }
   }
   if (!isRecord(stored)) {
+    const error = new CacheError('corrupted', 'cache state is not a valid object')
+    logger.logError(error, 'cache-service', { severity: 'warn' })
     return {
       ok: false,
       value: fallback,
-      error: new RuntimeDataError('cache', 'root', 'expected a versioned object'),
+      error,
       migrated: false,
       repaired: true,
     }
   }
   const migrated = stored.version === undefined
   if (!migrated && stored.version !== CACHE_STATE_VERSION) {
+    const error = new CacheError(
+      'corrupted',
+      `unsupported cache version ${String(stored.version)}`
+    )
+    logger.logError(error, 'cache-service', { severity: 'warn', version: stored.version })
     return {
       ok: false,
       value: fallback,
-      error: new RuntimeDataError(
-        'cache',
-        'version',
-        `unsupported version ${String(stored.version)}`
-      ),
+      error,
       migrated: false,
       repaired: true,
     }
   }
   if (!isRecord(stored.entries)) {
+    logger.addBreadcrumb('cache entries repaired (not a valid object)')
     return {
       ok: true,
       value: fallback,
@@ -123,6 +131,9 @@ const loadCache = (): CacheState => {
 }
 
 let cacheState: CacheState = loadCache()
+let cacheGeneration = 0
+
+export const getCacheGeneration = () => cacheGeneration
 
 const serializedBytes = (value: unknown): number => {
   try {
@@ -162,13 +173,16 @@ const isExpired = (entry: CacheEntry) => entry.expiresAt <= Date.now()
 
 export const getCachedValue = <T>(
   key: string,
-  decode?: (value: unknown) => T
+  decode?: (value: unknown) => T,
+  options?: { allowExpired?: boolean; preserveExpired?: boolean }
 ): T | null => {
   const entry = cacheState.entries[key]
   if (!entry) return null
-  if (isExpired(entry)) {
-    delete cacheState.entries[key]
-    persistCache()
+  if (isExpired(entry) && !options?.allowExpired) {
+    if (!options?.preserveExpired) {
+      delete cacheState.entries[key]
+      persistCache()
+    }
     return null
   }
   if (!decode) return entry.value as T
@@ -225,6 +239,7 @@ export const setCachedValue = (
 }
 
 export const clearCache = (): StorageResult => {
+  cacheGeneration += 1
   cacheState = emptyCache()
   return persistCache()
 }
@@ -234,6 +249,9 @@ export const clearCache = (): StorageResult => {
 // when deletion fails so the caller can safely retry.
 export const removeCache = (): StorageResult => {
   const result = removeStorage(CACHE_KEY)
-  if (result.ok) cacheState = emptyCache()
+  if (result.ok) {
+    cacheGeneration += 1
+    cacheState = emptyCache()
+  }
   return result
 }

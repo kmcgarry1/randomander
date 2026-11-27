@@ -153,7 +153,7 @@ Every draw or follow-up pairing creates a new `AbortController` and aborts the p
 
 ### Candidate bounds
 
-Every draw and follow-up uses one frozen request context with a shared 24-call ceiling and ten-second deadline. A ranked candidate reserves two calls because it can require an index lookup and page fetch. This avoids an infinite or multiplicative loop when filters describe an empty or extremely rare pool. A failure remains actionable: the UI tells the user that no matching result was found so filters can be relaxed.
+Every draw and follow-up uses one frozen request context with a shared 24-call ceiling and ten-second deadline. Each actual HTTP attempt counts once, including retries and both requests in a ranked lookup; cache hits do not consume calls. A stale-cache background refresh is a separate operation outside the originating draw's budget. This avoids an infinite or multiplicative loop when filters describe an empty or extremely rare pool. A failure remains actionable: the UI tells the user that no matching result was found so filters can be relaxed.
 
 ### History timing
 
@@ -242,7 +242,7 @@ The public build performs no post-reveal EDHREC request. In the test-only adapte
 - checks the optional persistent cache before a request;
 - sends an abort signal to `fetch`;
 - parses JSON for successful responses;
-- throws a normalized `HttpError` for non-2xx responses;
+- classifies network and response errors, and retries timeouts, connection failures, HTTP 408, and 5xx responses up to three total attempts with 100 ms and 200 ms minimum backoffs;
 - retains `Retry-After` information;
 - writes eligible successful responses to cache.
 
@@ -252,7 +252,7 @@ Keep endpoint-specific schema handling out of this generic layer. Scryfall and E
 
 `src/services/scryfall.ts` owns upstream courtesy and failure policy:
 
-- request starts are globally spaced by at least 150 ms;
+- all request starts, including retries and background refreshes, are globally spaced by at least 150 ms;
 - queued requests can be aborted before starting;
 - HTTP 429 starts an in-memory cooldown of at least 60 seconds or the longer upstream `Retry-After`;
 - ordinary network/CORS `TypeError` failures do not start that cooldown, allowing immediate recovery after connectivity returns;

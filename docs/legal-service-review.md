@@ -23,7 +23,7 @@ Scryfall's current API documentation asks browser clients to retain the browser 
 - [x] Browser requests retain the browser User-Agent and use HTTPS.
 - [x] The browser supplies an Accept header; the app does not attempt to replace its protected User-Agent.
 - [x] Request starts are paced at 150 ms (below 10 requests per second).
-- [x] One draw has a shared 24-call/10-second ceiling and stops immediately on transport/rate-limit failures.
+- [x] One draw has a shared 24-call/10-second ceiling, counts transport retries, and stops immediately on rate-limit failures.
 - [x] HTTP 429 creates a bounded cooldown instead of a retry-through loop.
 - [ ] Browser evidence proves every displayed card image is contained at its native aspect ratio, unobscured, and visually unmodified.
 - [ ] The former blurred/cropped `art_crop` backdrop is absent from the production bundle and network log.

@@ -129,7 +129,8 @@ describe('versioned persisted-state decoding', () => {
     expect(decoded.error).toMatchObject({
       name: 'RuntimeDataError',
       source: 'persisted-state',
-      recoverable: true,
+      type: 'validation',
+      code: 'schema-mismatch',
     })
     expect(decoded.value).toMatchObject({
       version: PERSISTED_STATE_VERSION,

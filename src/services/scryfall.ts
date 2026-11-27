@@ -1,6 +1,8 @@
 import { decodeScryfallCard, type ScryfallCard } from '../lib/scryfall'
-import { getCachedValue, setCachedValue } from '../lib/cache'
-import { fetchJson, HttpError, type CacheOptions } from './http'
+import { getCachedValue, getCacheGeneration, setCachedValue } from '../lib/cache'
+import { fetchJson, type CacheOptions } from './http'
+import { NetworkError, ValidationError } from '../lib/appError'
+import { getGlobalErrorLogger } from '../lib/errorLogger'
 import {
   RuntimeDataError,
   finiteNumber,
@@ -128,6 +130,32 @@ const scheduleScryfallRequest = <T>(
   return rejectWhenAborted(scheduled, signal)
 }
 
+const scheduleScryfallAttempt = <T>(
+  attempt: () => Promise<T>,
+  signal?: AbortSignal
+) => scheduleScryfallRequest(async () => {
+  try {
+    return await attempt()
+  } catch (error) {
+    if (error instanceof NetworkError && error.code === 'http-error' && error.metadata.status === 429) {
+      const wrapped = new ScryfallRequestError(
+        'Scryfall is rate-limiting this connection. Wait before trying again.',
+        'rate-limit',
+        error
+      )
+      startCooldown(
+        wrapped,
+        Math.max(
+          RATE_LIMIT_COOLDOWN_MS,
+          typeof error.metadata.retryAfterMs === 'number' ? error.metadata.retryAfterMs : 0
+        )
+      )
+      throw wrapped
+    }
+    throw error
+  }
+}, signal)
+
 const decodeCardResponse = (value: unknown, path = 'card') => {
   if (isRecord(value) && value.object === 'error') {
     throw new RuntimeDataError(
@@ -175,96 +203,126 @@ const decodeSearchPage = (value: unknown): SearchPage => {
 const fetchScryfallJson = async <T>(
   url: string,
   decode: (value: unknown) => T,
-  options: { signal?: AbortSignal; cache?: CacheOptions } = {}
+  options: {
+    signal?: AbortSignal
+    cache?: CacheOptions
+    onStaleCache?: () => void
+    onAttempt?: () => void
+  } = {}
 ) => {
   throwIfAborted(options.signal)
   const cacheKey = options.cache?.key ?? url
+  const cacheGeneration = getCacheGeneration()
+  let staleCached: T | null = null
   if (options.cache?.enabled) {
-    const cached = getCachedValue(cacheKey, decode)
+    const cached = getCachedValue(cacheKey, decode, { preserveExpired: true })
     if (cached !== null) return cached
+    staleCached = getCachedValue(cacheKey, decode, { allowExpired: true })
   }
 
-  return scheduleScryfallRequest(async () => {
-    try {
-      const raw = await fetchJson<unknown>(url, {
-        signal: options.signal,
-        headers: { Accept: SCRYFALL_ACCEPT },
-      })
-      const decoded = decode(raw)
-      if (options.cache?.enabled) {
-        setCachedValue(
-          cacheKey,
-          decoded,
-          options.cache.ttlMs,
-          options.cache.maxEntries
-        )
-      }
-      return decoded
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') throw error
+  try {
+    const raw = await fetchJson<unknown>(url, {
+      signal: options.signal,
+      headers: { Accept: SCRYFALL_ACCEPT },
+      scheduleAttempt: scheduleScryfallAttempt,
+      onAttempt: options.onAttempt,
+    })
+    const decoded = decode(raw)
+    if (options.cache?.enabled) {
+      setCachedValue(
+        cacheKey,
+        decoded,
+        options.cache.ttlMs,
+        options.cache.maxEntries
+      )
+    }
+    return decoded
+  } catch (error) {
+    if (
+      (error instanceof Error || error instanceof DOMException) &&
+      error.name === 'AbortError'
+    ) throw error
 
-      if (error instanceof RuntimeDataError) {
-        throw new ScryfallRequestError(error.message, 'data', error)
+    if (error instanceof ValidationError) {
+      getGlobalErrorLogger().logError(error, 'scryfall-service', { url })
+      const cache = options.cache
+      if (
+        cache?.enabled &&
+        staleCached !== null &&
+        getCacheGeneration() === cacheGeneration
+      ) {
+        options.onStaleCache?.()
+        void (async () => {
+          const raw = await fetchJson<unknown>(url, {
+            headers: { Accept: SCRYFALL_ACCEPT },
+            scheduleAttempt: scheduleScryfallAttempt,
+          })
+          const refreshed = decode(raw)
+          if (getCacheGeneration() === cacheGeneration) {
+            setCachedValue(cacheKey, refreshed, cache.ttlMs, cache.maxEntries)
+          }
+        })().catch((refreshError: unknown) => {
+          const loggedError = refreshError instanceof Error
+            ? refreshError
+            : new Error(String(refreshError))
+          getGlobalErrorLogger().logError(loggedError, 'scryfall-cache-refresh', { url })
+        })
+        return staleCached
       }
+      throw error
+    }
 
-      if (error instanceof HttpError && error.status === 429) {
-        const wrapped = new ScryfallRequestError(
-          'Scryfall is rate-limiting this connection. Wait before trying again.',
-          'rate-limit',
-          error
-        )
-        startCooldown(
-          wrapped,
-          Math.max(RATE_LIMIT_COOLDOWN_MS, error.retryAfterMs ?? 0)
-        )
-        throw wrapped
-      }
+    if (isScryfallRequestError(error)) throw error
 
-      if (error instanceof TypeError) {
-        throw new ScryfallRequestError(
-          'Scryfall could not be reached. Check your connection and try again.',
-          'network',
-          error
-        )
-      }
-
+    if (error instanceof NetworkError && error.code === 'connection-failed') {
       throw new ScryfallRequestError(
-        error instanceof Error ? error.message : 'Scryfall request failed.',
-        'request',
+        'Scryfall could not be reached. Check your connection and try again.',
+        'network',
         error
       )
     }
-  }, options.signal)
+
+    throw new ScryfallRequestError(
+      error instanceof Error ? error.message : 'Scryfall request failed.',
+      'request',
+      error
+    )
+  }
 }
 
 export const fetchRandomCard = async (
   query: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onAttempt?: () => void
 ): Promise<ScryfallCard> => {
   const url = `https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`
-  return fetchScryfallJson(url, decodeCardResponse, { signal })
+  return fetchScryfallJson(url, decodeCardResponse, { signal, onAttempt })
 }
 
 export const fetchCardByExactName = async (
   name: string,
   signal?: AbortSignal,
-  cache?: CacheOptions
+  cache?: CacheOptions,
+  onStaleCache?: () => void,
+  onAttempt?: () => void
 ): Promise<ScryfallCard> => {
   const url = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`
-  return fetchScryfallJson(url, decodeCardResponse, { signal, cache })
+  return fetchScryfallJson(url, decodeCardResponse, { signal, cache, onStaleCache, onAttempt })
 }
 
 const fetchSearchPage = async (
   url: string,
-  signal?: AbortSignal
-): Promise<SearchPage> => fetchScryfallJson(url, decodeSearchPage, { signal })
+  signal?: AbortSignal,
+  onAttempt?: () => void
+): Promise<SearchPage> => fetchScryfallJson(url, decodeSearchPage, { signal, onAttempt })
 
 export const fetchRankedRandomCard = async (
   query: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onAttempt?: () => void
 ): Promise<ScryfallCard> => {
   const baseUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=edhrec&dir=asc`
-  const firstData = await fetchSearchPage(baseUrl, signal)
+  const firstData = await fetchSearchPage(baseUrl, signal, onAttempt)
   const totalCards = firstData.total_cards ?? firstData.data.length
   if (!totalCards || totalCards <= 0) {
     throw new Error('No cards available for this filter.')
@@ -279,7 +337,7 @@ export const fetchRankedRandomCard = async (
   const pageData =
     randomPage === 1
       ? firstData
-      : await fetchSearchPage(`${baseUrl}&page=${randomPage}`, signal)
+      : await fetchSearchPage(`${baseUrl}&page=${randomPage}`, signal, onAttempt)
 
   const card = pageData.data[pageIndex]
   if (!card) {

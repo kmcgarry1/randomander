@@ -94,6 +94,31 @@ describe('draw workflow budget, deadline, and provenance', () => {
     expect(store.history).toEqual([])
   })
 
+  it('counts transport retries against the shared draw budget', async () => {
+    const incompatiblePartner = createCard('same-partner', {
+      name: 'Same Partner',
+      oracle_text: 'Partner',
+    })
+    let attempts = 0
+    const fetchMock = vi.fn(() => {
+      attempts += 1
+      return Promise.resolve(attempts <= 22
+        ? response(incompatiblePartner)
+        : response({}, 503))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useRandomanderStore()
+    store.mode = 'partner'
+    store.options.twoChoices = true
+
+    const draw = store.randomize()
+    await vi.runAllTimersAsync()
+    await draw
+
+    expect(fetchMock).toHaveBeenCalledTimes(DRAW_WORKFLOW_CALL_BUDGET)
+    expect(store.errorMessage).toMatch(/no legal match.*24-call limit/i)
+  })
+
   it('enforces one end-to-end deadline through the transport abort signal', async () => {
     const fetchMock = vi.fn(
       () => new Promise<Response>(() => undefined)
@@ -122,7 +147,7 @@ describe('draw workflow budget, deadline, and provenance', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(response(primary))
-      .mockResolvedValueOnce(response({}, 500))
+      .mockResolvedValueOnce(response({}, 404))
     vi.stubGlobal('fetch', fetchMock)
 
     const store = useRandomanderStore()
@@ -132,7 +157,7 @@ describe('draw workflow budget, deadline, and provenance', () => {
     await draw
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(store.errorMessage).toMatch(/scryfall upstream failure.*500/i)
+    expect(store.errorMessage).toMatch(/scryfall upstream failure.*404/i)
   })
 
   it.each([

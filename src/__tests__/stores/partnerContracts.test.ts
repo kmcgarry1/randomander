@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ScryfallCard } from '../../lib/scryfall'
-import { clearCache } from '../../lib/cache'
+import { clearCache, setCachedValue } from '../../lib/cache'
 import { useRandomanderStore } from '../../stores/randomander'
 
 const createCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
@@ -31,8 +31,36 @@ describe('partner completion contracts', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.useRealTimers()
     clearCache()
     localStorage.clear()
+  })
+
+  it('marks a completed named pair when the partner came from stale cache', async () => {
+    vi.useFakeTimers()
+    const partner = createCard({
+      id: 'gorm',
+      name: 'Gorm the Great',
+      scryfall_uri: 'https://scryfall.com/card/test/gorm',
+      oracle_text: 'Partner with Virtus the Veiled',
+      color_identity: ['G'],
+    })
+    const url = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(partner.name)}`
+    setCachedValue(url, partner, 1_000, 10)
+    await vi.advanceTimersByTimeAsync(1_000)
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(response({ id: 'invalid' }))
+      .mockResolvedValueOnce(response(partner)))
+    const store = useRandomanderStore()
+    store.cacheSettings.enabled = true
+    store.cards = [createCard()]
+
+    const draw = store.randomizePartnerForPrimary()
+    await vi.runAllTimersAsync()
+    await draw
+
+    expect(store.cards.map(card => card.id)).toEqual(['virtus', 'gorm'])
+    expect(store.showingCachedData).toBe(true)
   })
 
   it('does not complete a named pair when the partner exceeds the deck limit', async () => {
