@@ -57,7 +57,7 @@
 ## 11. Documentation
 
 - [ ] 11.1 Create `docs/error-handling.md` documenting error class hierarchy, recovery strategies, and logging; include examples of handling network, validation, storage, and cache errors; verify documentation is consistent with code and specs
-- [ ] 11.2 Add JSDoc comments to all public error classes and functions in appError.ts, errorContext.ts, and errorLogger.ts; verify documentation renders correctly
+- [x] 11.2 Add JSDoc comments to all public error classes and functions in appError.ts, errorContext.ts, and errorLogger.ts; verify documentation renders correctly
 
 ## 12. Verification and Cleanup
 

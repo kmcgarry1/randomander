@@ -112,7 +112,7 @@ export function createErrorContext(
 /**
  * Adds a breadcrumb to an ErrorContext.
  *
- * @param context The error context to modify.
+ * @param context The error context whose existing breadcrumb array is updated.
  * @param breadcrumb The breadcrumb to add.
  * @returns The modified context.
  */
@@ -130,7 +130,7 @@ export function addBreadcrumb(
 }
 
 /**
- * Merges two ErrorContext objects, with later overwriting earlier.
+ * Shallow-merge metadata and concatenate breadcrumbs; later fields win.
  *
  * @param context1 First context.
  * @param context2 Second context (wins in case of conflicts).

@@ -29,6 +29,10 @@ export interface ErrorLoggerOptions {
   enableBufferLogging?: boolean;
 }
 
+/**
+ * Logs errors to the console and an optional bounded, in-memory buffer.
+ * Entries are newest first; buffer and breadcrumbs are lost on reload.
+ */
 export class ErrorLogger {
   private buffer: LogEntry[] = [];
   private maxBufferSize: number;
@@ -44,14 +48,14 @@ export class ErrorLogger {
   }
 
   /**
-   * Set the current request ID for all subsequent logs
+   * Set the shared request ID used by subsequent logs until reset or replaced.
    */
   setRequestId(requestId: string): void {
     this.currentRequestId = requestId;
   }
 
   /**
-   * Generate a new request ID
+   * Generate and set a request ID for subsequent logs.
    */
   generateRequestId(): string {
     const id = generateUUID();
@@ -60,7 +64,7 @@ export class ErrorLogger {
   }
 
   /**
-   * Add a breadcrumb to track the execution path
+   * Add a breadcrumb, retaining the most recent 20 messages.
    */
   addBreadcrumb(message: string): void {
     this.breadcrumbs.push(message);
@@ -70,7 +74,8 @@ export class ErrorLogger {
   }
 
   /**
-   * Log an error with structured data
+   * Log an error using the current request ID or a newly generated ID.
+   * Supplied metadata overrides matching fields from an AppError.
    */
   logError(
     error: AppError | Error,
@@ -121,42 +126,42 @@ export class ErrorLogger {
   }
 
   /**
-   * Get all buffered log entries
+   * Get a shallow copy of buffered entries, newest first.
    */
   getBuffer(): LogEntry[] {
     return [...this.buffer];
   }
 
   /**
-   * Get a specific number of recent log entries
+   * Get up to `count` buffered entries, newest first.
    */
   getRecentLogs(count: number = 10): LogEntry[] {
     return this.buffer.slice(0, count);
   }
 
   /**
-   * Clear the log buffer
+   * Clear the log buffer without clearing breadcrumbs or the request ID.
    */
   clearBuffer(): void {
     this.buffer = [];
   }
 
   /**
-   * Clear breadcrumbs
+   * Clear breadcrumbs without clearing buffered entries.
    */
   clearBreadcrumbs(): void {
     this.breadcrumbs = [];
   }
 
   /**
-   * Export logs as JSON string
+   * Serialize the current buffer as a formatted JSON string.
    */
   exportLogsAsJson(): string {
     return JSON.stringify(this.buffer, null, 2);
   }
 
   /**
-   * Export logs as CSV (simple format)
+   * Export selected log fields as CSV, including escaped message quotes.
    */
   exportLogsAsCsv(): string {
     const headers = [
@@ -180,7 +185,7 @@ export class ErrorLogger {
   }
 
   /**
-   * Reset the logger to initial state
+   * Clear the buffer, breadcrumbs and current request ID.
    */
   reset(): void {
     this.clearBuffer();
@@ -193,7 +198,7 @@ export class ErrorLogger {
 let globalLogger: ErrorLogger | null = null;
 
 /**
- * Get or create the global error logger instance
+ * Get or create the global logger. Options apply only when it is first created.
  */
 export function getGlobalErrorLogger(
   options?: ErrorLoggerOptions
@@ -205,7 +210,7 @@ export function getGlobalErrorLogger(
 }
 
 /**
- * Reset the global logger instance
+ * Discard the global logger so the next lookup creates a new instance.
  */
 export function resetGlobalErrorLogger(): void {
   globalLogger = null;

@@ -80,7 +80,7 @@ export abstract class AppError extends Error {
   }
 
   /**
-   * Serialize error to JSON for logging and storage.
+   * Serialize error fields for logging and storage. The original error is omitted.
    */
   toJSON() {
     return {
@@ -174,27 +174,30 @@ export class CacheError extends AppError {
 }
 
 /**
- * Type guard for AppError.
+ * Check whether a value is an application error.
  */
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError
 }
 
 /**
- * Type guard for specific error types.
+ * Check whether a value is a network error.
  */
 export function isNetworkError(error: unknown): error is NetworkError {
   return error instanceof NetworkError
 }
 
+/** Check whether a value is a validation error. */
 export function isValidationError(error: unknown): error is ValidationError {
   return error instanceof ValidationError
 }
 
+/** Check whether a value is a storage error. */
 export function isStorageError(error: unknown): error is StorageError {
   return error instanceof StorageError
 }
 
+/** Check whether a value is a cache error. */
 export function isCacheError(error: unknown): error is CacheError {
   return error instanceof CacheError
 }
