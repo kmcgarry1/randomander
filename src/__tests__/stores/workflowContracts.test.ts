@@ -122,7 +122,7 @@ describe('draw workflow budget, deadline, and provenance', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(response(primary))
-      .mockResolvedValueOnce(response({}, 500))
+      .mockResolvedValueOnce(response({}, 404))
     vi.stubGlobal('fetch', fetchMock)
 
     const store = useRandomanderStore()
@@ -132,7 +132,7 @@ describe('draw workflow budget, deadline, and provenance', () => {
     await draw
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(store.errorMessage).toMatch(/scryfall upstream failure.*500/i)
+    expect(store.errorMessage).toMatch(/scryfall upstream failure.*404/i)
   })
 
   it.each([

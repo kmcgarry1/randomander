@@ -1,6 +1,7 @@
 import { decodeScryfallCard, type ScryfallCard } from '../lib/scryfall'
 import { getCachedValue, setCachedValue } from '../lib/cache'
-import { fetchJson, HttpError, type CacheOptions } from './http'
+import { fetchJson, type CacheOptions } from './http'
+import { NetworkError } from '../lib/appError'
 import {
   RuntimeDataError,
   finiteNumber,
@@ -215,7 +216,7 @@ const fetchScryfallJson = async <T>(
         throw new ScryfallRequestError(error.message, 'data', error)
       }
 
-      if (error instanceof HttpError && error.status === 429) {
+      if (error instanceof NetworkError && error.code === 'http-error' && error.metadata.status === 429) {
         const wrapped = new ScryfallRequestError(
           'Scryfall is rate-limiting this connection. Wait before trying again.',
           'rate-limit',
@@ -223,12 +224,15 @@ const fetchScryfallJson = async <T>(
         )
         startCooldown(
           wrapped,
-          Math.max(RATE_LIMIT_COOLDOWN_MS, error.retryAfterMs ?? 0)
+          Math.max(
+            RATE_LIMIT_COOLDOWN_MS,
+            typeof error.metadata.retryAfterMs === 'number' ? error.metadata.retryAfterMs : 0
+          )
         )
         throw wrapped
       }
 
-      if (error instanceof TypeError) {
+      if (error instanceof NetworkError && error.code === 'connection-failed') {
         throw new ScryfallRequestError(
           'Scryfall could not be reached. Check your connection and try again.',
           'network',

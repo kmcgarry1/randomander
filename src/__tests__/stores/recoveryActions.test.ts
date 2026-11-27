@@ -143,7 +143,7 @@ describe('Store Recovery Actions', () => {
       ]
       store.choices = [
         {
-          label: 'Choice 1',
+          id: 'choice-1',
           cards: [
             {
               id: 'choice1',

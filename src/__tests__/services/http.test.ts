@@ -5,7 +5,6 @@ import {
   HttpError,
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../../services/http'
-import { isNetworkError } from '../../lib/appError'
 
 const response = (json: () => Promise<unknown>, ok = true, status = 200) =>
   ({
@@ -38,12 +37,13 @@ describe('HTTP request deadlines', () => {
     const pending = fetchJson('https://example.test/slow', { timeoutMs: 1_000 })
     const rejection = expect(pending).rejects.toEqual(
       expect.objectContaining({
-        name: 'RequestTimeoutError',
-        timeoutMs: 1_000,
+        name: 'NetworkError',
+        code: 'timeout',
+        metadata: { timeoutMs: 1_000 },
       })
     )
 
-    await vi.advanceTimersByTimeAsync(1_000)
+    await vi.advanceTimersByTimeAsync(3_300)
     await rejection
     expect(requestSignal?.aborted).toBe(true)
   })
@@ -125,17 +125,15 @@ describe('HTTP error handling', () => {
   it('throws HttpError on 429 rate limit with Retry-After header', async () => {
     const headers = new Headers()
     headers.set('Retry-After', '60')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
+    const fetchMock = vi.fn(() =>
         Promise.resolve({
           ok: false,
           status: 429,
           headers,
           json: () => Promise.resolve({}),
         } as Response)
-      )
     )
+    vi.stubGlobal('fetch', fetchMock)
 
     await expect(fetchJson('https://example.test/429')).rejects.toMatchObject({
       name: 'NetworkError',
@@ -146,6 +144,7 @@ describe('HTTP error handling', () => {
         retryAfterMs: 60_000,
       },
     })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('handles Retry-After with invalid date', async () => {
@@ -506,14 +505,39 @@ describe('HTTP retry logic', () => {
     vi.unstubAllGlobals()
   })
 
-  it('retries on 503 Service Unavailable', async () => {
+  it('retries timed out requests and succeeds', async () => {
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => Promise.resolve(response(() => new Promise(() => undefined))))
+      .mockImplementationOnce(() => Promise.resolve(response(async () => ({ ok: true }))))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = fetchJson('https://example.test/retry-timeout', { timeoutMs: 1_000 })
+    await vi.advanceTimersByTimeAsync(1_100)
+    await expect(result).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('cancels a pending retry during backoff', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(response(async () => ({}), false, 503)))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+    const pending = fetchJson('https://example.test/abort-retry', { signal: controller.signal })
+    const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(0)
+    controller.abort()
+    await rejection
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([501, 503])('retries on HTTP %i', async (status) => {
     let attempts = 0
     vi.stubGlobal(
       'fetch',
       vi.fn(() => {
         attempts++
         if (attempts < 2) {
-          return Promise.resolve(response(() => Promise.resolve({}), false, 503))
+          return Promise.resolve(response(() => Promise.resolve({}), false, status))
         }
         return Promise.resolve(response(() => Promise.resolve({ ok: true }), true, 200))
       })
@@ -527,20 +551,20 @@ describe('HTTP retry logic', () => {
     expect(attempts).toBe(2)
   })
 
-  it('retries on 429 Rate Limit', async () => {
+  it('retries on 408 Request Timeout', async () => {
     let attempts = 0
     vi.stubGlobal(
       'fetch',
       vi.fn(() => {
         attempts++
         if (attempts < 3) {
-          return Promise.resolve(response(() => Promise.resolve({}), false, 429))
+          return Promise.resolve(response(() => Promise.resolve({}), false, 408))
         }
         return Promise.resolve(response(() => Promise.resolve({ ok: true }), true, 200))
       })
     )
 
-    const promise = fetchJson('https://example.test/retry-429', { timeoutMs: 10_000 })
+    const promise = fetchJson('https://example.test/retry-408', { timeoutMs: 10_000 })
     await vi.advanceTimersByTimeAsync(1000) // Advance for all attempts + retry delays
     const result = await promise
 

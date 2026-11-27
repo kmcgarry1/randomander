@@ -18,28 +18,28 @@
 ## 4. Cache Error Classification and Fallback
 
 - [x] 4.1 Update `src/lib/cache.ts` decode/encode functions to classify cache errors explicitly (throw `CacheError` with code `corrupted`, `quota-exceeded`, etc.) instead of generic errors; verify cache tests pass and error types are correct
-- [x] 4.2 Implement cache fallback logic in `src/services/scryfall.ts`: when validation fails, check cache for valid entry; if found, return cache and queue refresh; if not found, surface validation error; verify tests cover cache hit, cache miss, and refresh scenarios
+- [ ] 4.2 Implement cache fallback logic in `src/services/scryfall.ts`: when validation fails, check cache for valid entry; if found, return cache and queue refresh; if not found, surface validation error; verify tests cover cache hit, cache miss, and refresh scenarios
 
 ## 5. Error State Management in Pinia Store
 
 - [x] 5.1 Add `lastError` and `errorHistory` properties to `src/stores/randomander.ts`; add `setError()`, `clearError()`, `retryLastOperation()` actions; persist `lastError` to `randomander:state:v3:error` localStorage key; verify store tests confirm state is set, persisted, and cleared correctly
-- [x] 5.2 Update error handling in drawing workflow (`src/stores/drawWorkflow.ts`) to call store's `setError()` on failures; verify workflow tests confirm errors are captured and stored
+- [ ] 5.2 Update error handling in drawing workflow (`src/stores/drawWorkflow.ts`) to call store's `setError()` on failures; verify workflow tests confirm errors are captured and stored
 
 ## 6. Structured Logging
 
 - [x] 6.1 Create `src/lib/errorLogger.ts` with `ErrorLogger` class that emits structured logs to console (JSON format) and in-memory buffer (max 50 entries); include timestamp, error type, source, metadata, breadcrumbs; verify tests confirm logging, buffer management, and export functionality
-- [x] 6.2 Add request ID generation to `src/services/http.ts`: generate UUID for each request and include it in log entries; verify tests confirm all logs from same request share same request ID
+- [ ] 6.2 Add request ID generation to `src/services/http.ts`: generate UUID for each request and include it in log entries; verify tests confirm all logs from same request share same request ID
 - [x] 6.3 Integrate `ErrorLogger` into HTTP service, cache, and storage to emit logs on all errors; verify unit tests confirm logs are emitted with correct structure
 
 ## 7. User-Facing Error Messages
 
 - [x] 7.1 Create `src/lib/errorMessages.ts` with mapping from error type/code to user-friendly message template; include recovery action descriptions; verify message coverage for network, validation, storage, and cache errors
-- [x] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show error message banner with recovery buttons ([Retry], [Clear Cache], [Reset State]) based on `store.lastError`; verify error UI appears when error is set and disappears when cleared
+- [ ] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show error message banner with recovery buttons ([Retry], [Clear Cache], [Reset State]) based on `store.lastError`; verify error UI appears when error is set and disappears when cleared
 
 ## 8. Recovery Actions UI Integration
 
-- [x] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify tests confirm each action clears error state and triggers appropriate recovery logic
-- [x] 8.2 Connect error UI recovery buttons to store actions; verify clicking each button invokes the correct action and updates UI state (loading → success/error)
+- [ ] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify tests confirm each action clears error state and triggers appropriate recovery logic
+- [ ] 8.2 Connect error UI recovery buttons to store actions; verify clicking each button invokes the correct action and updates UI state (loading → success/error)
 
 ## 9. Persistence and Cross-Session Recovery
 

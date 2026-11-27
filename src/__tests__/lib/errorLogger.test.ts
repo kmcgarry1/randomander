@@ -38,8 +38,8 @@ describe('ErrorLogger', () => {
       const loggerWithConsole = new ErrorLogger({
         enableConsoleLogging: true,
       });
-      const networkError = new NetworkError('Connection failed', 'timeout', {
-        url: 'http://test.com',
+      const networkError = new NetworkError('timeout', 'Connection failed', {
+        sourceId: 'http://test.com',
       });
 
       loggerWithConsole.logError(networkError, 'test-source');
@@ -51,7 +51,7 @@ describe('ErrorLogger', () => {
     it('should set and use custom request ID', () => {
       const customId = 'custom-request-123';
       logger.setRequestId(customId);
-      const networkError = new NetworkError('Failed', 'timeout');
+      const networkError = new NetworkError('timeout', 'Failed');
 
       logger.logError(networkError, 'test-source');
       const logs = logger.getBuffer();
@@ -100,7 +100,7 @@ describe('ErrorLogger', () => {
       logger.addBreadcrumb('step 1');
       logger.addBreadcrumb('step 2');
 
-      const error = new NetworkError('Failed', 'timeout');
+      const error = new NetworkError('timeout', 'Failed');
       logger.logError(error, 'test-source');
 
       const logs = logger.getBuffer();
@@ -113,7 +113,7 @@ describe('ErrorLogger', () => {
         logger.addBreadcrumb(`step ${i}`);
       }
 
-      const error = new NetworkError('Failed', 'timeout');
+      const error = new NetworkError('timeout', 'Failed');
       logger.logError(error, 'test-source');
 
       const logs = logger.getBuffer();
@@ -126,7 +126,7 @@ describe('ErrorLogger', () => {
       logger.addBreadcrumb('step 1');
       logger.clearBreadcrumbs();
 
-      const error = new NetworkError('Failed', 'timeout');
+      const error = new NetworkError('timeout', 'Failed');
       logger.logError(error, 'test-source');
 
       const logs = logger.getBuffer();
@@ -327,7 +327,7 @@ describe('ErrorLogger', () => {
     it('should reset all state', () => {
       logger.setRequestId('test-id');
       logger.addBreadcrumb('step 1');
-      logger.logError(new NetworkError('Error', 'timeout'), 'source');
+      logger.logError(new NetworkError('timeout', 'Error'), 'source');
 
       expect(logger.getBuffer().length).toBe(1);
 
@@ -361,7 +361,7 @@ describe('ErrorLogger', () => {
 
     it('should reset global logger instance', () => {
       const logger1 = getGlobalErrorLogger({ enableConsoleLogging: false });
-      logger1.logError(new NetworkError('Error', 'timeout'), 'source');
+      logger1.logError(new NetworkError('timeout', 'Error'), 'source');
       expect(logger1.getBuffer().length).toBe(1);
 
       resetGlobalErrorLogger();
@@ -403,7 +403,7 @@ describe('ErrorLogger', () => {
         enableConsoleLogging: false,
       });
 
-      const error = new NetworkError('Test error', 'timeout');
+      const error = new NetworkError('timeout', 'Test error');
       loggerNoBuffer.logError(error, 'test-source');
 
       expect(loggerNoBuffer.getBuffer().length).toBe(0);
