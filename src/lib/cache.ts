@@ -22,7 +22,7 @@ export type CacheState = {
   entries: Record<string, CacheEntry>
 }
 
-const CACHE_KEY = 'randomander:cache:v1'
+export const CACHE_KEY = 'randomander:cache:v1'
 export const DEFAULT_CACHE_MAX_BYTES = 1_500_000
 
 const emptyCache = (): CacheState => ({
