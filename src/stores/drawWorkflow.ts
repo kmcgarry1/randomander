@@ -1,7 +1,5 @@
 import { DEFAULT_REQUEST_TIMEOUT_MS } from '../services/http'
 
-// Ranked Scryfall candidates can require two transport calls, so callers reserve
-// two units for them. This keeps the actual workflow-wide request count bounded.
 export const DRAW_WORKFLOW_CALL_BUDGET = 24
 
 // The caller deadline intentionally expires before a single transport timeout,

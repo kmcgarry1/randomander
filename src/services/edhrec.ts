@@ -300,7 +300,8 @@ const extractTags = (data: EdhrecResponse): EdhrecTag[] => {
 export const fetchCommanderMeta = async (
   slug: string,
   signal?: AbortSignal,
-  cache?: CacheOptions
+  cache?: CacheOptions,
+  onAttempt?: () => void
 ): Promise<EdhrecMeta> => {
   if (!isValidEdhrecIdentifier(slug)) {
     throw new RuntimeDataError(
@@ -317,7 +318,7 @@ export const fetchCommanderMeta = async (
   }
 
   // Normalize the large upstream document before it reaches persistent cache.
-  const data = decodeEdhrecResponse(await fetchJson<unknown>(url, { signal }))
+  const data = decodeEdhrecResponse(await fetchJson<unknown>(url, { signal, onAttempt }))
   const modernDeckCount = data.container?.json_dict?.card?.num_decks
   const deckCount =
     typeof modernDeckCount === 'number'

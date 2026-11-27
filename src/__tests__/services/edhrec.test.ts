@@ -19,6 +19,19 @@ beforeEach(() => {
 })
 
 describe('EDHREC commander metadata', () => {
+  it('counts each metadata transport retry', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(mockResponse({ num_decks: 42 }))
+    const onAttempt = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchCommanderMeta('test-commander', undefined, undefined, onAttempt))
+      .resolves.toMatchObject({ deckCount: 42 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(onAttempt).toHaveBeenCalledTimes(2)
+  })
+
   it('reads the modern deck count and returns only the first four modern themes', async () => {
     vi.stubGlobal(
       'fetch',
@@ -145,8 +158,9 @@ describe('EDHREC commander metadata', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
     const cache = { enabled: true, ttlMs: 60_000, maxEntries: 10 }
+    const onAttempt = vi.fn()
 
-    await expect(fetchCommanderMeta('test-commander', undefined, cache)).resolves.toEqual({
+    await expect(fetchCommanderMeta('test-commander', undefined, cache, onAttempt)).resolves.toEqual({
       deckCount: 12_345,
       tags: [
         {
@@ -157,9 +171,10 @@ describe('EDHREC commander metadata', () => {
         },
       ],
     })
-    await fetchCommanderMeta('test-commander', undefined, cache)
+    await fetchCommanderMeta('test-commander', undefined, cache, onAttempt)
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onAttempt).toHaveBeenCalledTimes(1)
     const persisted = localStorage.getItem('randomander:cache:v1') ?? ''
     expect(persisted).toContain('"deckCount":12345')
     expect(persisted).not.toContain('large_unused_payload')

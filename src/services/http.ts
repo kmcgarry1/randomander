@@ -9,11 +9,18 @@ export type CacheOptions = {
   key?: string
 }
 
+export type HttpAttemptScheduler = <T>(
+  attempt: () => Promise<T>,
+  signal?: AbortSignal
+) => Promise<T>
+
 type FetchJsonOptions = {
   signal?: AbortSignal
   cache?: CacheOptions
   headers?: HeadersInit
   timeoutMs?: number
+  scheduleAttempt?: HttpAttemptScheduler
+  onAttempt?: () => void
 }
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
@@ -87,6 +94,7 @@ async function retryAsync<T>(
     try {
       return await operation()
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err
       // Preserve the original error object
       lastError =
         err instanceof Error ? err : new Error(String(err))
@@ -198,6 +206,8 @@ export const fetchJson = async <T>(
     cache,
     headers,
     timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    scheduleAttempt,
+    onAttempt,
   }: FetchJsonOptions = {}
 ): Promise<T> => {
   // Generate unique request ID for correlation
@@ -208,11 +218,13 @@ export const fetchJson = async <T>(
     if (cached !== null) return cached
   }
 
-  // Wrap the entire request (including retries) in a retry wrapper
-  return retryAsync(
-    async () => {
-      const requestController = new AbortController()
-      let didTimeout = false
+  const executeAttempt = async () => {
+    if (signal?.aborted) {
+      throw new DOMException('The request was cancelled.', 'AbortError')
+    }
+    onAttempt?.()
+    const requestController = new AbortController()
+    let didTimeout = false
     const onCallerAbort = () => requestController.abort()
     if (signal?.aborted) onCallerAbort()
     else signal?.addEventListener('abort', onCallerAbort, { once: true })
@@ -298,7 +310,12 @@ export const fetchJson = async <T>(
     }
 
     return data
-  },
+  }
+
+  return retryAsync(
+    () => scheduleAttempt
+      ? scheduleAttempt(executeAttempt, signal)
+      : executeAttempt(),
     signal,
     RETRY_CONFIG.maxAttempts,
     RETRY_CONFIG.backoffMs,

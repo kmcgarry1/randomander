@@ -955,7 +955,6 @@ export const useRandomanderStore = defineStore('randomander', () => {
     }
     const cached = metaCache.get(slug)
     if (cached) return cached
-    workflow?.consumeCalls()
     if (!AUTOMATED_EDHREC_METADATA_ENABLED) {
       throw new Error('Automated EDHREC metadata is disabled in this build.')
     }
@@ -963,7 +962,8 @@ export const useRandomanderStore = defineStore('randomander', () => {
     const meta = await fetchCommanderMeta(
       slug,
       signal,
-      workflow?.config.cacheOptions ?? cacheOptions.value
+      workflow?.config.cacheOptions ?? cacheOptions.value,
+      workflow?.consumeCalls
     )
     metaCache.set(slug, meta)
     return meta
@@ -1019,10 +1019,9 @@ export const useRandomanderStore = defineStore('randomander', () => {
     )
 
     while (true) {
-      workflow.consumeCalls(useRankedRandom ? 2 : 1)
       const card = useRankedRandom
-        ? await fetchRankedRandomCard(constrainedQuery, workflow.signal)
-        : await fetchRandomCard(constrainedQuery, workflow.signal)
+        ? await fetchRankedRandomCard(constrainedQuery, workflow.signal, workflow.consumeCalls)
+        : await fetchRandomCard(constrainedQuery, workflow.signal, workflow.consumeCalls)
       if (
         !colorFilter.matchesCandidate(card, palette) ||
         !extraFilter(card)
@@ -1051,13 +1050,13 @@ export const useRandomanderStore = defineStore('randomander', () => {
           'Unable to find a named partner for this commander.'
         )
       }
-      workflow.consumeCalls()
       let usedStaleCache = false
       const partner = await fetchCardByExactName(
         partnerName,
         workflow.signal,
         config.cacheOptions,
-        () => { usedStaleCache = true }
+        () => { usedStaleCache = true },
+        workflow.consumeCalls
       )
       if (!(await passesDeckLimit(partner, workflow))) {
         throw new CandidateMismatchError(
