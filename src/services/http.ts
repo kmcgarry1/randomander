@@ -96,9 +96,14 @@ async function retryAsync<T>(
         throw lastError
       }
 
-      if (attempt === maxAttempts || !isRetryable(lastError)) {
+      const retryable = isRetryable(lastError)
+      if (attempt === maxAttempts || !retryable) {
         // Log error before throwing
         if (lastError instanceof NetworkError) {
+          if (attempt === maxAttempts && retryable) {
+            lastError.metadata.retryExhausted = true
+            lastError.metadata.attempts = attempt
+          }
           logger.logError(lastError, 'http-service', {
             attempt,
             maxAttempts,

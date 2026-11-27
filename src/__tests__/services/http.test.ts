@@ -39,7 +39,7 @@ describe('HTTP request deadlines', () => {
       expect.objectContaining({
         name: 'NetworkError',
         code: 'timeout',
-        metadata: { timeoutMs: 1_000 },
+        metadata: expect.objectContaining({ timeoutMs: 1_000 }),
       })
     )
 
@@ -633,10 +633,35 @@ describe('HTTP retry logic', () => {
       })
     )
 
-    const promise = fetchJson('https://example.test/max-retries', { timeoutMs: 10_000 }).catch(() => {})
+    const promise = fetchJson('https://example.test/max-retries', { timeoutMs: 10_000 })
+    const rejection = expect(promise).rejects.toMatchObject({
+      code: 'http-error',
+      metadata: { status: 500, retryExhausted: true, attempts: 3 },
+    })
     await vi.advanceTimersByTimeAsync(1000) // Advance for all attempts + retry delays
-    await promise
+    await rejection
 
     expect(attempts).toBe(3) // Should have tried 3 times
+  })
+
+  it('records exhaustion while retaining the final connection error', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+    const pending = fetchJson('https://example.test/offline')
+    const rejection = expect(pending).rejects.toMatchObject({
+      code: 'connection-failed',
+      metadata: { retryExhausted: true, attempts: 3 },
+    })
+
+    await vi.advanceTimersByTimeAsync(300)
+    await rejection
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not mark non-retryable errors as exhausted', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response(async () => ({}), false, 404))))
+    const error = await fetchJson('https://example.test/not-found').catch((err: unknown) => err)
+    expect(error).toMatchObject({ code: 'http-error', metadata: { status: 404 } })
+    expect(error).not.toHaveProperty('metadata.retryExhausted')
   })
 })
