@@ -8,7 +8,7 @@
 
 ## 2. HTTP Retry Logic
 
-- [ ] 2.1 Configure `src/services/http.ts` for at most 3 total attempts with 100ms and 200ms delays; retry timeouts, connection failures, 408 and 5xx, but not other 4xx including 429; verify each case and cancellable backoff
+- [x] 2.1 Configure `src/services/http.ts` for at most 3 total attempts with 100ms and 200ms delays; retry timeouts, connection failures, 408 and 5xx, but not other 4xx including 429; verify each case and cancellable backoff
 - [ ] 2.2 Update `retryAsync()` and `fetchJson()` to preserve the final classified network error code and record retry exhaustion in context; test exhaustion and successful retries
 
 ## 3. Runtime Validation Error Handling

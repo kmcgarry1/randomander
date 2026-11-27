@@ -151,6 +151,8 @@ describe('Scryfall request policy', () => {
       .mockRejectedValueOnce(
         new TypeError('NetworkError when attempting to fetch resource.')
       )
+      .mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource.'))
+      .mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource.'))
       .mockResolvedValueOnce(createCardResponse('online'))
     vi.stubGlobal('fetch', fetchMock)
     const { fetchRandomCard } = await import('../../services/scryfall')
@@ -160,16 +162,14 @@ describe('Scryfall request policy', () => {
       kind: 'network',
       recoverable: true,
     })
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(300)
     await firstRejection
 
     const recovered = fetchRandomCard('is:commander')
-    await vi.advanceTimersByTimeAsync(149)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(0)
 
     await expect(recovered).resolves.toMatchObject({ id: 'online' })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
   })
 
   it('cancels a queued request without sending it', async () => {
@@ -320,6 +320,26 @@ describe('Scryfall request policy', () => {
     const rejection = expect(pending).rejects.toMatchObject({ type: 'validation' })
     await vi.advanceTimersByTimeAsync(0)
     await rejection
+  })
+
+  it('uses validated stale data when fresh JSON cannot be parsed', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createCardResponse('stale'))
+      .mockResolvedValueOnce(new Response('invalid JSON', { status: 200 }))
+      .mockResolvedValueOnce(createCardResponse('refreshed'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchCardByExactName } = await import('../../services/scryfall')
+    const cache = { enabled: true, ttlMs: 1_000, maxEntries: 10 }
+
+    const first = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await first
+    await vi.advanceTimersByTimeAsync(1_000)
+    const fallback = fetchCardByExactName('Card', undefined, cache)
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(fallback).resolves.toMatchObject({ id: 'stale' })
+    await vi.advanceTimersByTimeAsync(150)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
   it('logs a failed background refresh without scheduling another refresh', async () => {

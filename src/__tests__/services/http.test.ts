@@ -517,6 +517,38 @@ describe('HTTP retry logic', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('retries connection failures with 100ms and 200ms backoff', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(response(async () => ({ ok: true })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const pending = fetchJson('https://example.test/connection-retry')
+    await vi.advanceTimersByTimeAsync(99)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(199)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(pending).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not retry malformed JSON as a connection failure', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(response(() => Promise.reject(new SyntaxError('Invalid JSON'))))
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchJson('https://example.test/bad-json')).rejects.toMatchObject({
+      type: 'validation',
+      code: 'malformed-data',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('cancels a pending retry during backoff', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(response(async () => ({}), false, 503)))
     vi.stubGlobal('fetch', fetchMock)

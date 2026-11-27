@@ -1,7 +1,7 @@
 import { decodeScryfallCard, type ScryfallCard } from '../lib/scryfall'
 import { getCachedValue, getCacheGeneration, setCachedValue } from '../lib/cache'
 import { fetchJson, type CacheOptions } from './http'
-import { NetworkError } from '../lib/appError'
+import { NetworkError, ValidationError } from '../lib/appError'
 import { getGlobalErrorLogger } from '../lib/errorLogger'
 import {
   RuntimeDataError,
@@ -208,7 +208,7 @@ const fetchScryfallJson = async <T>(
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw error
 
-      if (error instanceof RuntimeDataError) {
+      if (error instanceof ValidationError) {
         getGlobalErrorLogger().logError(error, 'scryfall-service', { url })
         const cache = options.cache
         if (

@@ -1,5 +1,5 @@
 import { getCachedValue, setCachedValue } from '../lib/cache'
-import { NetworkError } from '../lib/appError'
+import { NetworkError, ValidationError } from '../lib/appError'
 import { getGlobalErrorLogger } from '../lib/errorLogger'
 
 export type CacheOptions = {
@@ -20,12 +20,12 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
 /**
  * Retry configuration for HTTP requests.
- * Exponential backoff: 100ms, 200ms, 400ms (max 3 attempts)
+ * Exponential backoff: 100ms, 200ms (max 3 attempts)
  * Skip retry on 4xx errors (except 408 Timeout Request)
  */
 export const RETRY_CONFIG = {
   maxAttempts: 3,
-  backoffMs: [100, 200, 400],
+  backoffMs: [100, 200],
   retryableStatusCodes: new Set([408]),
 }
 
@@ -40,7 +40,7 @@ function isRetryableStatusCode(status: number): boolean {
 }
 
 /**
- * Determines if an error is retryable (timeout or specific HTTP status codes).
+ * Determines if an error is retryable (timeout, connection failure, or specific HTTP status codes).
  * Does NOT retry DOMException (AbortError) since those are user-initiated cancellations.
  * @internal
  */
@@ -57,7 +57,7 @@ function isRetryable(error: Error): boolean {
   }
   // NetworkError might have been converted from an HttpError - check if it was retryable
   if (error instanceof NetworkError) {
-    if (error.code === 'timeout') {
+    if (error.code === 'timeout' || error.code === 'connection-failed') {
       return true
     }
     if (error.code === 'http-error' && error.metadata?.status) {
@@ -262,6 +262,14 @@ export const fetchJson = async <T>(
       } catch (err) {
         if (err instanceof HttpError || err instanceof RequestTimeoutError) {
           throw toNetworkError(err, url, requestId)
+        }
+        if (err instanceof Error && err.name === 'AbortError') throw err
+        if (err instanceof SyntaxError) {
+          throw new ValidationError('malformed-data', 'The response is not valid JSON.', {
+            sourceId: url,
+            requestId,
+            originalError: err,
+          })
         }
         // Network error (e.g., fetch failed due to no connection)
         throw new NetworkError('connection-failed', String(err), {
