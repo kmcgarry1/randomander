@@ -74,7 +74,7 @@ export class ErrorLogger {
   }
 
   /**
-   * Log an error using the current request ID or a newly generated ID.
+   * Log an error using its request ID, the current ID, or a newly generated ID.
    * Supplied metadata overrides matching fields from an AppError.
    */
   logError(
@@ -82,7 +82,10 @@ export class ErrorLogger {
     source: string,
     metadata?: Record<string, unknown>
   ): void {
-    const requestId = this.currentRequestId || generateUUID();
+    const requestId =
+      (error instanceof AppError && error.requestId) ||
+      this.currentRequestId ||
+      generateUUID();
     const timestamp = new Date().toISOString();
 
     let errorType: string;

@@ -5,6 +5,7 @@ import {
   HttpError,
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from '../../services/http'
+import { getGlobalErrorLogger, resetGlobalErrorLogger } from '../../lib/errorLogger'
 
 const response = (json: () => Promise<unknown>, ok = true, status = 200) =>
   ({
@@ -88,6 +89,39 @@ describe('HTTP request deadlines', () => {
 describe('HTTP error handling', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  describe('HTTP attempt correlation', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+      resetGlobalErrorLogger()
+    })
+
+    it('records a distinct request ID for each failed attempt', async () => {
+      vi.useFakeTimers()
+      vi.spyOn(Math, 'random').mockReturnValue(0.5)
+      vi.spyOn(Date, 'now').mockReturnValue(1_000)
+      resetGlobalErrorLogger()
+      const logger = getGlobalErrorLogger({ enableConsoleLogging: false })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn()
+          .mockRejectedValueOnce(new TypeError('First connection failed'))
+          .mockRejectedValueOnce(new TypeError('Second connection failed'))
+          .mockResolvedValue(response(async () => ({ ok: true })))
+      )
+
+      const result = fetchJson('https://example.test/retry')
+      await vi.advanceTimersByTimeAsync(300)
+      await expect(result).resolves.toEqual({ ok: true })
+
+      const attempts = logger.getBuffer().filter((entry) => entry.source === 'http-service')
+      expect(attempts).toHaveLength(2)
+      expect(attempts[0].requestId).not.toBe(attempts[1].requestId)
+      expect(attempts.map((entry) => entry.metadata?.attempt)).toEqual([2, 1])
+    })
   })
 
   it('throws HttpError on 500 server error', async () => {

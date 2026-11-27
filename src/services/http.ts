@@ -84,8 +84,7 @@ async function retryAsync<T>(
   operation: () => Promise<T>,
   signal?: AbortSignal,
   maxAttempts: number = RETRY_CONFIG.maxAttempts,
-  backoffMs: number[] = RETRY_CONFIG.backoffMs,
-  requestId?: string
+  backoffMs: number[] = RETRY_CONFIG.backoffMs
 ): Promise<T> {
   let lastError: Error | undefined
   const logger = getGlobalErrorLogger()
@@ -105,19 +104,17 @@ async function retryAsync<T>(
       }
 
       const retryable = isRetryable(lastError)
-      if (attempt === maxAttempts || !retryable) {
-        // Log error before throwing
-        if (lastError instanceof NetworkError) {
-          if (attempt === maxAttempts && retryable) {
-            lastError.metadata.retryExhausted = true
-            lastError.metadata.attempts = attempt
-          }
-          logger.logError(lastError, 'http-service', {
-            attempt,
-            maxAttempts,
-            requestId,
-          })
+      if (lastError instanceof NetworkError) {
+        if (attempt === maxAttempts && retryable) {
+          lastError.metadata.retryExhausted = true
+          lastError.metadata.attempts = attempt
         }
+        logger.logError(lastError, 'http-service', {
+          attempt,
+          maxAttempts,
+        })
+      }
+      if (attempt === maxAttempts || !retryable) {
         throw lastError
       }
 
@@ -210,9 +207,6 @@ export const fetchJson = async <T>(
     onAttempt,
   }: FetchJsonOptions = {}
 ): Promise<T> => {
-  // Generate unique request ID for correlation
-  const requestId = generateRequestId()
-
   if (cache?.enabled) {
     const cached = getCachedValue<T>(cache.key ?? url)
     if (cached !== null) return cached
@@ -223,6 +217,7 @@ export const fetchJson = async <T>(
       throw new DOMException('The request was cancelled.', 'AbortError')
     }
     onAttempt?.()
+    const requestId = generateRequestId()
     const requestController = new AbortController()
     let didTimeout = false
     const onCallerAbort = () => requestController.abort()
@@ -318,8 +313,7 @@ export const fetchJson = async <T>(
       : executeAttempt(),
     signal,
     RETRY_CONFIG.maxAttempts,
-    RETRY_CONFIG.backoffMs,
-    requestId
+    RETRY_CONFIG.backoffMs
   )
 }
 
@@ -327,6 +321,9 @@ export const fetchJson = async <T>(
  * Generate a unique request ID for correlation and logging.
  * @internal
  */
+let requestSequence = 0
+
 function generateRequestId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  requestSequence += 1
+  return `${Date.now()}-${requestSequence.toString(36)}${Math.random().toString(36).slice(2, 11)}`
 }

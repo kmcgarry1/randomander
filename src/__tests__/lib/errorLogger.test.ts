@@ -48,6 +48,16 @@ describe('ErrorLogger', () => {
   });
 
   describe('request ID management', () => {
+    it('uses the request ID attached to an error instead of the shared ID', () => {
+      logger.setRequestId('shared-request');
+      logger.logError(
+        new NetworkError('timeout', 'Failed', { requestId: 'attempt-request' }),
+        'http-service'
+      );
+
+      expect(logger.getBuffer()[0].requestId).toBe('attempt-request');
+    });
+
     it('should set and use custom request ID', () => {
       const customId = 'custom-request-123';
       logger.setRequestId(customId);
