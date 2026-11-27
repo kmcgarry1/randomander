@@ -44,7 +44,11 @@ Create an `AppError` base class (extends `Error`) with subclasses for each error
 - Extend each built-in error type (TypeError, etc.): pollutes Error semantics; harder to track metadata
 
 ### Decision: Retry at HTTP Service Layer
-Implement automatic retry in `src/services/http.ts` `fetchJson()` for timeouts, connection failures, 5xx responses and HTTP 408. Use at most 3 total attempts with 100ms and 200ms backoff between attempts. Do not retry other 4xx responses, including 429; preserve the service's rate-limit handling. Cancellation interrupts backoff. When attempts are exhausted, preserve the final classified network error code and record retry exhaustion in its context.
+Implement automatic retry in `src/services/http.ts` `fetchJson()` for timeouts, connection failures, 5xx responses and HTTP 408. Use at most 3 total attempts with minimum backoffs of 100ms and 200ms after the first and second failures. Do not retry other 4xx responses, including 429. Cancellation interrupts backoff. When attempts are exhausted, preserve the final classified network error code and record retry exhaustion in its context.
+
+Every Scryfall HTTP attempt, including a retry or background refresh attempt, must pass through the global request-start pacing and cooldown policy: starts are at least 150ms apart, and a 429 blocks subsequent starts during cooldown. Service pacing may extend the HTTP backoff. Queue waits and backoff remain cancellable, and a draw's deadline continues to apply while waiting.
+
+Count each actual HTTP attempt belonging to a draw or follow-up workflow against its shared 24-call budget, including retries and both requests in a ranked lookup. Do not also charge the existing ranked-request reservations. Cache hits and attempts cancelled before starting consume no calls. If the budget or deadline prevents another attempt, stop the workflow with the corresponding reason instead of reporting retry exhaustion. A stale-cache background refresh is a separate operation outside the originating draw's budget and deadline; it still obeys Scryfall pacing, cooldown, and the HTTP attempt limit.
 
 **Rationale:** Network errors are transient; retrying at the HTTP layer is transparent to callers. Backoff avoids overwhelming the server.
 
@@ -98,8 +102,8 @@ Implement recovery actions (`retry`, `clearCache`, `resetState`, etc.) as Pinia 
 
 ## Risks / Trade-offs
 
-**[Risk]** Retry backoff may delay user action if network is intermittently down.
-→ **Mitigation:** Use short initial delay (100ms) and fast backoff; show loading state so users know operation is retrying. If retries fail, surface error immediately.
+**[Risk]** Retry backoff and upstream pacing may delay user action if network is intermittently down.
+→ **Mitigation:** Use short minimum backoffs, respect the workflow deadline, and show loading state so users know the operation is retrying. If retries fail, surface the error.
 
 **[Risk]** Cache fallback returns stale data, potentially hiding real API issues.
 → **Mitigation:** Always queue a background refresh and surface a warning badge to users ("Showing cached data"). Log validation error for diagnostics.

@@ -8,8 +8,9 @@
 
 ## 2. HTTP Retry Logic
 
-- [x] 2.1 Configure `src/services/http.ts` for at most 3 total attempts with 100ms and 200ms delays; retry timeouts, connection failures, 408 and 5xx, but not other 4xx including 429; verify each case and cancellable backoff
+- [ ] 2.1 Configure `src/services/http.ts` for at most 3 total attempts with minimum 100ms and 200ms backoffs; retry timeouts, connection failures, 408 and 5xx, but not other 4xx including 429; verify each case, cancellable backoff, and compatibility with upstream pacing
 - [x] 2.2 Update `retryAsync()` and `fetchJson()` to preserve the final classified network error code and record retry exhaustion in context; test exhaustion and successful retries
+- [ ] 2.3 Enforce global Scryfall 150ms request-start spacing and 429 cooldown for every attempt, including retries and background refreshes; count each actual draw or follow-up HTTP attempt once against its 24-call budget without double-counting ranked reservations, and preserve cancellation and deadline stop reasons. Test concurrent requests, retries, ranked lookups, cache hits, budget exhaustion, cancellation, deadline expiry, and separate background refreshes.
 
 ## 3. Runtime Validation Error Handling
 

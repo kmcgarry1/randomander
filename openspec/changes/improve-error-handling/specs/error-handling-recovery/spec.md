@@ -7,11 +7,11 @@ Defines automatic and user-initiated recovery strategies that allow the system t
 ## ADDED Requirements
 
 ### Requirement: Automatic retry with exponential backoff
-The system SHALL automatically retry timeouts, connection failures, HTTP 408 and 5xx responses, with at most 3 total attempts and delays of 100ms and 200ms between attempts. Other 4xx responses, including 429, SHALL NOT be retried automatically by the HTTP layer. Each retry SHALL use the same request parameters and timeout, and cancellation SHALL interrupt the wait.
+The system SHALL automatically retry timeouts, connection failures, HTTP 408 and 5xx responses, with at most 3 total attempts and minimum backoffs of 100ms and 200ms after the first and second failures. Upstream pacing MAY delay an attempt further. Other 4xx responses, including 429, SHALL NOT be retried automatically by the HTTP layer. Each retry SHALL use the same request parameters and timeout, and cancellation SHALL interrupt the wait.
 
 #### Scenario: First network error triggers automatic retry
 - **WHEN** an HTTP request fails with type `network`, code `timeout`
-- **THEN** the system waits 100ms and retries the same request
+- **THEN** the system waits at least 100ms and retries the same request when upstream pacing permits
 
 #### Scenario: Retry fails after max attempts
 - **WHEN** a retryable request fails on all 3 attempts
@@ -19,7 +19,7 @@ The system SHALL automatically retry timeouts, connection failures, HTTP 408 and
 
 #### Scenario: Backoff increases exponentially
 - **WHEN** the first or second attempt fails with a retryable error
-- **THEN** the next attempt waits 100ms or 200ms respectively before retrying
+- **THEN** the next attempt waits at least 100ms or 200ms respectively before retrying
 
 #### Scenario: Connection failure is retried
 - **WHEN** an attempt fails because a connection cannot be established
@@ -29,12 +29,39 @@ The system SHALL automatically retry timeouts, connection failures, HTTP 408 and
 - **WHEN** an attempt receives HTTP 429
 - **THEN** the HTTP layer surfaces the error without retrying so service-specific rate-limit handling can run
 
+### Requirement: Retries respect upstream and workflow limits
+Every Scryfall HTTP attempt SHALL obey the global minimum 150ms spacing between request starts and the Scryfall 429 cooldown. Every actual HTTP attempt in a draw or follow-up workflow, including retries, SHALL count once against its shared 24-call budget. The workflow deadline and cancellation SHALL apply while waiting for backoff or pacing.
+
+#### Scenario: Scryfall retry follows backoff and pacing
+- **WHEN** a Scryfall attempt fails immediately with a retryable error
+- **THEN** its retry starts no sooner than 100ms after the failure and no sooner than 150ms after the previous Scryfall request start
+
+#### Scenario: Concurrent Scryfall requests include retries
+- **WHEN** multiple Scryfall operations and retries are scheduled
+- **THEN** all request starts remain at least 150ms apart and no attempt starts during a 429 cooldown
+
+#### Scenario: Draw attempt budget is exhausted
+- **WHEN** a draw or follow-up workflow has started 24 HTTP attempts and needs another
+- **THEN** no further attempt starts and the workflow reports its budget stop reason rather than retry exhaustion
+
+#### Scenario: Cached or cancelled request consumes no call
+- **WHEN** a request is served from cache or cancelled before its HTTP attempt starts
+- **THEN** that request consumes no draw-workflow call budget
+
+#### Scenario: Workflow deadline expires while waiting
+- **WHEN** the draw deadline expires during retry backoff or upstream pacing
+- **THEN** the pending attempt does not start and the workflow reports its timeout stop reason
+
 ### Requirement: Cache-driven fallback for validation errors
 When validation fails on freshly fetched data, the system SHALL attempt to recover using validated cached data from a previous successful fetch, including expired data, while logging the validation error for diagnostics.
 
 #### Scenario: Validation error falls back to cache
 - **WHEN** JSON validation fails on new data and valid cached data exists
 - **THEN** the system returns the cached entry with stale-data provenance, warns the user, and queues one background refresh
+
+#### Scenario: Background refresh is a separate operation
+- **WHEN** a stale-cache fallback queues a background refresh
+- **THEN** its attempts use the normal HTTP attempt limit and Scryfall pacing and cooldown, without consuming the originating draw's call budget or deadline
 
 #### Scenario: Failed validation with no cached alternative
 - **WHEN** validation fails and no valid cache entry exists
