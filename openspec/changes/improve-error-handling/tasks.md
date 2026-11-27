@@ -35,22 +35,23 @@
 ## 7. User-Facing Error Messages
 
 - [x] 7.1 Create `src/lib/errorMessages.ts` with mapping from error type/code to user-friendly message template; include recovery action descriptions; verify message coverage for network, validation, storage, and cache errors
-- [ ] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show the error and only applicable, working recovery actions; verify error display, stale-cache warning, and persistence or cleanup failure warnings
+- [ ] 7.2 Add error display support to `src/features/draw/DrawView.vue` (or appropriate component): show the error and only applicable, working recovery actions; verify error display, stale-cache warning, storage conflict guidance, and persistence or cleanup failure warnings
 
 ## 8. Recovery Actions UI Integration
 
-- [ ] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify they perform the correct operation, clear errors only on success or dismissal, and preserve recovery state on failure
+- [ ] 8.1 Implement recovery action handlers in store: `retryLastOperation()`, `clearCacheAndRetry()`, `resetState()` as Pinia actions; verify they perform the correct operation only when recovery preconditions hold, clear errors only on success or dismissal, and preserve recovery state on failure
 - [ ] 8.2 Connect error UI recovery buttons to store actions; verify clicking each button invokes the correct action and updates UI state (loading → success/error)
 
 ## 9. Persistence and Cross-Session Recovery
 
-- [ ] 9.1 Persist and restore the last error and a validated, serializable operation descriptor with inputs for draw, partner/choice, and storage operations; test reload and replay of each operation and reject invalid descriptors without offering a broken retry
+- [ ] 9.1 Persist and restore the last error and a validated, serializable operation descriptor with inputs for draw, partner/choice, and storage operations, including affected-target baselines and known partial effects; test reload and replay of each operation and reject invalid descriptors without offering a broken retry
 - [ ] 9.2 Clear persisted recovery records from both backends after successful recovery or dismissal; verify reload cannot resurrect old records and cleanup failures are reported
 - [ ] 9.3 Use localStorage first and IndexedDB when localStorage fails; test fallback, reload, and explicit warning with in-memory recovery when both backends fail
+- [ ] 9.4 Guard storage recovery with target-baseline verification and coordination with app-tab writes; stop and report changed or unverifiable targets or unavailable coordination without overwriting current data. Test unchanged targets, cross-tab changes before and during replay, unavailable verification, and known partial effects.
 
 ## 10. Test Coverage and Verification
 
-- [ ] 10.1 Add integration tests in `src/__tests__/stores/errorHandling.integration.test.ts` covering error → store state → UI → retry → success or failure, including recovery after reload and persistence fallback; verify tests pass and coverage meets thresholds (>85% statements, >80% branches)
+- [ ] 10.1 Add integration tests in `src/__tests__/stores/errorHandling.integration.test.ts` covering error → store state → UI → retry → success or failure, including recovery after reload, storage conflicts, and persistence fallback; verify tests pass and coverage meets thresholds (>85% statements, >80% branches)
 - [ ] 10.2 Update existing tests in `src/__tests__/services/` and `src/__tests__/lib/` to verify error types are thrown correctly and error metadata is complete; verify all existing tests still pass
 
 ## 11. Documentation

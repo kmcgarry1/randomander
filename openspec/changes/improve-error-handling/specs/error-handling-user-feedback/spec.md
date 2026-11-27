@@ -40,6 +40,10 @@ When an error occurs, the UI SHALL present only applicable and working recovery 
 - **WHEN** user clicks [Retry] or [Clear Cache and Retry]
 - **THEN** the UI shows a loading state; on success, the previous operation resumes; on failure, a new error message appears
 
+#### Scenario: Storage recovery cannot safely replay
+- **WHEN** storage targets changed or cannot be verified or coordinated safely
+- **THEN** the UI explains that the old operation was not applied, does not offer a misleading retry, and directs the user to review current data and initiate a fresh action if desired
+
 ### Requirement: Recovery and stale-data warnings are visible
 The system SHALL clearly warn users when it displays stale cached data or cannot persist or clear recovery state.
 

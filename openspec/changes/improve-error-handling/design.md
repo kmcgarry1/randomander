@@ -61,6 +61,8 @@ Add a `lastError` property to `randomanderStore` (Pinia) to track the last error
 
 Write the recovery record to localStorage under `randomander:state:v3:error` first; if that fails, use IndexedDB. If both fail, retain the record in memory and notify the user that recovery across reloads is unavailable. On successful recovery or dismissal, clear persisted copies from both backends so an older error cannot reappear; report cleanup failures rather than silently claiming durable clearance. A failed recovery retains the error or replaces it with the new failure and its retryable operation.
 
+For storage operations, the descriptor also records a validated baseline for each affected target, including any known partial effects of the failed operation. Before replay, verify that the current targets still match that baseline. Coordinate the check and replay with other app-tab writes so a concurrent change cannot be overwritten between them. If a target has changed, its baseline cannot be verified, or safe coordination is unavailable, stop without applying the retry, preserve the current data and recovery state, and explain the conflict. The user may initiate a fresh operation against the current data.
+
 **Rationale:** UI needs access to current error state for display; persistence allows recovery across reloads. Centralizing in Pinia keeps state consistent.
 
 **Alternatives considered:**
@@ -113,6 +115,9 @@ Implement recovery actions (`retry`, `clearCache`, `resetState`, etc.) as Pinia 
 
 **[Risk]** Both recovery persistence backends can be unavailable or full.
 → **Mitigation:** Retain the current recovery state in memory and explicitly warn that it cannot be restored after reload.
+
+**[Risk]** Retrying an old storage operation could delete or overwrite newer data.
+→ **Mitigation:** Validate target baselines and coordinate with app-tab writes; refuse unsafe replay and report the conflict.
 
 ## Open Questions
 

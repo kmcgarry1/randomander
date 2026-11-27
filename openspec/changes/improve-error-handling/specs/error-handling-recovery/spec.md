@@ -76,11 +76,11 @@ The system SHALL track the last error state (type, code, timestamp, message, rec
 
 #### Scenario: User clears cache to recover from storage error
 - **WHEN** a storage `quota-exceeded` error occurs and user invokes recovery action `clear-cache`
-- **THEN** the system clears the response cache (not persisted state), retries the failed operation, and reports success or new error
+- **THEN** the system verifies the affected targets first; if safe, it clears the response cache (not persisted state), retries the failed operation, and reports success or the failure
 
 #### Scenario: Retry after user action
 - **WHEN** a previous error is recorded and user invokes `retry`
-- **THEN** the system reattempts the actual failed operation with its captured inputs
+- **THEN** the system reattempts the actual failed operation with its captured inputs when its recovery preconditions are satisfied
 
 #### Scenario: Recovery fails again
 - **WHEN** a recovery action fails
@@ -89,6 +89,29 @@ The system SHALL track the last error state (type, code, timestamp, message, rec
 #### Scenario: State reset clears error and cached results
 - **WHEN** user invokes recovery action `reset-state`
 - **THEN** the system clears the last error, clears response cache, and resets in-memory choice state; persisted History and Saved records remain intact
+
+### Requirement: Storage recovery protects changed data
+Before replaying a failed storage operation, the system SHALL verify affected targets against recorded baselines and coordinate the check and replay with other app-tab writes. If targets have changed, cannot be verified, or cannot be safely coordinated, it SHALL stop without overwriting current data, preserve recovery state, and report the issue.
+
+#### Scenario: Unchanged target is retried
+- **WHEN** the affected storage targets match their recorded baselines and replay can be coordinated safely
+- **THEN** the system retries the failed operation with its captured inputs
+
+#### Scenario: Another tab changes the target
+- **WHEN** a failed clear or save operation is retried after another app tab changes an affected target
+- **THEN** the system does not apply the old operation or overwrite the newer data and reports the conflict
+
+#### Scenario: A target cannot be verified
+- **WHEN** a target baseline is missing or invalid, or the current target cannot be read or safely coordinated
+- **THEN** the system does not replay the operation and reports that it cannot safely retry
+
+#### Scenario: A change races a retry
+- **WHEN** another app tab attempts to change an affected target during a storage retry
+- **THEN** the check and replay do not overwrite that intervening change
+
+#### Scenario: Failure left known partial effects
+- **WHEN** the failed operation already completed some storage changes before failing
+- **THEN** its recovery baseline accounts for those known effects before deciding whether replay is safe
 
 ### Requirement: Recovery state is persistent across reloads
 The system SHALL persist the last error and its validated operation descriptor so users can retry draw, partner/choice and storage operations after reload. It SHALL use localStorage first and IndexedDB if localStorage fails. Persisted copies SHALL be cleared after successful recovery or dismissal; cleanup failures SHALL be reported.
