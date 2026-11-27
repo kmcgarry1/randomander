@@ -131,6 +131,9 @@ const loadCache = (): CacheState => {
 }
 
 let cacheState: CacheState = loadCache()
+let cacheGeneration = 0
+
+export const getCacheGeneration = () => cacheGeneration
 
 const serializedBytes = (value: unknown): number => {
   try {
@@ -170,13 +173,16 @@ const isExpired = (entry: CacheEntry) => entry.expiresAt <= Date.now()
 
 export const getCachedValue = <T>(
   key: string,
-  decode?: (value: unknown) => T
+  decode?: (value: unknown) => T,
+  options?: { allowExpired?: boolean; preserveExpired?: boolean }
 ): T | null => {
   const entry = cacheState.entries[key]
   if (!entry) return null
-  if (isExpired(entry)) {
-    delete cacheState.entries[key]
-    persistCache()
+  if (isExpired(entry) && !options?.allowExpired) {
+    if (!options?.preserveExpired) {
+      delete cacheState.entries[key]
+      persistCache()
+    }
     return null
   }
   if (!decode) return entry.value as T
@@ -233,6 +239,7 @@ export const setCachedValue = (
 }
 
 export const clearCache = (): StorageResult => {
+  cacheGeneration += 1
   cacheState = emptyCache()
   return persistCache()
 }
@@ -242,6 +249,9 @@ export const clearCache = (): StorageResult => {
 // when deletion fails so the caller can safely retry.
 export const removeCache = (): StorageResult => {
   const result = removeStorage(CACHE_KEY)
-  if (result.ok) cacheState = emptyCache()
+  if (result.ok) {
+    cacheGeneration += 1
+    cacheState = emptyCache()
+  }
   return result
 }

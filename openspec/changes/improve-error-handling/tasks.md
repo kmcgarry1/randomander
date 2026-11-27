@@ -18,7 +18,7 @@
 ## 4. Cache Error Classification and Fallback
 
 - [x] 4.1 Update `src/lib/cache.ts` decode/encode functions to classify cache errors explicitly (throw `CacheError` with code `corrupted`, `quota-exceeded`, etc.) instead of generic errors; verify cache tests pass and error types are correct
-- [ ] 4.2 Implement cache fallback logic in `src/services/scryfall.ts`: when validation fails, check cache for valid entry; if found, return cache and queue refresh; if not found, surface validation error; verify tests cover cache hit, cache miss, and refresh scenarios
+- [x] 4.2 Implement cache fallback logic in `src/services/scryfall.ts`: when validation fails, check cache for valid entry; if found, return cache and queue refresh; if not found, surface validation error; verify tests cover cache hit, cache miss, and refresh scenarios
 
 ## 5. Error State Management in Pinia Store
 

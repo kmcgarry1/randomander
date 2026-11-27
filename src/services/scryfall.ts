@@ -1,7 +1,8 @@
 import { decodeScryfallCard, type ScryfallCard } from '../lib/scryfall'
-import { getCachedValue, setCachedValue } from '../lib/cache'
+import { getCachedValue, getCacheGeneration, setCachedValue } from '../lib/cache'
 import { fetchJson, type CacheOptions } from './http'
 import { NetworkError } from '../lib/appError'
+import { getGlobalErrorLogger } from '../lib/errorLogger'
 import {
   RuntimeDataError,
   finiteNumber,
@@ -176,13 +177,16 @@ const decodeSearchPage = (value: unknown): SearchPage => {
 const fetchScryfallJson = async <T>(
   url: string,
   decode: (value: unknown) => T,
-  options: { signal?: AbortSignal; cache?: CacheOptions } = {}
+  options: { signal?: AbortSignal; cache?: CacheOptions; onStaleCache?: () => void } = {}
 ) => {
   throwIfAborted(options.signal)
   const cacheKey = options.cache?.key ?? url
+  const cacheGeneration = getCacheGeneration()
+  let staleCached: T | null = null
   if (options.cache?.enabled) {
-    const cached = getCachedValue(cacheKey, decode)
+    const cached = getCachedValue(cacheKey, decode, { preserveExpired: true })
     if (cached !== null) return cached
+    staleCached = getCachedValue(cacheKey, decode, { allowExpired: true })
   }
 
   return scheduleScryfallRequest(async () => {
@@ -205,15 +209,31 @@ const fetchScryfallJson = async <T>(
       if (error instanceof Error && error.name === 'AbortError') throw error
 
       if (error instanceof RuntimeDataError) {
-        // Cache fallback: if validation fails but we have cached data, use it
-        if (options.cache?.enabled) {
-          const fallbackCached = getCachedValue(cacheKey)
-          if (fallbackCached !== null) {
-            // Queue a refresh attempt for next time, but return cached data
-            return fallbackCached as T
-          }
+        getGlobalErrorLogger().logError(error, 'scryfall-service', { url })
+        const cache = options.cache
+        if (
+          cache?.enabled &&
+          staleCached !== null &&
+          getCacheGeneration() === cacheGeneration
+        ) {
+          options.onStaleCache?.()
+          void scheduleScryfallRequest(async () => {
+            const raw = await fetchJson<unknown>(url, {
+              headers: { Accept: SCRYFALL_ACCEPT },
+            })
+            const refreshed = decode(raw)
+            if (getCacheGeneration() === cacheGeneration) {
+              setCachedValue(cacheKey, refreshed, cache.ttlMs, cache.maxEntries)
+            }
+          }).catch((refreshError: unknown) => {
+            const loggedError = refreshError instanceof Error
+              ? refreshError
+              : new Error(String(refreshError))
+            getGlobalErrorLogger().logError(loggedError, 'scryfall-cache-refresh', { url })
+          })
+          return staleCached
         }
-        throw new ScryfallRequestError(error.message, 'data', error)
+        throw error
       }
 
       if (error instanceof NetworkError && error.code === 'http-error' && error.metadata.status === 429) {
@@ -260,10 +280,11 @@ export const fetchRandomCard = async (
 export const fetchCardByExactName = async (
   name: string,
   signal?: AbortSignal,
-  cache?: CacheOptions
+  cache?: CacheOptions,
+  onStaleCache?: () => void
 ): Promise<ScryfallCard> => {
   const url = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`
-  return fetchScryfallJson(url, decodeCardResponse, { signal, cache })
+  return fetchScryfallJson(url, decodeCardResponse, { signal, cache, onStaleCache })
 }
 
 const fetchSearchPage = async (

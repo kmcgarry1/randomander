@@ -326,6 +326,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const sparkPalette = ref<string[] | null>(null)
   const isLoading = ref(false)
   const errorMessage = ref('')
+  const showingCachedData = ref(false)
   const lastError = ref<AppError | null>(null)
   const errorHistory = ref<AppError[]>([])
   const initialPersistenceFailure: StorageFailureKind | null =
@@ -340,6 +341,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
   const resultProvenance = shallowRef<ResultProvenance | null>(null)
 
   let activeWorkflow: ActiveDrawWorkflow | null = null
+  const workflowsUsingStaleCache = new WeakSet<ActiveDrawWorkflow>()
   let suppressQueryInvalidation = false
   let suppressPersistenceWatch = false
   let persistenceCoordinator: ReturnType<
@@ -913,6 +915,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     clearError()
     // Clear error state and reset to initial conditions
     errorMessage.value = ''
+    showingCachedData.value = false
     cards.value = []
     choices.value = []
     sparkPalette.value = null
@@ -934,6 +937,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     choices.value = []
     sparkPalette.value = null
     resultProvenance.value = null
+    showingCachedData.value = false
     errorMessage.value = ''
   }
 
@@ -1048,10 +1052,12 @@ export const useRandomanderStore = defineStore('randomander', () => {
         )
       }
       workflow.consumeCalls()
+      let usedStaleCache = false
       const partner = await fetchCardByExactName(
         partnerName,
         workflow.signal,
-        config.cacheOptions
+        config.cacheOptions,
+        () => { usedStaleCache = true }
       )
       if (!(await passesDeckLimit(partner, workflow))) {
         throw new CandidateMismatchError(
@@ -1070,6 +1076,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
           `That partner pair does not match ${pairColorFilter.ui.summary}.`
         )
       }
+      if (usedStaleCache) workflowsUsingStaleCache.add(workflow)
       return partner
     }
     if (partnerKind === 'choose_background') {
@@ -1380,6 +1387,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
         }),
       })
       errorMessage.value = ''
+      showingCachedData.value = false
       isLoading.value = false
     } finally {
       suppressQueryInvalidation = false
@@ -1452,6 +1460,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     assertCurrentWorkflow(workflow)
     const provenance = provenanceFromConfig(workflow.config)
     resultProvenance.value = provenance
+    showingCachedData.value = workflowsUsingStaleCache.has(workflow)
     cards.value = result.choices ? [] : result.cards
     choices.value = result.choices ?? []
     sparkPalette.value = result.sparkPalette ?? null
@@ -1563,6 +1572,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       choices.value = []
       sparkPalette.value = null
       resultProvenance.value = provenance
+      showingCachedData.value = workflowsUsingStaleCache.has(workflow)
       addHistory(buildRecord(cards.value, undefined, provenance))
     } catch (error) {
       handleWorkflowError(error, workflow, 'Unable to fetch a partner.')
@@ -1602,6 +1612,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       }
       const provenance = provenanceFromConfig(workflow.config)
       resultProvenance.value = provenance
+      showingCachedData.value = showingCachedData.value || workflowsUsingStaleCache.has(workflow)
       addHistory(buildRecord([], choices.value, provenance))
     } catch (error) {
       handleWorkflowError(error, workflow, 'Unable to fetch a partner.')
@@ -1623,6 +1634,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
       choices.value = []
       sparkPalette.value = null
       resultProvenance.value = provenance
+      showingCachedData.value = false
       addHistory(buildRecord(cards.value, undefined, provenance))
     } catch (error) {
       handleWorkflowError(error, workflow, 'Unable to fetch a commander.')
@@ -2036,6 +2048,7 @@ export const useRandomanderStore = defineStore('randomander', () => {
     sparkPalette,
     isLoading,
     errorMessage,
+    showingCachedData,
     lastError,
     errorHistory,
     persistenceError,

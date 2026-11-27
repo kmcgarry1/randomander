@@ -57,6 +57,7 @@ const {
   options,
   performance,
   saved,
+  showingCachedData,
 } = storeToRefs(store);
 
 const {
@@ -523,6 +524,13 @@ const handleErrorDismiss = () => {
       @recovery-action="handleErrorRecoveryAction"
       @dismiss="handleErrorDismiss"
     />
+    <p
+      v-if="showingCachedData"
+      role="status"
+      class="mb-4 rounded-lg bg-[var(--md-sys-color-secondary-container)] p-3 text-sm text-[var(--md-sys-color-on-secondary-container)]"
+    >
+      Showing cached data while fresh card data is unavailable.
+    </p>
     
     <header class="mb-4 flex items-end justify-between gap-4 sm:mb-6 sm:gap-8">
       <div class="max-w-2xl">
